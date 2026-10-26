@@ -260,15 +260,21 @@ DECLARE
   v_tokens INT;
   v_elapsed INT;
 BEGIN
+  -- Input validation guards
+  IF p_key IS NULL OR length(trim(p_key)) = 0 THEN
+    RAISE EXCEPTION 'INVALID_ARGUMENT: Rate limit key cannot be null or empty.';
+  END IF;
+  IF p_max_tokens <= 0 OR p_refill_seconds <= 0 OR p_cost <= 0 THEN
+    RAISE EXCEPTION 'INVALID_ARGUMENT: Rate limit parameters must be positive integers.';
+  END IF;
+
+  -- Atomic initialization: ensures row exists without race conditions on simultaneous first requests
+  INSERT INTO public.rate_limits (key, tokens, last_refilled_at, expires_at)
+  VALUES (p_key, p_max_tokens, v_now, v_now + (p_refill_seconds || ' seconds')::INTERVAL)
+  ON CONFLICT (key) DO NOTHING;
+
   -- Row-level lock to prevent concurrency race conditions across serverless instances
   SELECT * INTO v_record FROM public.rate_limits WHERE key = p_key FOR UPDATE;
-
-  IF NOT FOUND THEN
-    INSERT INTO public.rate_limits (key, tokens, last_refilled_at, expires_at)
-    VALUES (p_key, p_max_tokens - p_cost, v_now, v_now + (p_refill_seconds || ' seconds')::INTERVAL);
-    RETURN QUERY SELECT true, 0;
-    RETURN;
-  END IF;
 
   -- Refill calculation based on elapsed time
   v_elapsed := EXTRACT(EPOCH FROM (v_now - v_record.last_refilled_at))::INT;
@@ -349,6 +355,15 @@ DECLARE
   v_new_id UUID;
 BEGIN
   -- 1. Input restriction & validation checks
+  IF p_idempotency_key IS NULL THEN
+    RAISE EXCEPTION 'INVALID_INPUT: Idempotency key cannot be null.';
+  END IF;
+  IF p_request_payload_hash IS NULL OR length(p_request_payload_hash) <> 64 THEN
+    RAISE EXCEPTION 'INVALID_INPUT: Request payload hash must be a 64-character SHA-256 hex string.';
+  END IF;
+  IF p_submission_ip_hash IS NULL OR length(p_submission_ip_hash) <> 64 THEN
+    RAISE EXCEPTION 'INVALID_INPUT: Submission IP hash must be a 64-character SHA-256 hex string.';
+  END IF;
   IF length(trim(p_business_name)) < 2 OR length(p_business_name) > 200 THEN
     RAISE EXCEPTION 'INVALID_INPUT: Business name must be between 2 and 200 characters.';
   END IF;
@@ -459,7 +474,7 @@ BEGIN
     'quotation_request',
     v_new_id,
     'submitted',
-    'public_rpc',
+    'server_api',
     p_submission_ip_hash,
     jsonb_build_object(
       'reference_number', v_ref,
@@ -480,17 +495,19 @@ ALTER FUNCTION public.submit_quotation_request(
   BOOLEAN, VARCHAR(64), TEXT, VARCHAR(50)
 ) OWNER TO postgres;
 
+-- Server-only RPC: Completely revoked from public and anonymous callers to ensure all
+-- submissions traverse Next.js rate-limiting, honeypot bot trap, and edge IP extraction.
 REVOKE ALL ON FUNCTION public.submit_quotation_request(
   UUID, VARCHAR(64), TEXT, TEXT, TEXT, TEXT, TEXT,
   public.service_category_enum, TEXT, TEXT, TEXT, TEXT, TEXT,
   BOOLEAN, VARCHAR(64), TEXT, VARCHAR(50)
-) FROM PUBLIC;
+) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.submit_quotation_request(
   UUID, VARCHAR(64), TEXT, TEXT, TEXT, TEXT, TEXT,
   public.service_category_enum, TEXT, TEXT, TEXT, TEXT, TEXT,
   BOOLEAN, VARCHAR(64), TEXT, VARCHAR(50)
-) TO anon, authenticated, service_role;
+) TO service_role;
 
 -- ==============================================================================
 -- 7. ROW LEVEL SECURITY (RLS) POLICIES
@@ -521,6 +538,10 @@ CREATE POLICY "Only active admins can update staff profiles"
 CREATE POLICY "Deny delete on staff profiles"
   ON public.staff_profiles FOR DELETE TO authenticated
   USING (false);
+
+CREATE POLICY "Deny insert on staff profiles for authenticated"
+  ON public.staff_profiles FOR INSERT TO authenticated
+  WITH CHECK (false);
 
 -- ------------------------------------------------------------------------------
 -- customers RLS
@@ -582,6 +603,14 @@ CREATE POLICY "Deny mutation on audit_logs via RLS"
   ON public.audit_logs FOR UPDATE TO authenticated
   USING (false);
 
+CREATE POLICY "Deny delete on audit_logs via RLS"
+  ON public.audit_logs FOR DELETE TO authenticated
+  USING (false);
+
+CREATE POLICY "Deny insert on audit_logs for authenticated"
+  ON public.audit_logs FOR INSERT TO authenticated
+  WITH CHECK (false);
+
 -- ==============================================================================
 -- 8. TABLE PERMISSIONS & GRANTS
 -- ==============================================================================
@@ -606,4 +635,7 @@ GRANT ALL ON public.customers TO service_role;
 GRANT ALL ON public.quotation_requests TO service_role;
 GRANT ALL ON public.rate_limits TO service_role;
 GRANT SELECT, INSERT ON public.audit_logs TO service_role;
-GRANT USAGE, SELECT ON SEQUENCE public.quotation_request_seq TO anon, authenticated, service_role;
+
+-- Revoke sequence permissions from anonymous and public callers; grant exclusively to service_role
+REVOKE ALL ON SEQUENCE public.quotation_request_seq FROM PUBLIC, anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.quotation_request_seq TO service_role;

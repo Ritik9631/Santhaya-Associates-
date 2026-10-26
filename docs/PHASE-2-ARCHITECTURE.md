@@ -553,11 +553,11 @@ ALTER FUNCTION public.submit_quotation_request(
 ) OWNER TO postgres;
 
 -- Explicit privilege grants:
-REVOKE ALL ON FUNCTION public.submit_quotation_request FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.submit_quotation_request TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.submit_quotation_request FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.submit_quotation_request TO service_role;
 ```
 
-Direct table permissions on `quotation_requests`, `customers`, and `audit_logs` remain **completely revoked** from `anon` and `authenticated`. This delivers true defense-in-depth and least privilege.
+Direct table permissions on `quotation_requests`, `customers`, and `audit_logs` remain **completely revoked** from `anon` and `authenticated`. Furthermore, anonymous callers cannot invoke `submit_quotation_request` directly via PostgREST; all requests must traverse the Next.js API Route Handler where bot protection, Vercel IP extraction, and atomic rate limiting are enforced.
 
 ---
 
@@ -693,22 +693,31 @@ CREATE POLICY "Deny all delete on quotation_requests"
     v_tokens INT;
     v_elapsed INT;
   BEGIN
-    SELECT * INTO v_record FROM public.rate_limits WHERE key = p_key FOR UPDATE;
-
-    IF NOT FOUND THEN
-      INSERT INTO public.rate_limits (key, tokens, last_refilled_at, expires_at)
-      VALUES (p_key, p_max_tokens - p_cost, v_now, v_now + (p_refill_seconds || ' seconds')::INTERVAL);
-      RETURN QUERY SELECT true, 0;
-      RETURN;
+    -- Input validation guards
+    IF p_key IS NULL OR length(trim(p_key)) = 0 THEN
+      RAISE EXCEPTION 'INVALID_ARGUMENT: Rate limit key cannot be null or empty.';
+    END IF;
+    IF p_max_tokens <= 0 OR p_refill_seconds <= 0 OR p_cost <= 0 THEN
+      RAISE EXCEPTION 'INVALID_ARGUMENT: Rate limit parameters must be positive integers.';
     END IF;
 
-    -- Refill calculation
+    -- Atomic initialization: ensures row exists without race conditions on simultaneous first requests
+    INSERT INTO public.rate_limits (key, tokens, last_refilled_at, expires_at)
+    VALUES (p_key, p_max_tokens, v_now, v_now + (p_refill_seconds || ' seconds')::INTERVAL)
+    ON CONFLICT (key) DO NOTHING;
+
+    -- Row-level lock to prevent concurrency race conditions across serverless instances
+    SELECT * INTO v_record FROM public.rate_limits WHERE key = p_key FOR UPDATE;
+
+    -- Refill calculation based on elapsed time
     v_elapsed := EXTRACT(EPOCH FROM (v_now - v_record.last_refilled_at))::INT;
     v_tokens := LEAST(p_max_tokens, v_record.tokens + (v_elapsed * p_max_tokens / p_refill_seconds));
 
     IF v_tokens >= p_cost THEN
       UPDATE public.rate_limits
-      SET tokens = v_tokens - p_cost, last_refilled_at = v_now, expires_at = v_now + (p_refill_seconds || ' seconds')::INTERVAL
+      SET tokens = v_tokens - p_cost,
+          last_refilled_at = v_now,
+          expires_at = v_now + (p_refill_seconds || ' seconds')::INTERVAL
       WHERE key = p_key;
       RETURN QUERY SELECT true, 0;
     ELSE
