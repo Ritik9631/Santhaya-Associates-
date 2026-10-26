@@ -164,11 +164,13 @@ Maintains atomic, distributed rate limiting directly in PostgreSQL to prevent ra
 - **Atomic Procedure:**
   - Handled via `public.check_rate_limit(p_key TEXT, p_max_tokens INT, p_refill_seconds INT, p_cost INT)` which locks the row (`FOR UPDATE`), refills tokens based on elapsed time, and returns an atomic boolean and remaining retry window in a single transaction.
 
-#### 5. `audit_logs` (Phase 2 Immediate — True Immutability Safeguards)
+#### 5. `audit_logs` (Phase 2 Immediate — Operational Tamper-Resistance)
 Immutable audit trail recording state transitions, security events, and administrative edits.
 
-- **Immutability Vulnerability Analysis:**
-  - In PostgreSQL / Supabase, Row Level Security (RLS) policies are **bypassed by the `service_role` and table owners**. Therefore, RLS alone cannot guarantee immutability against privileged roles or programmatic bugs.
+- **Tamper-Resistance Scope & Realistic Boundary:**
+  - In PostgreSQL / Supabase, Row Level Security (RLS) policies are bypassed by the `service_role` and table owners.
+  - To prevent tampering by ordinary users, application logic bugs, and compromised clients, database-level triggers (`BEFORE UPDATE OR DELETE OR TRUNCATE`) and explicit `REVOKE` statements are enforced.
+  - **Important Clarification on Immutability:** These triggers and grant revocations provide robust operational tamper-resistance against normal application workflows and standard database roles. They do **not** provide absolute mathematical protection against database superusers (e.g. `postgres` superuser role or cloud platform administrators) who inherently possess root DDL/DML capabilities to disable triggers. Complete cryptographic immutability requires external immutable WORM storage or independent cryptographic ledger export.
 - **Mandatory Non-RLS Database Safeguards:**
   1. **Strict Revocations:**
      ```sql
@@ -183,9 +185,13 @@ Immutable audit trail recording state transitions, security events, and administ
      SET search_path = public, pg_temp
      AS $$
      BEGIN
-       RAISE EXCEPTION 'Audit log entries are immutable and cannot be modified or deleted.';
+       RAISE EXCEPTION 'Audit log entries are tamper-resistant and cannot be updated, deleted, or truncated.';
      END;
      $$;
+
+     ALTER FUNCTION public.prevent_audit_log_mutation() OWNER TO postgres;
+     REVOKE ALL ON FUNCTION public.prevent_audit_log_mutation() FROM PUBLIC, anon, authenticated;
+     GRANT EXECUTE ON FUNCTION public.prevent_audit_log_mutation() TO service_role;
 
      CREATE TRIGGER trg_audit_logs_immutable
        BEFORE UPDATE OR DELETE OR TRUNCATE ON public.audit_logs
@@ -382,6 +388,7 @@ The public Next.js API Route validates input via Zod, checks atomic rate limits,
 ```sql
 CREATE OR REPLACE FUNCTION public.submit_quotation_request(
   p_idempotency_key UUID,
+  p_request_payload_hash VARCHAR(64),
   p_business_name TEXT,
   p_contact_person TEXT,
   p_email TEXT,
@@ -401,7 +408,7 @@ CREATE OR REPLACE FUNCTION public.submit_quotation_request(
 RETURNS TABLE (
   reference_number TEXT,
   created_at TIMESTAMPTZ,
-  is_retry BOOLEAN
+  result_status TEXT
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -414,18 +421,45 @@ DECLARE
   v_created_at TIMESTAMPTZ;
   v_new_id UUID;
 BEGIN
-  -- 1. Check idempotency: Return existing record if key matches
+  -- 1. Input restriction & validation checks
+  IF length(trim(p_business_name)) < 2 OR length(p_business_name) > 200 THEN
+    RAISE EXCEPTION 'INVALID_INPUT: Business name must be between 2 and 200 characters.';
+  END IF;
+  IF length(trim(p_contact_person)) < 2 OR length(p_contact_person) > 100 THEN
+    RAISE EXCEPTION 'INVALID_INPUT: Contact person must be between 2 and 100 characters.';
+  END IF;
+  IF p_email !~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' OR length(p_email) > 254 THEN
+    RAISE EXCEPTION 'INVALID_INPUT: Invalid email address format.';
+  END IF;
+  IF p_phone !~ '^[6-9]\d{9}$' THEN
+    RAISE EXCEPTION 'INVALID_INPUT: Phone must be a valid 10-digit Indian mobile number.';
+  END IF;
+  IF p_gstin IS NOT NULL AND p_gstin <> '' AND p_gstin !~ '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$' THEN
+    RAISE EXCEPTION 'INVALID_INPUT: Invalid GSTIN format.';
+  END IF;
+  IF length(trim(p_requirement_details)) < 10 OR length(p_requirement_details) > 5000 THEN
+    RAISE EXCEPTION 'INVALID_INPUT: Requirement details must be between 10 and 5000 characters.';
+  END IF;
+  IF length(trim(p_delivery_location)) < 2 OR length(p_delivery_location) > 500 THEN
+    RAISE EXCEPTION 'INVALID_INPUT: Delivery location must be between 2 and 500 characters.';
+  END IF;
+  IF NOT p_privacy_consent THEN
+    RAISE EXCEPTION 'INVALID_INPUT: Privacy consent is mandatory.';
+  END IF;
+
+  -- 2. Idempotency Check with 409 Conflict logic
   SELECT * INTO v_existing FROM public.quotation_requests 
   WHERE idempotency_key = p_idempotency_key;
 
   IF FOUND THEN
-    RETURN QUERY SELECT v_existing.reference_number, v_existing.created_at, true;
-    RETURN;
-  END IF;
-
-  -- 2. Validate privacy consent
-  IF NOT p_privacy_consent THEN
-    RAISE EXCEPTION 'Privacy consent is mandatory for quotation submission.';
+    IF v_existing.request_payload_hash = p_request_payload_hash THEN
+      -- Safe Replay: returns existing reference
+      RETURN QUERY SELECT v_existing.reference_number, v_existing.created_at, 'replayed'::TEXT;
+      RETURN;
+    ELSE
+      -- Conflict: Same idempotency key used with differing payload
+      RAISE EXCEPTION 'CONFLICT_PAYLOAD_MISMATCH: Idempotency key already used with a different request payload.';
+    END IF;
   END IF;
 
   -- 3. Determine status based on risk flag
@@ -456,27 +490,29 @@ BEGIN
     submission_ip_hash,
     user_agent,
     idempotency_key,
+    request_payload_hash,
     risk_flag,
     created_at,
     updated_at
   ) VALUES (
     v_ref,
-    p_business_name,
-    p_contact_person,
-    p_email,
-    p_phone,
-    p_gstin,
+    trim(p_business_name),
+    trim(p_contact_person),
+    lower(trim(p_email)),
+    trim(p_phone),
+    NULLIF(upper(trim(p_gstin)), ''),
     p_service_category,
-    p_requirement_details,
-    p_quantity,
-    p_technical_specs,
-    p_delivery_location,
-    p_notes,
+    trim(p_requirement_details),
+    NULLIF(trim(p_quantity), ''),
+    NULLIF(trim(p_technical_specs), ''),
+    trim(p_delivery_location),
+    NULLIF(trim(p_notes), ''),
     p_privacy_consent,
     v_status,
     p_submission_ip_hash,
     p_user_agent,
     p_idempotency_key,
+    p_request_payload_hash,
     p_risk_flag,
     v_created_at,
     v_created_at
@@ -506,9 +542,15 @@ BEGIN
     v_created_at
   );
 
-  RETURN QUERY SELECT v_ref, v_created_at, false;
+  RETURN QUERY SELECT v_ref, v_created_at, 'created'::TEXT;
 END;
 $$;
+
+ALTER FUNCTION public.submit_quotation_request(
+  UUID, VARCHAR(64), TEXT, TEXT, TEXT, TEXT, TEXT,
+  service_category_enum, TEXT, TEXT, TEXT, TEXT, TEXT,
+  BOOLEAN, VARCHAR(64), TEXT, VARCHAR(50)
+) OWNER TO postgres;
 
 -- Explicit privilege grants:
 REVOKE ALL ON FUNCTION public.submit_quotation_request FROM PUBLIC;
@@ -552,6 +594,14 @@ AS $$
     WHERE id = user_id AND is_active = true AND role = ANY(required_roles)
   );
 $$;
+
+ALTER FUNCTION public.is_active_staff(UUID) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.is_active_staff(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_active_staff(UUID) TO authenticated, service_role;
+
+ALTER FUNCTION public.has_staff_role(UUID, staff_role_enum[]) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.has_staff_role(UUID, staff_role_enum[]) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.has_staff_role(UUID, staff_role_enum[]) TO authenticated, service_role;
 ```
 
 ### Self-Privilege Escalation Defenses
@@ -610,9 +660,11 @@ CREATE POLICY "Deny all delete on quotation_requests"
 - **Problem with Content Hashing:** Hashing content causes false rejections when a legitimate customer submits a second inquiry for the same machinery model or service.
 - **Solution:**
   1. The client form initializes a cryptographically random **`Idempotency-Key` (UUID v4)** on page load.
-  2. If a network disruption occurs and the client retries with the *same* `Idempotency-Key`, the database detects the existing record via `idx_quotation_requests_idempotency` and safely replays the existing `reference_number` and status without creating a duplicate row.
-  3. When the customer initiates a new, distinct submission (even with identical text), a *new* `Idempotency-Key` is generated, allowing independent inquiry tracking.
-  4. Keys expire after 24 hours.
+  2. The server computes a SHA-256 hash of the canonical request payload (`p_request_payload_hash`).
+  3. **Identical Payload Replay:** If a network disruption occurs and the client retries with the *same* `Idempotency-Key` and matching payload hash, the database detects the existing record and safely replays the existing `reference_number` and status (HTTP 200/201, `result_status = 'replayed'`) without creating a duplicate row or incrementing the inquiry sequence.
+  4. **Differing Payload Conflict (HTTP 409):** If an existing `Idempotency-Key` is re-sent with a *different* payload hash, the database raises `CONFLICT_PAYLOAD_MISMATCH`, which the API Route translates to **HTTP 409 Conflict** (`Idempotency key was previously used with a different request payload`).
+  5. **Legitimate Repeat Inquiries:** When the customer initiates a new, distinct submission (even with identical text), a *new* `Idempotency-Key` is generated, allowing independent inquiry tracking.
+  6. **Expiration & Cleanup Behavior:** Idempotency keys are active for a 24-hour deduplication window. A scheduled maintenance procedure periodically cleans transient rate limits, while quotation request rows retain their historical key for auditability.
 
 ### 2. Layered Bot Protection (Autofill Safe)
 - **Removal of Hard 2.5s Auto-Rejection:** Modern browser autofill (Chrome, Edge, 1Password) can complete forms in under 2 seconds. Hard rejection creates severe false positives for legitimate corporate buyers.
@@ -664,11 +716,16 @@ CREATE POLICY "Deny all delete on quotation_requests"
     END IF;
   END;
   $$;
+
+  ALTER FUNCTION public.check_rate_limit(TEXT, INT, INT, INT) OWNER TO postgres;
+  REVOKE ALL ON FUNCTION public.check_rate_limit(TEXT, INT, INT, INT) FROM PUBLIC, anon, authenticated;
+  GRANT EXECUTE ON FUNCTION public.check_rate_limit(TEXT, INT, INT, INT) TO service_role;
   ```
-- **Trustworthy IP Extraction:**
+- **Trustworthy IP Extraction (Vercel Hosting Platform):**
   - Do not trust unverified client-provided `X-Forwarded-For` headers.
-  - On Vercel / Cloudflare: read the trusted edge header (`x-real-ip` or the rightmost untrusted proxy IP).
-  - Compute a salted SHA-256 hash: `SHA-256(client_ip + SERVER_SALT)`. Raw IPs are never stored in database tables or logs.
+  - On Vercel: The Vercel edge router terminates incoming TLS connections, discards untrusted client-supplied `x-real-ip` headers, and injects the authentic client socket IP into `x-real-ip` and `x-vercel-forwarded-for`.
+  - Next.js Route Handlers read: `request.headers.get('x-real-ip') || request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim()`.
+  - Compute a salted SHA-256 hash: `SHA-256(client_ip + RATE_LIMIT_SALT)`. Raw IPs are never stored in database tables or server logs.
   - Return `HTTP 429 Too Many Requests` with dynamic `Retry-After: <seconds>`.
 
 ---
@@ -721,7 +778,8 @@ CREATE POLICY "Deny all delete on quotation_requests"
 | **SEC-04** | Invalid GSTIN format | GSTIN `"INVALIDGST123"` | HTTP 400 Bad Request, field error on `gstin` | DB untouched; form displays error |
 | **SEC-05** | Missing privacy consent | `privacyConsent: false` | HTTP 400 Bad Request | DB untouched; submission blocked |
 | **SEC-06** | **Concurrent submissions** | 10 simultaneous requests from distinct clients | 10 distinct sequential reference numbers generated | Zero duplicate reference numbers; sequence lock verified |
-| **SEC-07** | **Duplicate retry (Idempotency)** | Re-sending identical request with *same* Idempotency-Key | HTTP 200/201 returning *same* reference number | Exactly 1 DB row exists; zero duplicate rows |
+| **SEC-07A** | **Duplicate retry (Same Payload)** | Re-sending identical request with *same* Idempotency-Key and matching payload hash | HTTP 200/201 returning *same* reference number (`result_status: replayed`) | Exactly 1 DB row exists; zero duplicate rows |
+| **SEC-07B** | **Idempotency Conflict (Different Payload)** | Submitting *different* payload using an already used Idempotency-Key | HTTP 409 Conflict: *"Idempotency key already used with different payload"* | DB untouched; 409 error logged; no corruption |
 | **SEC-08** | Repeat inquiry (Different Key) | Customer submits identical scope with *new* Idempotency-Key | HTTP 201 returning new reference number | 2 distinct inquiry records tracked independently |
 | **SEC-09** | **Rate-limit enforcement** | > 5 requests from same hashed IP in 15 mins | HTTP 429 Too Many Requests, `Retry-After: <seconds>` | 6th request blocked at API gateway level |
 | **SEC-10** | Bot honeypot trap | Decoy `company_fax_or_website` filled | HTTP 200 returned to fool bot, NO database row created | Verified in audit logs |
@@ -729,7 +787,7 @@ CREATE POLICY "Deny all delete on quotation_requests"
 | **SEC-12** | Anonymous direct table write | Direct `insert()` into `quotation_requests` with anon key | `401/403 Permission Denied` via RLS | Enforces that writes must flow through RPC |
 | **SEC-13** | **Staff privilege escalation** | Authenticated `viewer` attempts to UPDATE own role to `admin` | `403 Permission Denied` via RLS `CHECK` clause | Role remains unchanged; security alert logged |
 | **SEC-14** | **Service-role exposure audit** | Client bundle inspection (`next build` trace analysis) | Zero occurrences of `SUPABASE_SERVICE_ROLE_KEY` | Verified absent from client JavaScript |
-| **SEC-15** | **Audit log immutability** | Attempting `UPDATE` or `DELETE` on `audit_logs` (even via service role) | Exception raised: *"Audit log entries are immutable"* | Trigger and grant block modification |
+| **SEC-15** | **Audit log tamper-resistance** | Attempting `UPDATE` or `DELETE` on `audit_logs` (even via service role) | Exception raised: *"Audit log entries are tamper-resistant"* | Trigger and grant block modification |
 
 ---
 

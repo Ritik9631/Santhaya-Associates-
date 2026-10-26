@@ -67,18 +67,30 @@ Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Complet
   9. Testing: Expanded security testing matrix to 15 scenarios (SEC-01 through SEC-15) covering concurrency, duplicate retries, privilege escalation, service-role exposure, and audit-log modification attempts.
   - No backend code or dependencies installed; awaiting final human approval.
 - 2026-10-26: User established permanent "Mandatory Authentication and Public Website Rule". Updated `PRD.md`, `RULES.md`, `PHASES.md`, `docs/PHASE-2-ARCHITECTURE.md`, and `MEMORY.md` to mandate: zero public login/signup, zero auth links in public UI, unauthenticated quotation requests, admin-provisioned staff accounts only, server-side auth/authorization, sitemap exclusion with noindex for staff routes, no security through obscurity, and strict deferral of staff login/dashboard until Phase 3.
+- 2026-10-26: Received conditional approval for Phase 2A Architecture v2.0 and authorization for Phase 2B Preparation:
+  - Installed compatible Supabase dependencies: `@supabase/supabase-js` (^2.118.0) and `@supabase/ssr` (^0.12.7).
+  - Created `.env.example` with placeholder variable names only.
+  - Created `src/types/database.ts` with complete TypeScript database schema types.
+  - Created server-side database client utilities without real credentials (`src/lib/supabase/env.ts`, `src/lib/supabase/client.ts`, `src/lib/supabase/server.ts`, `src/lib/supabase/admin.ts`).
+  - Prepared version-controlled SQL migration file for review: `supabase/migrations/20261026120000_phase2_schema_and_security.sql` incorporating secure function ownership (`OWNER TO postgres`), `search_path = public, pg_temp` hardening, internal function access revokes, audit log operational tamper resistance, atomic token-bucket `check_rate_limit`, and `submit_quotation_request` RPC with HTTP 409 conflict detection on differing payload reuse.
+  - Updated `docs/PHASE-2-ARCHITECTURE.md` with the 5 final corrections (function ownership/grants, audit tamper-resistance clarification, Vercel IP extraction, HTTP 409 idempotency conflict, and public auth isolation).
+  - Executed lint, typecheck, and production build checks.
+  - Zero database tables created or migrations executed; awaiting human review and approval.
 
 ## Current phase and pending tasks
 - [x] Phase 1 completed, QA reviewed, and formally approved by user (2026-10-26).
 - [x] Phase 2A architecture planning completed (`docs/PHASE-2-ARCHITECTURE.md`).
 - [x] Phase 2A security and architecture corrections completed (`docs/PHASE-2-ARCHITECTURE.md` v2.0).
 - [x] Mandatory Authentication and Public Website Rule documented across PRD, RULES, PHASES, MEMORY, and Architecture spec.
-- [ ] User final approval of Phase 2A corrected architecture plan before starting Phase 2B.
-- [ ] Phase 2B implementation: Supabase dependencies and credentials configuration.
-- [ ] Phase 2B implementation: database schema migrations and RLS policies execution.
-- [ ] Phase 2B implementation: server-side validation, rate-limiter, and `/api/quotation-request` route handler.
-- [ ] Phase 2B implementation: client form connection to live backend and verified receipt badge.
-- [ ] Phase 2B integration test suite execution and test matrix verification (SEC-01 through SEC-15).
+- [x] Phase 2B preparation: Installed compatible Supabase dependencies (`@supabase/supabase-js`, `@supabase/ssr`).
+- [x] Phase 2B preparation: Created `.env.example` with variable placeholders only.
+- [x] Phase 2B preparation: Created type-safe database client utilities without credentials (`src/lib/supabase/*`).
+- [x] Phase 2B preparation: Prepared version-controlled SQL migration file (`supabase/migrations/20261026120000_phase2_schema_and_security.sql`).
+- [ ] User review and approval of migration SQL file and Phase 2B implementation report.
+- [ ] Phase 2B execution: apply database schema migrations and RLS policies on Supabase.
+- [ ] Phase 2B execution: implement server-side validation pipeline and `/api/quotation-request` route handler.
+- [ ] Phase 2B execution: connect client form to live API endpoint and verify live submission receipt badge.
+- [ ] Phase 2B execution: run integration test suite (SEC-01 through SEC-15).
 - [ ] Phase 3 staff auth/roles/dashboard.
 - [ ] Phase 4 quotation PDFs and lifecycle.
 - [ ] Phase 5 GST invoices, orders and payment tracking after professional review.
@@ -96,14 +108,15 @@ Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Complet
 ## API and database decisions
 - Database: Supabase PostgreSQL with Row Level Security (RLS) enabled on all tables.
 - Decimal safety: All monetary amounts, tax rates, and totals use `NUMERIC(15,2)` / `NUMERIC(12,4)` (no floating point).
-- Access control: [SUPERSEDED 2026-10-26: direct table write via server service_role] Superseded by Approach B: Restricted PostgreSQL RPC function (`submit_quotation_request`) granted `EXECUTE` to `anon`, keeping direct table access (`quotation_requests`, `customers`, `audit_logs`) completely revoked.
-- Customer matching: [NEW 2026-10-26] Quotations are never auto-merged on email; independent snapshots preserved on `quotation_requests`. Customer linking is a staff-governed operation based on verified legal identity.
-- Idempotency & Bot defense: [NEW 2026-10-26] Client-generated UUID v4 `Idempotency-Key` (24h replay); autofill-friendly bot defense (honeypot + rapid timing flagged for review, not auto-rejected).
-- Rate limiting: [NEW 2026-10-26] Atomic database-backed token bucket (`rate_limits` + `check_rate_limit` RPC with row lock) for serverless compatibility; trusted edge IP (`x-real-ip`) with salted SHA-256 hash; dynamic `Retry-After: <seconds>`.
-- Staff authorization: [NEW 2026-10-26] Active check mandatory (`is_active_staff`); self-privilege escalation blocked via admin-only UPDATE policy on `staff_profiles`; explicit `search_path = public, pg_temp` on all SECURITY DEFINER functions.
-- Auditability: [SUPERSEDED 2026-10-26: RLS alone] Immutability enforced via non-RLS database safeguards (`REVOKE UPDATE, DELETE, TRUNCATE` from all roles + BEFORE UPDATE/DELETE/TRUNCATE trigger `prevent_audit_log_mutation()`).
+- Access control: Approach B adopted: Restricted PostgreSQL RPC function (`submit_quotation_request`) granted `EXECUTE` to `anon`, keeping direct table access (`quotation_requests`, `customers`, `audit_logs`, `rate_limits`) completely revoked.
+- Function security: All `SECURITY DEFINER` functions specify `SET search_path = public, pg_temp` and `OWNER TO postgres`. Internal helpers (`is_active_staff`, `has_staff_role`, `check_rate_limit`) revoked from `PUBLIC` and `anon`.
+- Customer matching: Quotations are never auto-merged on email; independent snapshots preserved on `quotation_requests`. Customer linking is a staff-governed operation based on verified legal identity.
+- Idempotency & Bot defense: Client-generated UUID v4 `Idempotency-Key` (24h window). Identical payload yields safe replay (`result_status = 'replayed'`); differing payload reuse yields HTTP 409 Conflict. Autofill-friendly bot defense (honeypot + rapid timing flagged for review, not auto-rejected).
+- Rate limiting: Atomic database-backed token bucket (`rate_limits` + `check_rate_limit` RPC with row lock) for serverless compatibility; trusted edge IP (`x-real-ip` on Vercel) with salted SHA-256 hash; dynamic `Retry-After: <seconds>`.
+- Staff authorization: Active check mandatory (`is_active_staff`); self-privilege escalation blocked via admin-only UPDATE policy on `staff_profiles`. Staff accounts are invitation/admin-provisioned only (no public registration).
+- Auditability: Operational tamper-resistance enforced via non-RLS database safeguards (`REVOKE UPDATE, DELETE, TRUNCATE` from standard roles + BEFORE trigger `prevent_audit_log_mutation()`). Triggers protect against standard operations, not root database superusers.
 - GST Invoicing: Decimal-safe structure with HSN/SAC, place of supply, and dynamic tax allocation; calculations require certified accountant sign-off prior to production.
-- Public site & auth constraints: [NEW 2026-10-26] No client accounts; no login/register links in public navigation/footer/form; unauthenticated quotation form; admin-provisioned staff accounts only; staff login/dashboard deferred to Phase 3.
+- Public site & auth constraints: No client accounts; no login/register links in public navigation/footer/form; unauthenticated quotation form; admin-provisioned staff accounts only; staff login/dashboard deferred to Phase 3.
 
 ## Reusable components
 - `Header`: Responsive brand header with desktop nav, mobile drawer, and CTA.
@@ -122,6 +135,7 @@ Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Complet
 - 2026-10-26: User approved Phase 1. Completed Phase 2A Supabase Architecture & Submission Planning specification (`docs/PHASE-2-ARCHITECTURE.md`).
 - 2026-10-26: Received conditional approval for Phase 2A architecture. Updated `docs/PHASE-2-ARCHITECTURE.md` (v2.0) and `MEMORY.md` incorporating all 9 security corrections: audit log trigger & grant immutability, safe customer matching, UUID idempotency, autofill-safe bot protection, atomic serverless rate limiter, restricted RPC over service_role, anti-escalation staff RLS, accountant gate on GST, and 15-scenario security test matrix. Awaiting final human approval before Phase 2B.
 - 2026-10-26: User issued permanent "Mandatory Authentication and Public Website Rule". Updated `PRD.md`, `RULES.md`, `PHASES.md`, `docs/PHASE-2-ARCHITECTURE.md`, and `MEMORY.md`. Enforced: zero public login/signup, zero auth links in public UI, unauthenticated quotation requests, admin-provisioned staff accounts only, server-side auth/authorization, sitemap exclusion with noindex for staff routes, no security through obscurity, and strict deferral of staff login/dashboard until Phase 3.
+- 2026-10-26: User granted Phase 2B Preparation Approval. Installed Supabase SDKs (`@supabase/supabase-js`, `@supabase/ssr`), created `.env.example`, database TypeScript interfaces (`src/types/database.ts`), server database client utilities (`src/lib/supabase/*`), version-controlled migration SQL (`supabase/migrations/20261026120000_phase2_schema_and_security.sql`), and updated architecture specification with 5 final corrections. Verified with lint, typecheck, and build (all passed). Awaiting human review before applying database migrations.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
