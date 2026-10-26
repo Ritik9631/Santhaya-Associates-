@@ -5,12 +5,17 @@ Version: 1.0 | Status: Approved project direction; company details pending confi
 Build a professional public website and secure internal quotation/billing platform for Santhaya Associates Pvt. Ltd. (legal name to be confirmed). Business areas, per project brief: government and private construction tenders, construction machinery supply, and manufacturing machinery supply. Do not invent company credentials, inventory, history, testimonials, registration status, or addresses.
 
 ## 2. Users and access
-- Public visitors: browse services, contact company, submit quotation requests; no client account.
-- Authorized staff: authenticate to review inquiries, draft/send quotations, manage sales orders, invoices and payments.
-- Admin: manage staff roles and company settings; least privilege. Staff dashboard never publicly accessible without authorization.
+- **Public visitors & clients:** Must never be required to log in or sign up. Public visitors browse services, contact the company, and submit quotation requests without client authentication.
+- **No public auth UI:** Do not display Login, Sign In, Register, Sign Up, Account, or Dashboard links anywhere in the public website navigation, footer, or quotation form.
+- **Authorized staff:** Staff authentication is implemented separately for authorized Santhaya Associates employees. Public staff self-registration is strictly prohibited; all staff accounts must be provisioned by an authorized administrator.
+- **Staff protection:** All staff dashboard pages, APIs, and database operations must be protected using server-side authentication and role-based authorization.
+- **Route governance & SEO:** Exclude staff authentication and dashboard routes from public navigation and XML sitemaps, and apply `noindex` to staff-facing pages.
+- **No security through obscurity:** Never rely on a hidden URL, robots.txt, or noindex as a security mechanism.
+- **Data confidentiality:** Never expose customer information, quotation records, GST invoices, or payment data to unauthorized users.
+- **Phase boundary:** Do not implement staff login or dashboard functionality during Phase 2 unless separately approved (scheduled for Phase 3).
 
 ## 3. Public site requirements
-Responsive navigation, hero, About, three services, How We Work, factual benefits, contact CTA, footer, privacy and terms placeholder pages. Homepage message: 'Building Today. Powering Tomorrow.' Main CTA: 'Request a Quotation'. Brand palette navy #10243B, gold #F4B323, white #FFFFFF. Use actual supplied logo only; if missing, use text wordmark with a visible asset-needed note, not a fabricated logo. Phone, email, address, GSTIN and company legal details are configurable and must remain explicitly unverified until provided.
+Responsive navigation, hero, About, three services, How We Work, factual benefits, contact CTA, footer, privacy and terms placeholder pages. Homepage message: 'Building Today. Powering Tomorrow.' Main CTA: 'Request a Quotation'. Brand palette navy #10243B, gold #F4B323, white #FFFFFF. Use actual supplied logo only; if missing, use text wordmark with a visible asset-needed note, not a fabricated logo. Phone, email, address, GSTIN and company legal details are configurable and must remain explicitly unverified until provided. Public navigation and footer must never include Login, Sign In, Register, Sign Up, Account, or Dashboard links.
 
 ## 4. Public quotation request form
 Route `/request-quotation`. Fields: business/customer name, contact person, email, Indian phone, optional GSTIN, service category (construction tender, construction machinery, manufacturing machinery, other), item/service requirements, optional quantity, technical specifications, delivery location/state, notes, and privacy consent. Client-side validation in Phase 1; server-side validation, abuse controls, persistence and notification in Phase 2. During Phase 1, never claim a request was submitted or received: label the form as a demo/not yet operational and do not retain personal data.
@@ -33,8 +38,8 @@ Semantic headings, unique metadata, sitemap/robots for public routes, private ro
 ## 10. Delivery phases and acceptance
 Phase 0: documentation, logo/company data checklist and architecture approval.
 Phase 1: project scaffold, public pages, responsive navigation, demo quotation form with validation, SEO metadata, legal placeholders, README, tests and verified lint/typecheck/build.
-Phase 2: Supabase schema, secure public form persistence, anti-spam, notification and tests.
-Phase 3: staff authentication, role authorization, dashboard, RLS tests.
+Phase 2: Supabase schema, secure public form persistence, anti-spam, notification and tests (no staff login or dashboard in Phase 2).
+Phase 3: staff authentication (admin-provisioned accounts only; no public self-registration), role authorization, dashboard, RLS tests.
 Phase 4: quotation lifecycle, revisions, PDFs, delivery and acceptance evidence.
 Phase 5: sales orders, GST invoice logic after accountant validation, payment tracking, audit logs.
 Phase 6: end-to-end security, accounting, accessibility and deployment review.

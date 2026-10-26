@@ -32,8 +32,21 @@
 23. No deployment or migration against production without explicit approval and backup plan.
 24. Stop after current phase and request human review.
 
+## Mandatory Authentication and Public Website Rule (Approved 2026-10-26)
+25. Public visitors and clients must never be required to log in or sign up.
+26. Do not display Login, Sign In, Register, Sign Up, Account, or Dashboard links anywhere in the public website navigation, footer, or quotation form.
+27. The public quotation request form must work without client authentication.
+28. Staff authentication must be implemented separately for authorized Santhaya Associates employees.
+29. Do not provide public staff self-registration. Staff accounts must be provisioned by an authorized administrator.
+30. Protect all staff dashboard pages, APIs, and database operations using server-side authentication and role-based authorization.
+31. Exclude staff authentication and dashboard routes from public navigation and XML sitemaps, and apply noindex to staff-facing pages.
+32. Never rely on a hidden URL, robots.txt, or noindex as a security mechanism.
+33. Do not expose customer information, quotation records, GST invoices, or payment data to unauthorized users.
+34. Do not implement staff login or dashboard functionality during Phase 2 unless separately approved.
+
 ## Rules maintenance
 When the user approves a new durable rule, add it here with date and rationale, note it in MEMORY, and preserve earlier decisions as superseded rather than silently deleting them.
 
 ## Scope lock — 2026-10-26
 Santhaya Associates is a construction tender and machinery supply business. Implement only government/private construction tender services, construction machinery supply, manufacturing machinery supply, and the approved quotation and GST billing workflows. Do not add unrelated agency services or content without explicit user approval.
+

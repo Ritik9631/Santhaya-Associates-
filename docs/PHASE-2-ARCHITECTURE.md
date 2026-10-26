@@ -21,6 +21,20 @@ No unrelated agency services, inventory e-commerce, or public client accounts ar
 
 ---
 
+## Mandatory Authentication and Public Website Constraints (Approved 2026-10-26)
+1. **Zero Client Authentication:** Public visitors and commercial clients must never be required to log in or sign up.
+2. **Zero Public Auth UI:** Do not display Login, Sign In, Register, Sign Up, Account, or Dashboard links anywhere in the public website navigation, header, mobile drawer, footer, or quotation form.
+3. **Unauthenticated Public Submissions:** The public quotation request form operates completely unauthenticated without requiring or suggesting account creation.
+4. **Separate Staff Authentication:** Staff authentication is strictly isolated for authorized Santhaya Associates personnel only.
+5. **Admin-Provisioned Accounts Only:** Public staff self-registration is strictly prohibited. All staff accounts must be provisioned directly by an authorized administrator.
+6. **Robust Server-Side Authorization:** All staff dashboard pages, internal APIs, and database operations must be protected by server-side authentication and role-based authorization (RLS + middleware).
+7. **Route Exclusion & SEO Hygiene:** Exclude all staff authentication and dashboard routes from public navigation and XML sitemaps, and enforce `noindex, nofollow` on staff-facing pages.
+8. **No Security through Obscurity:** Never rely on a hidden URL, robots.txt, or noindex as a security mechanism; all access is enforced by cryptographic sessions and database RLS.
+9. **Data Confidentiality:** Never expose customer information, quotation records, GST invoices, or payment data to unauthorized users or public endpoints.
+10. **Phase Boundary Enforcement:** Do not implement staff login, authentication UI, or dashboard functionality during Phase 2 unless separately approved (strictly scheduled for Phase 3).
+
+---
+
 ## 1. Database Design & Phased Table Segregation
 
 The database architecture employs PostgreSQL via Supabase. To ensure clean separation of concerns and phased rollout, tables are categorized into:
@@ -756,6 +770,10 @@ CREATE POLICY "Deny all delete on quotation_requests"
 [ Gate 2B: Phase 2 Completion Review ]
   - Present test evidence, logs, and updated MEMORY.md for human approval before Phase 3
 ```
+
+> [!IMPORTANT]
+> **Phase 2 Scope Boundary Enforcement:**
+> In accordance with the Mandatory Authentication and Public Website Rule, **no staff login pages, authentication UI, session handlers, or dashboard views will be implemented during Phase 2**. Phase 2 is strictly limited to unauthenticated public quotation persistence, anti-spam heuristics, atomic rate limiting, and foundational schema/RLS setup. Staff authentication, admin provisioning, and dashboard development are scheduled for Phase 3 upon explicit human approval.
 
 ---
 

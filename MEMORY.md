@@ -3,7 +3,17 @@ Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Complet
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
-- Public quotation requests require no client login; staff manage quotations.
+- Mandatory Authentication & Public Website Rule (2026-10-26):
+  1. Public visitors and clients must never be required to log in or sign up.
+  2. Do not display Login, Sign In, Register, Sign Up, Account, or Dashboard links anywhere in the public website navigation, footer, or quotation form.
+  3. The public quotation request form must work without client authentication.
+  4. Staff authentication must be implemented separately for authorized Santhaya Associates employees.
+  5. Do not provide public staff self-registration. Staff accounts must be provisioned by an authorized administrator.
+  6. Protect all staff dashboard pages, APIs, and database operations using server-side authentication and role-based authorization.
+  7. Exclude staff authentication and dashboard routes from public navigation and XML sitemaps, and apply noindex to staff-facing pages.
+  8. Never rely on a hidden URL, robots.txt, or noindex as a security mechanism.
+  9. Do not expose customer information, quotation records, GST invoices, or payment data to unauthorized users.
+  10. Do not implement staff login or dashboard functionality during Phase 2 unless separately approved (scheduled for Phase 3).
 - Business areas: government/private construction tenders, construction machinery supply, manufacturing machinery supply.
 - Stack: Next.js App Router + strict TypeScript + Tailwind + Lucide + Zod; Supabase PostgreSQL/Auth/RLS planned; Vercel hosting; GitHub; server-generated PDFs and transactional email later.
 - Brand palette: navy #10243B, gold #F4B323, white #FFFFFF; use actual company logo when supplied.
@@ -56,12 +66,14 @@ Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Complet
   8. Indian GST: Structured schema for dynamic tax rates and place of supply; strictly gated production calculation and invoice numbering behind certified Indian Chartered Accountant review.
   9. Testing: Expanded security testing matrix to 15 scenarios (SEC-01 through SEC-15) covering concurrency, duplicate retries, privilege escalation, service-role exposure, and audit-log modification attempts.
   - No backend code or dependencies installed; awaiting final human approval.
+- 2026-10-26: User established permanent "Mandatory Authentication and Public Website Rule". Updated `PRD.md`, `RULES.md`, `PHASES.md`, `docs/PHASE-2-ARCHITECTURE.md`, and `MEMORY.md` to mandate: zero public login/signup, zero auth links in public UI, unauthenticated quotation requests, admin-provisioned staff accounts only, server-side auth/authorization, sitemap exclusion with noindex for staff routes, no security through obscurity, and strict deferral of staff login/dashboard until Phase 3.
 
 ## Current phase and pending tasks
 - [x] Phase 1 completed, QA reviewed, and formally approved by user (2026-10-26).
 - [x] Phase 2A architecture planning completed (`docs/PHASE-2-ARCHITECTURE.md`).
 - [x] Phase 2A security and architecture corrections completed (`docs/PHASE-2-ARCHITECTURE.md` v2.0).
-- [ ] User final approval of Phase 2A corrected architecture plan.
+- [x] Mandatory Authentication and Public Website Rule documented across PRD, RULES, PHASES, MEMORY, and Architecture spec.
+- [ ] User final approval of Phase 2A corrected architecture plan before starting Phase 2B.
 - [ ] Phase 2B implementation: Supabase dependencies and credentials configuration.
 - [ ] Phase 2B implementation: database schema migrations and RLS policies execution.
 - [ ] Phase 2B implementation: server-side validation, rate-limiter, and `/api/quotation-request` route handler.
@@ -91,6 +103,7 @@ Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Complet
 - Staff authorization: [NEW 2026-10-26] Active check mandatory (`is_active_staff`); self-privilege escalation blocked via admin-only UPDATE policy on `staff_profiles`; explicit `search_path = public, pg_temp` on all SECURITY DEFINER functions.
 - Auditability: [SUPERSEDED 2026-10-26: RLS alone] Immutability enforced via non-RLS database safeguards (`REVOKE UPDATE, DELETE, TRUNCATE` from all roles + BEFORE UPDATE/DELETE/TRUNCATE trigger `prevent_audit_log_mutation()`).
 - GST Invoicing: Decimal-safe structure with HSN/SAC, place of supply, and dynamic tax allocation; calculations require certified accountant sign-off prior to production.
+- Public site & auth constraints: [NEW 2026-10-26] No client accounts; no login/register links in public navigation/footer/form; unauthenticated quotation form; admin-provisioned staff accounts only; staff login/dashboard deferred to Phase 3.
 
 ## Reusable components
 - `Header`: Responsive brand header with desktop nav, mobile drawer, and CTA.
@@ -108,6 +121,7 @@ Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Complet
 - 2026-10-26: Conducted Phase 1 comprehensive QA. Resolved missing quotation metadata, generic validation messages, and footer image loading. Re-verified lint, typecheck, build, and responsive screenshots across 4 screen sizes. Zero defects remaining.
 - 2026-10-26: User approved Phase 1. Completed Phase 2A Supabase Architecture & Submission Planning specification (`docs/PHASE-2-ARCHITECTURE.md`).
 - 2026-10-26: Received conditional approval for Phase 2A architecture. Updated `docs/PHASE-2-ARCHITECTURE.md` (v2.0) and `MEMORY.md` incorporating all 9 security corrections: audit log trigger & grant immutability, safe customer matching, UUID idempotency, autofill-safe bot protection, atomic serverless rate limiter, restricted RPC over service_role, anti-escalation staff RLS, accountant gate on GST, and 15-scenario security test matrix. Awaiting final human approval before Phase 2B.
+- 2026-10-26: User issued permanent "Mandatory Authentication and Public Website Rule". Updated `PRD.md`, `RULES.md`, `PHASES.md`, `docs/PHASE-2-ARCHITECTURE.md`, and `MEMORY.md`. Enforced: zero public login/signup, zero auth links in public UI, unauthenticated quotation requests, admin-provisioned staff accounts only, server-side auth/authorization, sitemap exclusion with noindex for staff routes, no security through obscurity, and strict deferral of staff login/dashboard until Phase 3.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
