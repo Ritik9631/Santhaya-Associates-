@@ -1,9 +1,9 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Completed & Approved; Phase 2 Planning
+Updated: 2026-10-27 | Phase: 2 Planning | Implementation status: Phase 1 Completed & Approved; Phase 2 Planning
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
-- Mandatory Authentication & Public Website Rule (2026-10-26):
+- Mandatory Authentication and Public Website Rule:
   1. Public visitors and clients must never be required to log in or sign up.
   2. Do not display Login, Sign In, Register, Sign Up, Account, or Dashboard links anywhere in the public website navigation, footer, or quotation form.
   3. The public quotation request form must work without client authentication.
@@ -13,7 +13,7 @@ Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Complet
   7. Exclude staff authentication and dashboard routes from public navigation and XML sitemaps, and apply noindex to staff-facing pages.
   8. Never rely on a hidden URL, robots.txt, or noindex as a security mechanism.
   9. Do not expose customer information, quotation records, GST invoices, or payment data to unauthorized users.
-  10. Do not implement staff login or dashboard functionality during Phase 2 unless separately approved (scheduled for Phase 3).
+  10. Do not implement staff login or dashboard functionality during Phase 2 unless separately approved.
 - Business areas: government/private construction tenders, construction machinery supply, manufacturing machinery supply.
 - Stack: Next.js App Router + strict TypeScript + Tailwind + Lucide + Zod; Supabase PostgreSQL/Auth/RLS planned; Vercel hosting; GitHub; server-generated PDFs and transactional email later.
 - Brand palette: navy #10243B, gold #F4B323, white #FFFFFF; use actual company logo when supplied.
@@ -136,6 +136,7 @@ Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Complet
 - 2026-10-26: Received conditional approval for Phase 2A architecture. Updated `docs/PHASE-2-ARCHITECTURE.md` (v2.0) and `MEMORY.md` incorporating all 9 security corrections: audit log trigger & grant immutability, safe customer matching, UUID idempotency, autofill-safe bot protection, atomic serverless rate limiter, restricted RPC over service_role, anti-escalation staff RLS, accountant gate on GST, and 15-scenario security test matrix. Awaiting final human approval before Phase 2B.
 - 2026-10-26: User issued permanent "Mandatory Authentication and Public Website Rule". Updated `PRD.md`, `RULES.md`, `PHASES.md`, `docs/PHASE-2-ARCHITECTURE.md`, and `MEMORY.md`. Enforced: zero public login/signup, zero auth links in public UI, unauthenticated quotation requests, admin-provisioned staff accounts only, server-side auth/authorization, sitemap exclusion with noindex for staff routes, no security through obscurity, and strict deferral of staff login/dashboard until Phase 3.
 - 2026-10-26: User granted Phase 2B Preparation Approval. Installed Supabase SDKs (`@supabase/supabase-js`, `@supabase/ssr`), created `.env.example`, database TypeScript interfaces (`src/types/database.ts`), server database client utilities (`src/lib/supabase/*`), version-controlled migration SQL (`supabase/migrations/20261026120000_phase2_schema_and_security.sql`), and updated architecture specification with 5 final corrections. Verified with lint, typecheck, and build (all passed). Awaiting human review before applying database migrations.
+- 2026-10-27: Codified and verified the permanent "Mandatory Authentication and Public Website Rule" across all project documents (`PRD.md`, `RULES.md`, `MEMORY.md`, `PHASES.md`, and `docs/PHASE-2-ARCHITECTURE.md`). Re-verified that all 10 requirements are explicitly aligned: zero public login/signup, zero public auth UI, unauthenticated quotation requests, admin-provisioned staff accounts only, server-side auth and role-based authorization, sitemap exclusion with noindex, no security through obscurity, data confidentiality, and strict deferral of staff login/dashboard during Phase 2. Execution halted pending human approval.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

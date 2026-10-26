@@ -21,17 +21,17 @@ No unrelated agency services, inventory e-commerce, or public client accounts ar
 
 ---
 
-## Mandatory Authentication and Public Website Constraints (Approved 2026-10-26)
-1. **Zero Client Authentication:** Public visitors and commercial clients must never be required to log in or sign up.
-2. **Zero Public Auth UI:** Do not display Login, Sign In, Register, Sign Up, Account, or Dashboard links anywhere in the public website navigation, header, mobile drawer, footer, or quotation form.
-3. **Unauthenticated Public Submissions:** The public quotation request form operates completely unauthenticated without requiring or suggesting account creation.
-4. **Separate Staff Authentication:** Staff authentication is strictly isolated for authorized Santhaya Associates personnel only.
-5. **Admin-Provisioned Accounts Only:** Public staff self-registration is strictly prohibited. All staff accounts must be provisioned directly by an authorized administrator.
-6. **Robust Server-Side Authorization:** All staff dashboard pages, internal APIs, and database operations must be protected by server-side authentication and role-based authorization (RLS + middleware).
-7. **Route Exclusion & SEO Hygiene:** Exclude all staff authentication and dashboard routes from public navigation and XML sitemaps, and enforce `noindex, nofollow` on staff-facing pages.
-8. **No Security through Obscurity:** Never rely on a hidden URL, robots.txt, or noindex as a security mechanism; all access is enforced by cryptographic sessions and database RLS.
-9. **Data Confidentiality:** Never expose customer information, quotation records, GST invoices, or payment data to unauthorized users or public endpoints.
-10. **Phase Boundary Enforcement:** Do not implement staff login, authentication UI, or dashboard functionality during Phase 2 unless separately approved (strictly scheduled for Phase 3).
+## Mandatory Authentication and Public Website Rule
+1. Public visitors and clients must never be required to log in or sign up.
+2. Do not display Login, Sign In, Register, Sign Up, Account, or Dashboard links anywhere in the public website navigation, footer, or quotation form.
+3. The public quotation request form must work without client authentication.
+4. Staff authentication must be implemented separately for authorized Santhaya Associates employees.
+5. Do not provide public staff self-registration. Staff accounts must be provisioned by an authorized administrator.
+6. Protect all staff dashboard pages, APIs, and database operations using server-side authentication and role-based authorization.
+7. Exclude staff authentication and dashboard routes from public navigation and XML sitemaps, and apply noindex to staff-facing pages.
+8. Never rely on a hidden URL, robots.txt, or noindex as a security mechanism.
+9. Do not expose customer information, quotation records, GST invoices, or payment data to unauthorized users.
+10. Do not implement staff login or dashboard functionality during Phase 2 unless separately approved.
 
 ---
 

@@ -32,7 +32,7 @@
 23. No deployment or migration against production without explicit approval and backup plan.
 24. Stop after current phase and request human review.
 
-## Mandatory Authentication and Public Website Rule (Approved 2026-10-26)
+## Mandatory Authentication and Public Website Rule
 25. Public visitors and clients must never be required to log in or sign up.
 26. Do not display Login, Sign In, Register, Sign Up, Account, or Dashboard links anywhere in the public website navigation, footer, or quotation form.
 27. The public quotation request form must work without client authentication.

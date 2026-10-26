@@ -5,14 +5,18 @@ Version: 1.0 | Status: Approved project direction; company details pending confi
 Build a professional public website and secure internal quotation/billing platform for Santhaya Associates Pvt. Ltd. (legal name to be confirmed). Business areas, per project brief: government and private construction tenders, construction machinery supply, and manufacturing machinery supply. Do not invent company credentials, inventory, history, testimonials, registration status, or addresses.
 
 ## 2. Users and access
-- **Public visitors & clients:** Must never be required to log in or sign up. Public visitors browse services, contact the company, and submit quotation requests without client authentication.
-- **No public auth UI:** Do not display Login, Sign In, Register, Sign Up, Account, or Dashboard links anywhere in the public website navigation, footer, or quotation form.
-- **Authorized staff:** Staff authentication is implemented separately for authorized Santhaya Associates employees. Public staff self-registration is strictly prohibited; all staff accounts must be provisioned by an authorized administrator.
-- **Staff protection:** All staff dashboard pages, APIs, and database operations must be protected using server-side authentication and role-based authorization.
-- **Route governance & SEO:** Exclude staff authentication and dashboard routes from public navigation and XML sitemaps, and apply `noindex` to staff-facing pages.
-- **No security through obscurity:** Never rely on a hidden URL, robots.txt, or noindex as a security mechanism.
-- **Data confidentiality:** Never expose customer information, quotation records, GST invoices, or payment data to unauthorized users.
-- **Phase boundary:** Do not implement staff login or dashboard functionality during Phase 2 unless separately approved (scheduled for Phase 3).
+
+### Mandatory Authentication and Public Website Rule
+1. Public visitors and clients must never be required to log in or sign up.
+2. Do not display Login, Sign In, Register, Sign Up, Account, or Dashboard links anywhere in the public website navigation, footer, or quotation form.
+3. The public quotation request form must work without client authentication.
+4. Staff authentication must be implemented separately for authorized Santhaya Associates employees.
+5. Do not provide public staff self-registration. Staff accounts must be provisioned by an authorized administrator.
+6. Protect all staff dashboard pages, APIs, and database operations using server-side authentication and role-based authorization.
+7. Exclude staff authentication and dashboard routes from public navigation and XML sitemaps, and apply noindex to staff-facing pages.
+8. Never rely on a hidden URL, robots.txt, or noindex as a security mechanism.
+9. Do not expose customer information, quotation records, GST invoices, or payment data to unauthorized users.
+10. Do not implement staff login or dashboard functionality during Phase 2 unless separately approved.
 
 ## 3. Public site requirements
 Responsive navigation, hero, About, three services, How We Work, factual benefits, contact CTA, footer, privacy and terms placeholder pages. Homepage message: 'Building Today. Powering Tomorrow.' Main CTA: 'Request a Quotation'. Brand palette navy #10243B, gold #F4B323, white #FFFFFF. Use actual supplied logo only; if missing, use text wordmark with a visible asset-needed note, not a fabricated logo. Phone, email, address, GSTIN and company legal details are configurable and must remain explicitly unverified until provided. Public navigation and footer must never include Login, Sign In, Register, Sign Up, Account, or Dashboard links.
