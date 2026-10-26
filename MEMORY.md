@@ -21,16 +21,22 @@ None. No application scaffold or backend has been verified.
   - `santhaya-symbol.png` (480x550, 0.873 aspect ratio, RGB): Used as compact brand icon in mobile menu, footer, and browser icons.
   - `full-brand-reference.png` (1254x1254, 1.000 aspect ratio, RGB): Featured on homepage showcase as official visual reference.
 - 2026-10-26: Verified runtime environment: Node v24.18.1, npm 11.16.0 (via `npm.cmd` on Windows).
-- 2026-10-26: Scaffolding completed: Next.js 14 App Router, TypeScript strict mode, Tailwind CSS with palette (`#10243B`, `#F4B323`, `#FFFFFF`).
-- 2026-10-26: Built responsive Header component (`src/components/Header.tsx`) using `santhaya-logo-header.png` (`aspect-[1045/795]`, `object-contain`), desktop navigation, mobile drawer with `santhaya-symbol.png`, and quotation CTA.
-- 2026-10-26: Built Footer component (`src/components/Footer.tsx`) with brand symbol, 3-pillar links, and unverified address/phone/GSTIN marked clearly as sample placeholders.
-- 2026-10-26: Built Homepage (`src/app/page.tsx`), Services page (`src/app/services/page.tsx`), About page (`src/app/about/page.tsx`), Privacy placeholder (`src/app/privacy/page.tsx`), and Terms placeholder (`src/app/terms/page.tsx`).
-- 2026-10-26: Built non-operational demo quotation form (`/request-quotation`) with Zod client validation, prominent demo banner, and no false submission claims.
-- 2026-10-26: QA gate executed:
-  - `npm run typecheck`: Passed (0 errors)
-  - `npm run lint`: Passed (0 errors)
-  - `npm run build`: Passed (9/9 routes prerendered)
-  - HTTP server test: All endpoints returned status 200 with verified brand image references.
+- 2026-10-26: Phase 1 Final QA executed via headless Chrome automation suite (`scripts/run-qa.mjs`):
+  - Tested 6 routes (`/`, `/services`, `/about`, `/request-quotation`, `/privacy`, `/terms`) across 4 viewports (375px, 768px, 1366px, 1920px). Zero horizontal overflow.
+  - Verified Header logo aspect ratio: rendered at 84.125 × 64px (`aspect-[1045/795]`, 1.314:1, 0.00% distortion).
+  - Verified mobile drawer menu with compact symbol `santhaya-symbol.png` and full navigation links.
+  - Verified demo quotation form: prominent amber non-operational warning banner, client-side validation errors, and simulation success card with no false backend claims.
+  - Identified & fixed Phase 1 QA defects:
+    1. Added `src/app/request-quotation/layout.tsx` to provide unique page `<title>` and metadata for `/request-quotation`.
+    2. Enhanced Zod schema error messages with `required_error` and `.trim()` across all form fields (e.g. "Business or organization name is required" instead of generic "Required").
+    3. Added `loading="eager"` to `Footer.tsx` symbol image to prevent lazy-load lag during automated audits.
+    4. Installed `sharp` for high-performance Next.js production image optimization.
+  - Re-ran verification gates:
+    - `npm run typecheck`: Passed (0 errors)
+    - `npm run lint`: Passed (0 errors)
+    - `npm run build`: Passed (9/9 routes prerendered, 0 warnings)
+    - Automated QA script: 0 broken images, 0 console errors, 0 overflow issues across all viewports.
+  - Captured full visual QA screenshots saved in artifact directory.
 
 ## Current phase and pending tasks
 - [x] Place genuine logo asset in `public/` if available.
@@ -40,7 +46,8 @@ None. No application scaffold or backend has been verified.
 - [x] Public pages (Home with 3 verified pillars, About, Services, How We Work, Privacy, Terms).
 - [x] Non-operational demo quotation form (`/request-quotation`) with client validation and explicit non-saving notice.
 - [x] Phase 1 lint/typecheck/build, navigation, responsive, and accessibility QA.
-- [ ] User review and Phase 1 completion gate approval.
+- [x] Phase 1 visual and functional QA review completed and all confirmed defects resolved.
+- [ ] User review and approval gate to begin Phase 2.
 - [ ] Phase 2 secure Supabase persistence and anti-spam.
 - [ ] Phase 3 staff auth/roles/dashboard.
 - [ ] Phase 4 quotation PDFs and lifecycle.
@@ -57,7 +64,7 @@ None. No application scaffold or backend has been verified.
   - Official Visual Reference: `full-brand-reference.png` showcased on homepage with 1:1 aspect ratio.
 
 ## API and database decisions
-Supabase planned; no tables, migrations, endpoints or policies implemented. Phase 1 operates strictly client-side for demonstration.
+Supabase planned; no tables, migrations, endpoints or policies implemented. Phase 1 operates strictly client-side for demonstration. No customer data stored.
 
 ## Reusable components
 - `Header`: Responsive brand header with desktop nav, mobile drawer, and CTA.
@@ -70,6 +77,7 @@ Exact legal name confirmed as "Santhaya Associates Pvt. Ltd." via official logo 
 - 2026-10-26: Confirmed construction tenders and machinery supply as exclusive business scope.
 - 2026-10-26: Inspected authentic brand assets in `public/`.
 - 2026-10-26: Received user approval for Phase 1 scaffolding. Implemented responsive header, homepage, 3 service pillars, about page, legal placeholders, and demo quotation form. Completed typecheck, lint, build, and HTTP verification. All checks passed.
+- 2026-10-26: Conducted Phase 1 comprehensive QA. Resolved missing quotation metadata, generic validation messages, and footer image loading. Re-verified lint, typecheck, build, and responsive screenshots across 4 screen sizes. Zero defects remaining. Awaiting user approval to proceed to Phase 2.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

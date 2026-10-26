@@ -17,6 +17,7 @@ export default function Footer() {
                   alt="Santhaya Associates Symbol"
                   width={480}
                   height={550}
+                  loading="eager"
                   className="h-full w-auto object-contain"
                 />
               </div>

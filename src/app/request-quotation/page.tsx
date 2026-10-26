@@ -18,12 +18,23 @@ import {
 } from 'lucide-react';
 
 const quotationSchema = z.object({
-  businessName: z.string().min(2, 'Business or organization name is required'),
-  contactPerson: z.string().min(2, 'Contact person name is required'),
-  email: z.string().email('Please enter a valid business email address'),
+  businessName: z
+    .string({ required_error: 'Business or organization name is required' })
+    .trim()
+    .min(2, 'Business or organization name is required (minimum 2 characters)'),
+  contactPerson: z
+    .string({ required_error: 'Contact person name is required' })
+    .trim()
+    .min(2, 'Contact person name is required (minimum 2 characters)'),
+  email: z
+    .string({ required_error: 'Official email address is required' })
+    .trim()
+    .min(1, 'Official email address is required')
+    .email('Please enter a valid business email address (e.g. name@company.com)'),
   phone: z
-    .string()
-    .regex(/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number (e.g., 9876543210)'),
+    .string({ required_error: 'Indian mobile number is required' })
+    .trim()
+    .regex(/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number (e.g. 9876543210)'),
   gstin: z
     .string()
     .trim()
@@ -40,15 +51,19 @@ const quotationSchema = z.object({
     }
   ),
   requirementDetails: z
-    .string()
+    .string({ required_error: 'Project or machinery requirement details are required' })
+    .trim()
     .min(10, 'Please provide specific requirements (minimum 10 characters)'),
   quantity: z.string().optional(),
   technicalSpecs: z.string().optional(),
-  deliveryLocation: z.string().min(2, 'Delivery state or location is required'),
+  deliveryLocation: z
+    .string({ required_error: 'Delivery state or location is required' })
+    .trim()
+    .min(2, 'Delivery state or location is required'),
   notes: z.string().optional(),
   privacyConsent: z.literal(true, {
     errorMap: () => ({
-      message: 'You must acknowledge the demo data notice and terms to test validation',
+      message: 'You must acknowledge the demo data notice to simulate validation',
     }),
   }),
 });
