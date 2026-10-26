@@ -44,13 +44,23 @@ Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Complet
     - Automated QA script: 0 broken images, 0 console errors, 0 overflow issues across all viewports.
   - Captured full visual QA screenshots saved in artifact directory.
 - 2026-10-26: User formally approved Phase 1. Completed Phase 1 milestone.
+- 2026-10-26: Completed Phase 2A Supabase Architecture & Secure Submission Plan (`docs/PHASE-2-ARCHITECTURE.md`):
+  - Defined 10-table schema (Phase 2 immediate: `staff_profiles`, `customers`, `quotation_requests`, `audit_logs`; Future phases: `quotations`, `quotation_items`, `sales_orders`, `invoices`, `invoice_items`, `payments`).
+  - Designed strict RLS policies: anonymous read/update/delete denied; server-mediated ingestion via `service_role`; active staff-only authenticated access; immutable audit records.
+  - Formulated public form submission pipeline with rate limiting (5 req/15 min/IP hash), honeypot trap, timing heuristics, and server-side Zod sanitization.
+  - Formulated Indian GST schema architecture, explicitly marking calculations for certified accountant review before production.
+  - Prepared comprehensive 12-scenario test matrix, migration management, and rollback strategy.
+  - No backend code or dependencies installed; awaiting human approval.
 
 ## Current phase and pending tasks
 - [x] Phase 1 completed, QA reviewed, and formally approved by user (2026-10-26).
-- [ ] User review and approval of Phase 2 detailed architecture plan.
-- [ ] Phase 2 Supabase schema migration and RLS policies.
-- [ ] Phase 2 public form server-side persistence, anti-spam, and rate limiting.
-- [ ] Phase 2 notification and end-to-end integration tests.
+- [x] Phase 2A architecture planning completed (`docs/PHASE-2-ARCHITECTURE.md`).
+- [ ] User review and approval of Phase 2A detailed architecture plan.
+- [ ] Phase 2B implementation: Supabase dependencies and credentials configuration.
+- [ ] Phase 2B implementation: database schema migrations and RLS policies execution.
+- [ ] Phase 2B implementation: server-side validation, rate-limiter, and `/api/quotation-request` route handler.
+- [ ] Phase 2B implementation: client form connection to live backend and verified receipt badge.
+- [ ] Phase 2B integration test suite execution and test matrix verification.
 - [ ] Phase 3 staff auth/roles/dashboard.
 - [ ] Phase 4 quotation PDFs and lifecycle.
 - [ ] Phase 5 GST invoices, orders and payment tracking after professional review.
@@ -66,20 +76,28 @@ Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Complet
   - Official Visual Reference: `full-brand-reference.png` showcased on homepage with 1:1 aspect ratio.
 
 ## API and database decisions
-Supabase planned; no tables, migrations, endpoints or policies implemented. Phase 1 operates strictly client-side for demonstration. No customer data stored.
+- Database: Supabase PostgreSQL with Row Level Security (RLS) enabled on all tables.
+- Decimal safety: All monetary amounts, tax rates, and totals use `NUMERIC(15,2)` / `NUMERIC(12,4)` (no floating point).
+- Access control: Zero public table grants. Anonymous users submit strictly through Next.js Server Route Handler (`/api/quotation-request`) utilizing server-only `SUPABASE_SERVICE_ROLE_KEY`.
+- Staff authorization: Authenticated users require an active entry in `staff_profiles` with an authorized role (`admin`, `estimator`, etc.) to view or update records.
+- Auditability: `audit_logs` is strictly append-only; update and delete are denied via RLS.
+- GST Invoicing: Decimal-safe structure with HSN/SAC, place of supply, and dual/single tax allocation; calculations require certified accountant sign-off prior to production.
 
 ## Reusable components
 - `Header`: Responsive brand header with desktop nav, mobile drawer, and CTA.
 - `Footer`: Comprehensive corporate footer with scope lock, unverified disclaimer, and compliance links.
 
 ## Assumptions / awaiting confirmation
-Exact legal name confirmed as "Santhaya Associates Pvt. Ltd." via official logo asset. Official registered office address, phone, email, GSTIN, domain, and staff roles remain configurable placeholders.
+- Exact legal name confirmed as "Santhaya Associates Pvt. Ltd." via official logo asset.
+- Official registered office address, phone, email, GSTIN, domain, and staff roles remain configurable placeholders.
+- Corporate transactional email provider (Resend / AWS SES / SendGrid) awaiting confirmation for staff inquiry alerts.
 
 ## Session log
 - 2026-10-26: Confirmed construction tenders and machinery supply as exclusive business scope.
 - 2026-10-26: Inspected authentic brand assets in `public/`.
 - 2026-10-26: Received user approval for Phase 1 scaffolding. Implemented responsive header, homepage, 3 service pillars, about page, legal placeholders, and demo quotation form. Completed typecheck, lint, build, and HTTP verification. All checks passed.
-- 2026-10-26: Conducted Phase 1 comprehensive QA. Resolved missing quotation metadata, generic validation messages, and footer image loading. Re-verified lint, typecheck, build, and responsive screenshots across 4 screen sizes. Zero defects remaining. Awaiting user approval to proceed to Phase 2.
+- 2026-10-26: Conducted Phase 1 comprehensive QA. Resolved missing quotation metadata, generic validation messages, and footer image loading. Re-verified lint, typecheck, build, and responsive screenshots across 4 screen sizes. Zero defects remaining.
+- 2026-10-26: User approved Phase 1. Completed Phase 2A Supabase Architecture & Submission Planning specification (`docs/PHASE-2-ARCHITECTURE.md`). Awaiting human review before Phase 2B code execution.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
