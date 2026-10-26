@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-navy: #10243b;
+  --brand-navy-dark: #0b1929;
+  --brand-gold: #f4b323;
+  --brand-gold-hover: #d6960e;
+  --brand-white: #ffffff;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+body {
+  color: #1e293b;
+  background-color: #f8fafc;
+  min-height: 100dvh;
+}
+
+/* Accessible focus styling */
+:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 2px;
+}
+
+/* Ensure images maintain aspect ratio without distortion */
+img {
+  max-width: 100%;
+  height: auto;
+}
