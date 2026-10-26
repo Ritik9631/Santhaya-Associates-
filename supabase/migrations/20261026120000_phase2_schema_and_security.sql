@@ -291,6 +291,27 @@ ALTER FUNCTION public.check_rate_limit(TEXT, INT, INT, INT) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.check_rate_limit(TEXT, INT, INT, INT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.check_rate_limit(TEXT, INT, INT, INT) TO service_role;
 
+-- Rate limit maintenance: Prune expired rate limit counters
+CREATE OR REPLACE FUNCTION public.cleanup_expired_rate_limits()
+RETURNS INT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_deleted INT;
+BEGIN
+  DELETE FROM public.rate_limits
+  WHERE expires_at < timezone('utc'::text, now());
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  RETURN v_deleted;
+END;
+$$;
+
+ALTER FUNCTION public.cleanup_expired_rate_limits() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.cleanup_expired_rate_limits() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.cleanup_expired_rate_limits() TO service_role;
+
 -- Public Ingestion RPC: Restricted submission function with input restrictions & 409 conflict checks
 CREATE OR REPLACE FUNCTION public.submit_quotation_request(
   p_idempotency_key UUID,

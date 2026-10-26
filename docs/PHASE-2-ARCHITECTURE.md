@@ -720,7 +720,31 @@ CREATE POLICY "Deny all delete on quotation_requests"
   ALTER FUNCTION public.check_rate_limit(TEXT, INT, INT, INT) OWNER TO postgres;
   REVOKE ALL ON FUNCTION public.check_rate_limit(TEXT, INT, INT, INT) FROM PUBLIC, anon, authenticated;
   GRANT EXECUTE ON FUNCTION public.check_rate_limit(TEXT, INT, INT, INT) TO service_role;
+
+  -- Rate limit maintenance procedure: Prunes expired rate limit entries
+  CREATE OR REPLACE FUNCTION public.cleanup_expired_rate_limits()
+  RETURNS INT
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path = public, pg_temp
+  AS $$
+  DECLARE
+    v_deleted INT;
+  BEGIN
+    DELETE FROM public.rate_limits
+    WHERE expires_at < timezone('utc'::text, now());
+    GET DIAGNOSTICS v_deleted = ROW_COUNT;
+    RETURN v_deleted;
+  END;
+  $$;
+
+  ALTER FUNCTION public.cleanup_expired_rate_limits() OWNER TO postgres;
+  REVOKE ALL ON FUNCTION public.cleanup_expired_rate_limits() FROM PUBLIC, anon, authenticated;
+  GRANT EXECUTE ON FUNCTION public.cleanup_expired_rate_limits() TO service_role;
   ```
+- **Rate Limit & Idempotency Expiration / Cleanup Lifecycle:**
+  - `rate_limits` entries expire when `expires_at` is reached (15-minute sliding window). The `cleanup_expired_rate_limits()` function can be executed via cron or administrative maintenance to keep the table compact.
+  - `idempotency_key` values on `quotation_requests` have a 24-hour client replay window. The key remains stored on the row indefinitely to maintain an immutable audit trail of the original client submission token.
 - **Trustworthy IP Extraction (Vercel Hosting Platform):**
   - Do not trust unverified client-provided `X-Forwarded-For` headers.
   - On Vercel: The Vercel edge router terminates incoming TLS connections, discards untrusted client-supplied `x-real-ip` headers, and injects the authentic client socket IP into `x-real-ip` and `x-vercel-forwarded-for`.

@@ -240,6 +240,10 @@ export interface Database {
           retry_after: number;
         }[];
       };
+      cleanup_expired_rate_limits: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
     };
   };
 }
