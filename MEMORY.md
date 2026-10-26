@@ -1,17 +1,23 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-10-26 | Phase: 0 preparation | Implementation status: NOT STARTED
+Updated: 2026-10-26 | Phase: 2 Planning | Implementation status: Phase 1 Completed & Approved; Phase 2 Planning
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
 - Public quotation requests require no client login; staff manage quotations.
 - Business areas: government/private construction tenders, construction machinery supply, manufacturing machinery supply.
-- Stack: Next.js App Router + strict TypeScript + Tailwind + shadcn/ui; Supabase PostgreSQL/Auth/RLS planned; Vercel hosting; GitHub; server-generated PDFs and transactional email later.
+- Stack: Next.js App Router + strict TypeScript + Tailwind + Lucide + Zod; Supabase PostgreSQL/Auth/RLS planned; Vercel hosting; GitHub; server-generated PDFs and transactional email later.
 - Brand palette: navy #10243B, gold #F4B323, white #FFFFFF; use actual company logo when supplied.
 - Indian GST invoicing planned; place-of-supply, tax classifications and invoice obligations require accountant validation.
 - Work in sequential phases with explicit human approval before proceeding.
 
 ## Implemented features
-None. No application scaffold or backend has been verified.
+- Phase 1 Complete (Approved 2026-10-26):
+  - Next.js 14 App Router scaffold with strict TypeScript and Tailwind CSS.
+  - Responsive header incorporating authentic `santhaya-logo-header.png` (84.125px × 64px, 1.314:1 aspect ratio, 0.00% distortion) and mobile menu drawer with `santhaya-symbol.png`.
+  - Scope-locked service pages for 3 core pillars: Government & Private Construction Tenders, Construction Machinery Supply, Manufacturing Machinery Supply.
+  - About Us, Privacy Policy, Terms of Service pages.
+  - Client-side validated quotation request form with Zod schema and prominent non-operational preview warning.
+  - Verified with 0 lint errors, 0 typecheck errors, successful static build (9/9 routes), and headless Chrome automated QA across mobile (375px), tablet (768px), laptop (1366px), and desktop (1920px).
 
 ## Completed tasks
 - 2026-10-26: Prepared Santhaya-only starter documentation and preserved the technical executive summary as reference.
@@ -37,18 +43,14 @@ None. No application scaffold or backend has been verified.
     - `npm run build`: Passed (9/9 routes prerendered, 0 warnings)
     - Automated QA script: 0 broken images, 0 console errors, 0 overflow issues across all viewports.
   - Captured full visual QA screenshots saved in artifact directory.
+- 2026-10-26: User formally approved Phase 1. Completed Phase 1 milestone.
 
 ## Current phase and pending tasks
-- [x] Place genuine logo asset in `public/` if available.
-- [x] User approval of Phase 1 architecture and file structure.
-- [x] Phase 1 scaffold: Next.js App Router + TypeScript + Tailwind CSS.
-- [x] Implement responsive website header with `santhaya-logo-header.png` and `santhaya-symbol.png` (no distortion, preserved colors #10243B / #F4B323).
-- [x] Public pages (Home with 3 verified pillars, About, Services, How We Work, Privacy, Terms).
-- [x] Non-operational demo quotation form (`/request-quotation`) with client validation and explicit non-saving notice.
-- [x] Phase 1 lint/typecheck/build, navigation, responsive, and accessibility QA.
-- [x] Phase 1 visual and functional QA review completed and all confirmed defects resolved.
-- [ ] User review and approval gate to begin Phase 2.
-- [ ] Phase 2 secure Supabase persistence and anti-spam.
+- [x] Phase 1 completed, QA reviewed, and formally approved by user (2026-10-26).
+- [ ] User review and approval of Phase 2 detailed architecture plan.
+- [ ] Phase 2 Supabase schema migration and RLS policies.
+- [ ] Phase 2 public form server-side persistence, anti-spam, and rate limiting.
+- [ ] Phase 2 notification and end-to-end integration tests.
 - [ ] Phase 3 staff auth/roles/dashboard.
 - [ ] Phase 4 quotation PDFs and lifecycle.
 - [ ] Phase 5 GST invoices, orders and payment tracking after professional review.
