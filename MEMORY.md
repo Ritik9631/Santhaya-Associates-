@@ -86,11 +86,14 @@ Updated: 2026-10-27 | Phase: 2 Planning | Implementation status: Phase 1 Complet
 - [x] Phase 2B preparation: Created `.env.example` with variable placeholders only.
 - [x] Phase 2B preparation: Created type-safe database client utilities without credentials (`src/lib/supabase/*`).
 - [x] Phase 2B preparation: Prepared version-controlled SQL migration file (`supabase/migrations/20261026120000_phase2_schema_and_security.sql`).
-- [ ] User review and approval of migration SQL file and Phase 2B implementation report.
-- [ ] Phase 2B execution: apply database schema migrations and RLS policies on Supabase.
+- [x] Phase 2B preparation: Completed final SQL security audit & remediated RPC/concurrency defects.
+- [x] Phase 2B preparation: Prepared isolated SQL test suite (`supabase/tests/20261026120000_phase2_security_tests.sql`).
+- [x] Phase 2B preparation: Prepared automated Node.js security test runner (`scripts/test-phase2-security.mjs`).
+- [ ] User review and approval to execute development database test run.
+- [ ] Phase 2B execution: apply database schema migrations and RLS policies on development Supabase instance.
+- [ ] Phase 2B execution: run and verify automated security test suite (SEC-01 through SEC-15).
 - [ ] Phase 2B execution: implement server-side validation pipeline and `/api/quotation-request` route handler.
 - [ ] Phase 2B execution: connect client form to live API endpoint and verify live submission receipt badge.
-- [ ] Phase 2B execution: run integration test suite (SEC-01 through SEC-15).
 - [ ] Phase 3 staff auth/roles/dashboard.
 - [ ] Phase 4 quotation PDFs and lifecycle.
 - [ ] Phase 5 GST invoices, orders and payment tracking after professional review.
@@ -138,6 +141,7 @@ Updated: 2026-10-27 | Phase: 2 Planning | Implementation status: Phase 1 Complet
 - 2026-10-26: User granted Phase 2B Preparation Approval. Installed Supabase SDKs (`@supabase/supabase-js`, `@supabase/ssr`), created `.env.example`, database TypeScript interfaces (`src/types/database.ts`), server database client utilities (`src/lib/supabase/*`), version-controlled migration SQL (`supabase/migrations/20261026120000_phase2_schema_and_security.sql`), and updated architecture specification with 5 final corrections. Verified with lint, typecheck, and build (all passed). Awaiting human review before applying database migrations.
 - 2026-10-27: Codified and verified the permanent "Mandatory Authentication and Public Website Rule" across all project documents (`PRD.md`, `RULES.md`, `MEMORY.md`, `PHASES.md`, and `docs/PHASE-2-ARCHITECTURE.md`). Re-verified that all 10 requirements are explicitly aligned: zero public login/signup, zero public auth UI, unauthenticated quotation requests, admin-provisioned staff accounts only, server-side auth and role-based authorization, sitemap exclusion with noindex, no security through obscurity, data confidentiality, and strict deferral of staff login/dashboard during Phase 2. Execution halted pending human approval.
 - 2026-10-27: Executed Phase 2B Final SQL Security Audit on `supabase/migrations/20261026120000_phase2_schema_and_security.sql`. Identified and fixed 4 critical security & correctness defects: (1) Revoked `submit_quotation_request` from `anon` and `authenticated`, restricting `EXECUTE` strictly to server-only `service_role` so public anon keys cannot bypass Next.js edge rate-limiting and bot protection; (2) Revoked sequence `quotation_request_seq` from `anon` and `authenticated`; (3) Eliminated first-request concurrency race condition in `check_rate_limit` by introducing atomic `ON CONFLICT (key) DO NOTHING` initialization prior to `FOR UPDATE` row locking, plus added parameter validation guards; (4) Added explicit input validation on idempotency keys and SHA-256 hashes in `submit_quotation_request`; (5) Added explicit RLS insert/delete denial policies on `staff_profiles` and `audit_logs`. Verified with typecheck, lint, and production build (all passed). Zero database migrations executed; awaiting human review and approval.
+- 2026-10-27: Completed Phase 2B Development Testing Preparation: (1) Created isolated SQL test suite (`supabase/tests/20261026120000_phase2_security_tests.sql`) wrapping each security test in independent PL/pgSQL DO blocks with exception assertion handlers so expected errors do not abort script execution; (2) Created automated Node.js security test harness (`scripts/test-phase2-security.mjs`, registered as `npm run test:security`) with strict non-production URL safety guards and synthetic test data covering SEC-01 through SEC-11; (3) Confirmed quotation submission RPC is callable exclusively by server-side `service_role`; (4) Verified zero production credentials or customer data; (5) Confirmed public quotation form remains strictly in unintegrated demo mode; (6) Halted prior to migration execution and requested approval for test run.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
