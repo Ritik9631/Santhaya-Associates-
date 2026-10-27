@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test:connection": "node scripts/verify-supabase-connection.mjs",
     "test:security": "node scripts/test-phase2-security.mjs"
   },
   "dependencies": {

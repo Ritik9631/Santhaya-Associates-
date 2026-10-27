@@ -45,6 +45,7 @@ if (fs.existsSync(envLocalPath)) {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const devProjectRef = process.env.DEV_SUPABASE_PROJECT_REF;
 const allowTestEnv = process.env.ALLOW_TEST_ENV === 'true';
 const supabaseEnv = process.env.SUPABASE_ENV;
 
@@ -157,36 +158,59 @@ function runStaticAudits() {
 // 3. DATABASE TESTING SUITE (Requires verified development sandbox)
 // -----------------------------------------------------------------------------
 async function runDatabaseTests() {
+  // Validate explicit allowlisted development project reference
+  if (!devProjectRef || devProjectRef.trim() === '' || devProjectRef.startsWith('REPLACE_WITH_')) {
+    console.error('\n🚨 SAFETY HARD ABORT: Missing DEV_SUPABASE_PROJECT_REF.');
+    console.error('The test harness strictly requires an explicit allowlisted development project reference');
+    console.error('configured in .env.local to ensure tests cannot run against unauthorized environments.\n');
+    process.exit(1);
+  }
+
   // Validate production safety guards
   const FORBIDDEN_PROD_PATTERNS = ['prod', 'production', 'live', 'main', 'santhaya.in', 'santhaya.com'];
   const urlLower = supabaseUrl.toLowerCase();
-  const isForbiddenProd = FORBIDDEN_PROD_PATTERNS.some(pat => urlLower.includes(pat));
+  const refLower = devProjectRef.toLowerCase();
+
+  const isForbiddenProd = 
+    FORBIDDEN_PROD_PATTERNS.some(pat => urlLower.includes(pat)) ||
+    FORBIDDEN_PROD_PATTERNS.some(pat => refLower.includes(pat));
 
   if (isForbiddenProd) {
-    console.error('\n🚨 SAFETY HARD ABORT: Connected URL contains production indicators:');
+    console.error('\n🚨 SAFETY HARD ABORT: Connected URL or Project Ref contains production indicators:');
     console.error(`URL: ${supabaseUrl}`);
+    console.error(`Project Reference: ${devProjectRef}`);
     console.error('Testing against production environments is strictly prohibited by project rules.');
     process.exit(1);
   }
 
-  const isLocal = urlLower.includes('localhost') || urlLower.includes('127.0.0.1');
-  const isExplicitSandbox = urlLower.includes('dev') || urlLower.includes('sandbox') || urlLower.includes('test');
-
-  if (!isLocal && !isExplicitSandbox && !allowTestEnv) {
-    console.error('\n🚨 SAFETY ABORT: Connected Supabase URL appears to be non-development:');
-    console.error(`URL: ${supabaseUrl}`);
-    console.error('To run against a dedicated remote development project, the project name must contain');
-    console.error('"dev" or "sandbox", or set ALLOW_TEST_ENV=true and SUPABASE_ENV=development.\n');
+  // Extract project ref from URL and verify exact match
+  let extractedRef = null;
+  try {
+    const parsedUrl = new URL(supabaseUrl);
+    if (parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1') {
+      extractedRef = 'local';
+    } else {
+      extractedRef = parsedUrl.hostname.split('.')[0];
+    }
+  } catch (err) {
+    console.error('\n🚨 SAFETY ABORT: Invalid NEXT_PUBLIC_SUPABASE_URL format:', err.message);
     process.exit(1);
   }
 
-  if (allowTestEnv && supabaseEnv !== 'development' && !isLocal && !isExplicitSandbox) {
-    console.error('\n🚨 SAFETY ABORT: ALLOW_TEST_ENV=true is set, but SUPABASE_ENV is not "development"');
-    console.error('and URL has no sandbox markers. Aborting to prevent accidental production execution.\n');
+  if (extractedRef !== devProjectRef) {
+    console.error('\n🚨 SAFETY HARD ABORT: Connected project reference mismatch:');
+    console.error(`  URL Project Reference:         ${extractedRef}`);
+    console.error(`  Allowlisted DEV Reference:     ${devProjectRef}`);
+    console.error('The connected Supabase URL does not match the allowlisted development project reference.\n');
     process.exit(1);
   }
 
-  console.log(`\nConnected Target: ${supabaseUrl.replace(/:\/\/.*@/, '://***@')} (Development Sandbox Verified)`);
+  if (supabaseEnv !== 'development' || !allowTestEnv) {
+    console.error('\n🚨 SAFETY ABORT: Testing requires SUPABASE_ENV=development and ALLOW_TEST_ENV=true in .env.local.\n');
+    process.exit(1);
+  }
+
+  console.log(`\nConnected Target: https://${devProjectRef}.supabase.co (Explicitly Allowlisted Development Sandbox)`);
   console.log(`Timestamp: ${new Date().toISOString()}`);
 
   const anonClient = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
