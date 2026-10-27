@@ -151,6 +151,12 @@ Updated: 2026-10-27 | Phase: 2 Planning | Implementation status: Phase 1 Complet
      - `npm.cmd run lint`: PASSED (0 errors, 0 warnings).
      - `npm.cmd run build`: PASSED (All 9 static routes prerendered cleanly).
   4. Stopped immediately in accordance with safety directive ("Stop immediately if the environment cannot be positively verified as the development sandbox"). No remote or local development Supabase instance credentials exist in `.env.local` or environment variables. Zero production modifications made. Ready for user to provide disposable development sandbox credentials.
+- 2026-10-27: Prepared Supabase development sandbox connection safety layer:
+  1. Created strictly git-ignored `.env.local` template with placeholder variable names and updated `.env.example` to document `DEV_SUPABASE_PROJECT_REF`, `SUPABASE_ENV`, and `ALLOW_TEST_ENV`. Confirmed `.env.local` is ignored via `git check-ignore -v .env.local`.
+  2. Implemented dedicated read-only connectivity verification script `scripts/verify-supabase-connection.mjs` (`npm run test:connection`). Enforces exact match between URL hostname and allowlisted `DEV_SUPABASE_PROJECT_REF`, hard-aborts on production indicators, tests unauthenticated and service-role PostgREST handshake, verifies zero tables currently exist, and masks all credentials without logging or exposing secrets.
+  3. Updated `scripts/test-phase2-security.mjs` to require explicit allowlisted `DEV_SUPABASE_PROJECT_REF`.
+  4. Re-verified zero public auth UI across the application codebase (no login, signup, register, account, or dashboard links).
+  5. Tested verification script in awaiting-credentials state (`exit code 2`). Zero database migrations executed, zero tables created, zero database writes executed. Awaiting user to supply development sandbox credentials in `.env.local`.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
