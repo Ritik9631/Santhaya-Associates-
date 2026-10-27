@@ -46,7 +46,7 @@ END $$;
 
 -- ------------------------------------------------------------------------------
 -- TEST 2: Anonymous Direct Table Read Denial (REQ-07)
--- Expectation: Anonymous queries to all tables must return 0 rows via RLS
+-- Expectation: Anonymous queries to all tables must be denied via REVOKE or RLS
 -- ------------------------------------------------------------------------------
 DO $$
 DECLARE
@@ -54,35 +54,65 @@ DECLARE
 BEGIN
   SET LOCAL ROLE anon;
 
-  SELECT count(*) INTO v_count FROM public.staff_profiles;
-  IF v_count <> 0 THEN
-    RESET ROLE;
-    RAISE EXCEPTION 'TEST 2A FAILED: Anonymous user can read staff_profiles (count=%)', v_count;
-  END IF;
+  -- Test 2A: staff_profiles
+  BEGIN
+    SELECT count(*) INTO v_count FROM public.staff_profiles;
+    IF v_count <> 0 THEN
+      RESET ROLE;
+      RAISE EXCEPTION 'TEST 2A FAILED: Anonymous user can read staff_profiles (count=%)', v_count;
+    END IF;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL; -- Expected: Table privilege revocation blocks anonymous read
+  END;
 
-  SELECT count(*) INTO v_count FROM public.customers;
-  IF v_count <> 0 THEN
-    RESET ROLE;
-    RAISE EXCEPTION 'TEST 2B FAILED: Anonymous user can read customers (count=%)', v_count;
-  END IF;
+  -- Test 2B: customers
+  BEGIN
+    SELECT count(*) INTO v_count FROM public.customers;
+    IF v_count <> 0 THEN
+      RESET ROLE;
+      RAISE EXCEPTION 'TEST 2B FAILED: Anonymous user can read customers (count=%)', v_count;
+    END IF;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL; -- Expected: Table privilege revocation blocks anonymous read
+  END;
 
-  SELECT count(*) INTO v_count FROM public.quotation_requests;
-  IF v_count <> 0 THEN
-    RESET ROLE;
-    RAISE EXCEPTION 'TEST 2C FAILED: Anonymous user can read quotation_requests (count=%)', v_count;
-  END IF;
+  -- Test 2C: quotation_requests
+  BEGIN
+    SELECT count(*) INTO v_count FROM public.quotation_requests;
+    IF v_count <> 0 THEN
+      RESET ROLE;
+      RAISE EXCEPTION 'TEST 2C FAILED: Anonymous user can read quotation_requests (count=%)', v_count;
+    END IF;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL; -- Expected: Table privilege revocation blocks anonymous read
+  END;
 
-  SELECT count(*) INTO v_count FROM public.rate_limits;
-  IF v_count <> 0 THEN
-    RESET ROLE;
-    RAISE EXCEPTION 'TEST 2D FAILED: Anonymous user can read rate_limits (count=%)', v_count;
-  END IF;
+  -- Test 2D: rate_limits
+  BEGIN
+    SELECT count(*) INTO v_count FROM public.rate_limits;
+    IF v_count <> 0 THEN
+      RESET ROLE;
+      RAISE EXCEPTION 'TEST 2D FAILED: Anonymous user can read rate_limits (count=%)', v_count;
+    END IF;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL; -- Expected: Table privilege revocation blocks anonymous read
+  END;
 
-  SELECT count(*) INTO v_count FROM public.audit_logs;
-  IF v_count <> 0 THEN
-    RESET ROLE;
-    RAISE EXCEPTION 'TEST 2E FAILED: Anonymous user can read audit_logs (count=%)', v_count;
-  END IF;
+  -- Test 2E: audit_logs
+  BEGIN
+    SELECT count(*) INTO v_count FROM public.audit_logs;
+    IF v_count <> 0 THEN
+      RESET ROLE;
+      RAISE EXCEPTION 'TEST 2E FAILED: Anonymous user can read audit_logs (count=%)', v_count;
+    END IF;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL; -- Expected: Table privilege revocation blocks anonymous read
+  END;
 
   RESET ROLE;
   RAISE NOTICE 'TEST 2 PASSED: Anonymous users cannot read any data from staff, customer, quotation, rate limit, or audit tables.';
@@ -267,7 +297,7 @@ END $$;
 
 -- ------------------------------------------------------------------------------
 -- TEST 7: Audit Log Tamper-Resistance — UPDATE Attempt (REQ-05)
--- Expectation: Updating audit_logs MUST be blocked by trigger prevent_audit_log_mutation
+-- Expectation: Updating audit_logs MUST be blocked by trigger or privilege revocation
 -- ------------------------------------------------------------------------------
 DO $$
 DECLARE
@@ -280,8 +310,10 @@ BEGIN
     SET action = 'tampered_record'
     WHERE entity_type = 'quotation_request';
   EXCEPTION
+    WHEN insufficient_privilege THEN
+      v_caught_tamper := true;
     WHEN OTHERS THEN
-      IF SQLERRM LIKE '%Audit log entries are tamper-resistant%' THEN
+      IF SQLERRM LIKE '%Audit log entries are tamper-resistant%' OR SQLERRM LIKE '%permission denied%' THEN
         v_caught_tamper := true;
       END IF;
   END;
@@ -289,15 +321,15 @@ BEGIN
   RESET ROLE;
 
   IF v_caught_tamper THEN
-    RAISE NOTICE 'TEST 7 PASSED: Audit log UPDATE blocked by tamper-resistance trigger.';
+    RAISE NOTICE 'TEST 7 PASSED: Audit log UPDATE blocked by tamper-resistance protection.';
   ELSE
-    RAISE EXCEPTION 'TEST 7 FAILED: Audit log UPDATE was not blocked by trigger!';
+    RAISE EXCEPTION 'TEST 7 FAILED: Audit log UPDATE was not blocked!';
   END IF;
 END $$;
 
 -- ------------------------------------------------------------------------------
 -- TEST 8: Audit Log Tamper-Resistance — DELETE Attempt (REQ-05)
--- Expectation: Deleting from audit_logs MUST be blocked by trigger prevent_audit_log_mutation
+-- Expectation: Deleting from audit_logs MUST be blocked by trigger or privilege revocation
 -- ------------------------------------------------------------------------------
 DO $$
 DECLARE
@@ -309,8 +341,10 @@ BEGIN
     DELETE FROM public.audit_logs
     WHERE entity_type = 'quotation_request';
   EXCEPTION
+    WHEN insufficient_privilege THEN
+      v_caught_tamper := true;
     WHEN OTHERS THEN
-      IF SQLERRM LIKE '%Audit log entries are tamper-resistant%' THEN
+      IF SQLERRM LIKE '%Audit log entries are tamper-resistant%' OR SQLERRM LIKE '%permission denied%' THEN
         v_caught_tamper := true;
       END IF;
   END;
@@ -318,9 +352,9 @@ BEGIN
   RESET ROLE;
 
   IF v_caught_tamper THEN
-    RAISE NOTICE 'TEST 8 PASSED: Audit log DELETE blocked by tamper-resistance trigger.';
+    RAISE NOTICE 'TEST 8 PASSED: Audit log DELETE blocked by tamper-resistance protection.';
   ELSE
-    RAISE EXCEPTION 'TEST 8 FAILED: Audit log DELETE was not blocked by trigger!';
+    RAISE EXCEPTION 'TEST 8 FAILED: Audit log DELETE was not blocked!';
   END IF;
 END $$;
 
@@ -333,14 +367,24 @@ DECLARE
   v_viewer_id UUID := 'b0000000-0000-0000-0000-000000000001'::UUID;
   v_updated_rows INT;
 BEGIN
-  -- Setup: Create dummy staff member with role 'viewer' as service_role
+  -- Setup: Create dummy auth user if auth.users table exists
   SET LOCAL ROLE service_role;
+  BEGIN
+    INSERT INTO auth.users (id, email, role, aud, instance_id)
+    VALUES (v_viewer_id, 'viewer.test@santhaya.local', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000'::uuid)
+    ON CONFLICT (id) DO NOTHING;
+  EXCEPTION
+    WHEN OTHERS THEN
+      NULL; -- Fallback for test setups where auth schema is mocked
+  END;
+
+  -- Create dummy staff member with role 'viewer' as service_role
   INSERT INTO public.staff_profiles (id, email, full_name, role, is_active)
   VALUES (v_viewer_id, 'viewer.test@santhaya.local', 'Test Viewer Staff', 'viewer'::public.staff_role_enum, true)
   ON CONFLICT (id) DO UPDATE SET role = 'viewer'::public.staff_role_enum;
   RESET ROLE;
 
-  -- Test: Attempt self-promotion as authenticated user with viewer UID
+  -- Test 9A: Attempt self-promotion as authenticated user with viewer UID
   SET LOCAL ROLE authenticated;
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_viewer_id::text, 'role', 'authenticated')::text, true);
 
@@ -352,9 +396,42 @@ BEGIN
   RESET ROLE;
 
   IF v_updated_rows = 0 THEN
-    RAISE NOTICE 'TEST 9 PASSED: Viewer staff member cannot self-promote to admin (0 rows updated via RLS).';
+    RAISE NOTICE 'TEST 9A PASSED: Viewer staff member cannot self-promote to admin (0 rows updated via RLS).';
   ELSE
-    RAISE EXCEPTION 'TEST 9 FAILED: Viewer staff member was able to self-promote to admin!';
+    RAISE EXCEPTION 'TEST 9A FAILED: Viewer staff member was able to self-promote to admin!';
+  END IF;
+END $$;
+
+-- ------------------------------------------------------------------------------
+-- TEST 9B: Staff Self-Provisioning Denial (REQ-06)
+-- Expectation: Authenticated staff cannot INSERT new staff profiles (anti-self-registration)
+-- ------------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_rogue_id UUID := 'b0000000-0000-0000-0000-000000000002'::UUID;
+  v_caught_insert_denial BOOLEAN := false;
+BEGIN
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_rogue_id::text, 'role', 'authenticated')::text, true);
+
+  BEGIN
+    INSERT INTO public.staff_profiles (id, email, full_name, role, is_active)
+    VALUES (v_rogue_id, 'rogue.admin@santhaya.local', 'Rogue Admin', 'admin'::public.staff_role_enum, true);
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      v_caught_insert_denial := true;
+    WHEN OTHERS THEN
+      IF SQLERRM LIKE '%policy%' OR SQLERRM LIKE '%violates row-level security%' THEN
+        v_caught_insert_denial := true;
+      END IF;
+  END;
+
+  RESET ROLE;
+
+  IF v_caught_insert_denial THEN
+    RAISE NOTICE 'TEST 9B PASSED: Authenticated user cannot insert staff profile (self-provisioning blocked by RLS).';
+  ELSE
+    RAISE EXCEPTION 'TEST 9B FAILED: Authenticated user was able to insert a staff profile!';
   END IF;
 END $$;
 
@@ -379,6 +456,66 @@ BEGIN
     RAISE NOTICE 'TEST 10 PASSED: Anonymous user cannot access quotation_request_seq (permission denied).';
   ELSE
     RAISE EXCEPTION 'TEST 10 FAILED: Anonymous user was able to advance quotation_request_seq!';
+  END IF;
+END $$;
+
+-- ------------------------------------------------------------------------------
+-- TEST 11: Audit Log Direct INSERT Denial by Authenticated User (REQ-05)
+-- Expectation: Authenticated users cannot directly forge audit logs via INSERT
+-- ------------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_caught_audit_insert_denial BOOLEAN := false;
+BEGIN
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    INSERT INTO public.audit_logs (
+      entity_type, entity_id, action, actor_type, new_state
+    ) VALUES (
+      'quotation_request', gen_random_uuid(), 'forged_action', 'intruder', '{"fake": true}'::jsonb
+    );
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      v_caught_audit_insert_denial := true;
+    WHEN OTHERS THEN
+      IF SQLERRM LIKE '%policy%' OR SQLERRM LIKE '%violates row-level security%' THEN
+        v_caught_audit_insert_denial := true;
+      END IF;
+  END;
+  RESET ROLE;
+
+  IF v_caught_audit_insert_denial THEN
+    RAISE NOTICE 'TEST 11 PASSED: Authenticated user cannot insert forged audit log entries (denied by RLS/grants).';
+  ELSE
+    RAISE EXCEPTION 'TEST 11 FAILED: Authenticated user was able to insert an audit log entry!';
+  END IF;
+END $$;
+
+-- ------------------------------------------------------------------------------
+-- TEST 12: Audit Log TRUNCATE Denial (REQ-05)
+-- Expectation: Truncating audit_logs MUST be blocked
+-- ------------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_caught_truncate_denial BOOLEAN := false;
+BEGIN
+  SET LOCAL ROLE service_role;
+  BEGIN
+    TRUNCATE TABLE public.audit_logs;
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      v_caught_truncate_denial := true;
+    WHEN OTHERS THEN
+      IF SQLERRM LIKE '%tamper-resistant%' OR SQLERRM LIKE '%permission denied%' THEN
+        v_caught_truncate_denial := true;
+      END IF;
+  END;
+  RESET ROLE;
+
+  IF v_caught_truncate_denial THEN
+    RAISE NOTICE 'TEST 12 PASSED: TRUNCATE on audit_logs blocked by tamper-resistance protection.';
+  ELSE
+    RAISE EXCEPTION 'TEST 12 FAILED: TRUNCATE on audit_logs was not blocked!';
   END IF;
 END $$;
 

@@ -3,12 +3,15 @@
  * File: scripts/test-phase2-security.mjs
  *
  * Automated verification suite for testing the Supabase Phase 2B database architecture
- * against a disposable local or development Supabase instance.
+ * and static client bundle safety against a disposable local or development Supabase instance.
  *
  * CRITICAL SAFETY RULES:
- * 1. Strictly refuses to run against production environments.
+ * 1. Strictly refuses to run against production environments (hard abort on prod keywords,
+ *    ignoring any ALLOW_TEST_ENV bypass attempts).
  * 2. Uses only synthetic test data (zero real customer or company PII).
  * 3. Does not activate public quotation endpoints.
+ * 4. Accurately reports PASS, FAIL, and NOT RUN statuses (tests for unimplemented API
+ *    endpoints or unconfigured databases are explicitly marked NOT RUN, not PASS).
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -17,54 +20,41 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // -----------------------------------------------------------------------------
-// 1. ENVIRONMENT & SAFETY CHECKS
+// 1. ENVIRONMENT CONFIGURATION & AUTOMATIC .env.local PARSING
 // -----------------------------------------------------------------------------
+const envLocalPath = path.resolve('.env.local');
+if (fs.existsSync(envLocalPath)) {
+  const content = fs.readFileSync(envLocalPath, 'utf8');
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx > 0) {
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (!process.env[key]) {
+        process.env[key] = val;
+      }
+    }
+  }
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const allowTestEnv = process.env.ALLOW_TEST_ENV === 'true';
+const supabaseEnv = process.env.SUPABASE_ENV;
 
 console.log('================================================================');
-console.log('Santhaya Associates — Phase 2B Security Test Runner');
+console.log('Santhaya Associates — Phase 2B Security & Isolation Test Runner');
 console.log('================================================================');
-
-if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-  console.error('\n❌ ERROR: Missing required environment variables.');
-  console.error('Please configure NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,');
-  console.error('and SUPABASE_SERVICE_ROLE_KEY in .env.local before running tests.\n');
-  process.exit(1);
-}
-
-// Ensure URL is explicitly a development / local / sandbox environment
-const isLocalOrDev = 
-  supabaseUrl.includes('localhost') || 
-  supabaseUrl.includes('127.0.0.1') || 
-  supabaseUrl.includes('dev') || 
-  supabaseUrl.includes('sandbox') || 
-  supabaseUrl.includes('test') ||
-  allowTestEnv;
-
-if (!isLocalOrDev) {
-  console.error('\n🚨 SAFETY ABORT: Connected Supabase URL appears to be non-development:');
-  console.error(`URL: ${supabaseUrl}`);
-  console.error('To run against a dedicated remote development project, set ALLOW_TEST_ENV=true.\n');
-  process.exit(1);
-}
-
-console.log(`Target Environment: ${supabaseUrl} (Development / Sandbox)`);
-console.log(`Timestamp: ${new Date().toISOString()}\n`);
-
-// Initialize Clients
-const anonClient = createClient(supabaseUrl, anonKey, {
-  auth: { persistSession: false }
-});
-
-const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { persistSession: false, autoRefreshToken: false }
-});
 
 let passedCount = 0;
 let failedCount = 0;
+let notRunCount = 0;
 
 function assert(condition, testName, details = '') {
   if (condition) {
@@ -77,16 +67,132 @@ function assert(condition, testName, details = '') {
   }
 }
 
+function markNotRun(testName, reason) {
+  console.log(`  ⊘ NOT RUN: ${testName} (${reason})`);
+  notRunCount++;
+}
+
 // Helper to compute canonical payload hash
 function computeHash(payload) {
   return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
 
 // -----------------------------------------------------------------------------
-// 2. TEST EXECUTION SUITE
+// 2. STATIC CODE & BUNDLE AUDITS (Can run offline / without database)
 // -----------------------------------------------------------------------------
-async function runTests() {
-  console.log('--- Suite 1: Anonymous Access & Function Restriction Checks ---');
+function runStaticAudits() {
+  console.log('\n--- Suite A: Static Code & Bundle Security Audits ---');
+
+  // SEC-STATIC-01: Service Role Key Client Bundle Leak Audit
+  const dotNextDir = path.resolve('.next');
+  let leakedCount = 0;
+  if (fs.existsSync(dotNextDir)) {
+    function scanDirectory(dir) {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory() && entry.name !== 'server' && entry.name !== 'cache') {
+          scanDirectory(fullPath);
+        } else if (entry.isFile() && (entry.name.endsWith('.js') || entry.name.endsWith('.html'))) {
+          const content = fs.readFileSync(fullPath, 'utf8');
+          if (content.includes('SUPABASE_SERVICE_ROLE_KEY') || (serviceRoleKey && content.includes(serviceRoleKey))) {
+            leakedCount++;
+            console.error(`  🚨 KEY LEAK DETECTED in: ${fullPath}`);
+          }
+        }
+      }
+    }
+    scanDirectory(path.join(dotNextDir, 'static'));
+  }
+  assert(
+    leakedCount === 0,
+    'SEC-STATIC-01: Zero Service-Role Secrets in Client JS Bundles',
+    `Scanned .next/static client chunks; found ${leakedCount} leaks`
+  );
+
+  // SEC-STATIC-02: Public Request Quotation Form Operates Without Authentication
+  const formPagePath = path.resolve('src/app/request-quotation/page.tsx');
+  let formHasNoAuthReq = false;
+  if (fs.existsSync(formPagePath)) {
+    const formCode = fs.readFileSync(formPagePath, 'utf8');
+    const hasAuthImport = formCode.includes('auth.getSession') || formCode.includes('signInWith') || formCode.includes('useUser');
+    const hasLoginRedirect = formCode.includes('/login') || formCode.includes('/signin');
+    formHasNoAuthReq = !hasAuthImport && !hasLoginRedirect;
+  }
+  assert(
+    formHasNoAuthReq,
+    'SEC-STATIC-02: Public Quotation Form Operates Unauthenticated (No Auth Gate/Login Redirect)',
+    'Verified src/app/request-quotation/page.tsx does not require client authentication'
+  );
+
+  // SEC-STATIC-03: No Client Components Import Admin Client or Service Role Key
+  const appDir = path.resolve('src/app');
+  let illegalAdminImports = 0;
+  function scanClientComponents(dir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        scanClientComponents(fullPath);
+      } else if (entry.isFile() && (entry.name.endsWith('.tsx') || entry.name.endsWith('.ts'))) {
+        const content = fs.readFileSync(fullPath, 'utf8');
+        if (content.includes("'use client'") || content.includes('"use client"')) {
+          if (content.includes('@/lib/supabase/admin') || content.includes('createAdminClient') || content.includes('SUPABASE_SERVICE_ROLE_KEY')) {
+            illegalAdminImports++;
+            console.error(`  🚨 ILLEGAL ADMIN IMPORT in client component: ${fullPath}`);
+          }
+        }
+      }
+    }
+  }
+  scanClientComponents(appDir);
+  assert(
+    illegalAdminImports === 0,
+    'SEC-STATIC-03: Zero Admin Client Imports in Client Components',
+    `Scanned src/app; found ${illegalAdminImports} illegal imports in 'use client' files`
+  );
+}
+
+// -----------------------------------------------------------------------------
+// 3. DATABASE TESTING SUITE (Requires verified development sandbox)
+// -----------------------------------------------------------------------------
+async function runDatabaseTests() {
+  // Validate production safety guards
+  const FORBIDDEN_PROD_PATTERNS = ['prod', 'production', 'live', 'main', 'santhaya.in', 'santhaya.com'];
+  const urlLower = supabaseUrl.toLowerCase();
+  const isForbiddenProd = FORBIDDEN_PROD_PATTERNS.some(pat => urlLower.includes(pat));
+
+  if (isForbiddenProd) {
+    console.error('\n🚨 SAFETY HARD ABORT: Connected URL contains production indicators:');
+    console.error(`URL: ${supabaseUrl}`);
+    console.error('Testing against production environments is strictly prohibited by project rules.');
+    process.exit(1);
+  }
+
+  const isLocal = urlLower.includes('localhost') || urlLower.includes('127.0.0.1');
+  const isExplicitSandbox = urlLower.includes('dev') || urlLower.includes('sandbox') || urlLower.includes('test');
+
+  if (!isLocal && !isExplicitSandbox && !allowTestEnv) {
+    console.error('\n🚨 SAFETY ABORT: Connected Supabase URL appears to be non-development:');
+    console.error(`URL: ${supabaseUrl}`);
+    console.error('To run against a dedicated remote development project, the project name must contain');
+    console.error('"dev" or "sandbox", or set ALLOW_TEST_ENV=true and SUPABASE_ENV=development.\n');
+    process.exit(1);
+  }
+
+  if (allowTestEnv && supabaseEnv !== 'development' && !isLocal && !isExplicitSandbox) {
+    console.error('\n🚨 SAFETY ABORT: ALLOW_TEST_ENV=true is set, but SUPABASE_ENV is not "development"');
+    console.error('and URL has no sandbox markers. Aborting to prevent accidental production execution.\n');
+    process.exit(1);
+  }
+
+  console.log(`\nConnected Target: ${supabaseUrl.replace(/:\/\/.*@/, '://***@')} (Development Sandbox Verified)`);
+  console.log(`Timestamp: ${new Date().toISOString()}`);
+
+  const anonClient = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  console.log('\n--- Suite 1: Anonymous Access & Function Restriction Checks ---');
 
   // Test 1: Direct anonymous client RPC call to submit_quotation_request
   try {
@@ -298,7 +404,7 @@ async function runTests() {
 
   assert(
     rateErrors.length === 0 && allowedDeductions.length === 5,
-    'SEC-07: Atomic Rate Limiter First-Request Concurrency (Zero Unique Key Collisions)',
+    'SEC-07: Atomic Rate Limiter First-Request Concurrency (Zero Collisions)',
     `Completed 5 parallel deductions without errors (allowed=${allowedDeductions.length}/5)`
   );
 
@@ -317,7 +423,7 @@ async function runTests() {
     `Blocked: ${!blockedResult?.[0]?.allowed}, Retry-After: ${blockedResult?.[0]?.retry_after}s`
   );
 
-  console.log('\n--- Suite 4: Audit Log Immutability & Client Bundle Security ---');
+  console.log('\n--- Suite 4: Audit Log Immutability ---');
 
   // Test 9: Audit Log Mutation Block (UPDATE attempt)
   const { error: updateAuditError } = await adminClient
@@ -325,10 +431,13 @@ async function runTests() {
     .update({ action: 'tampered_status' })
     .eq('entity_type', 'quotation_request');
 
-  const updateBlocked = updateAuditError && updateAuditError.message.includes('Audit log entries are tamper-resistant');
+  const updateBlocked = updateAuditError && (
+    updateAuditError.message.includes('Audit log entries are tamper-resistant') ||
+    updateAuditError.message.includes('permission denied')
+  );
   assert(
     updateBlocked,
-    'SEC-09: Audit Log Immutability (UPDATE Statement Blocked by Trigger)',
+    'SEC-09: Audit Log Immutability (UPDATE Statement Blocked)',
     updateAuditError?.message || 'UPDATE was unexpectedly allowed!'
   );
 
@@ -338,45 +447,56 @@ async function runTests() {
     .delete()
     .eq('entity_type', 'quotation_request');
 
-  const deleteBlocked = deleteAuditError && deleteAuditError.message.includes('Audit log entries are tamper-resistant');
+  const deleteBlocked = deleteAuditError && (
+    deleteAuditError.message.includes('Audit log entries are tamper-resistant') ||
+    deleteAuditError.message.includes('permission denied')
+  );
   assert(
     deleteBlocked,
-    'SEC-10: Audit Log Immutability (DELETE Statement Blocked by Trigger)',
+    'SEC-10: Audit Log Immutability (DELETE Statement Blocked)',
     deleteAuditError?.message || 'DELETE was unexpectedly allowed!'
   );
+}
 
-  // Test 11: Service Role Key Client Bundle Leak Audit
-  const dotNextDir = path.resolve('.next');
-  let leakedCount = 0;
-  if (fs.existsSync(dotNextDir)) {
-    function scanDirectory(dir) {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory() && entry.name !== 'server' && entry.name !== 'cache') {
-          scanDirectory(fullPath);
-        } else if (entry.isFile() && (entry.name.endsWith('.js') || entry.name.endsWith('.html'))) {
-          const content = fs.readFileSync(fullPath, 'utf8');
-          if (content.includes('SUPABASE_SERVICE_ROLE_KEY') || (serviceRoleKey && content.includes(serviceRoleKey))) {
-            leakedCount++;
-            console.error(`  🚨 KEY LEAK DETECTED in: ${fullPath}`);
-          }
-        }
-      }
-    }
-    scanDirectory(path.join(dotNextDir, 'static'));
+// -----------------------------------------------------------------------------
+// 4. MAIN ORCHESTRATION
+// -----------------------------------------------------------------------------
+async function main() {
+  // Step 1: Always execute static security audits
+  runStaticAudits();
+
+  // Step 2: Check for database environment credentials
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    console.log('\n--- Suite B: Database Ingestion & Security Tests (PAUSED) ---');
+    console.log('ℹ️  STATUS: No development Supabase credentials found in environment or .env.local.');
+    console.log('    Per Phase 2B completion gate, database tests cannot run without a verified sandbox.');
+    console.log('    The following database-dependent tests are explicitly marked as NOT RUN:\n');
+
+    markNotRun('SEC-01: Anonymous RPC Ingestion Rejection', 'Requires connected dev database');
+    markNotRun('SEC-02: Anonymous Direct Table Reads Denial', 'Requires connected dev database');
+    markNotRun('SEC-03: Server-Role Quotation Submission', 'Requires connected dev database');
+    markNotRun('SEC-04: Idempotency Safe Replay (Identical Payload)', 'Requires connected dev database');
+    markNotRun('SEC-05: Idempotency Conflict Detection (Different Payload)', 'Requires connected dev database');
+    markNotRun('SEC-06: Concurrent Sequence Lock & Reference Generation', 'Requires connected dev database');
+    markNotRun('SEC-07: Atomic Rate Limiter First-Request Concurrency', 'Requires connected dev database');
+    markNotRun('SEC-08: Rate Limiter Capacity Exhaustion & Dynamic Retry-After', 'Requires connected dev database');
+    markNotRun('SEC-09: Audit Log Immutability (UPDATE Statement Blocked)', 'Requires connected dev database');
+    markNotRun('SEC-10: Audit Log Immutability (DELETE Statement Blocked)', 'Requires connected dev database');
+  } else {
+    // Run database tests against verified sandbox
+    await runDatabaseTests();
   }
-  assert(
-    leakedCount === 0,
-    'SEC-11: Zero Service-Role Secrets in Client JS Bundles',
-    `Scanned .next/static client chunks; found ${leakedCount} leaks`
-  );
 
-  // ---------------------------------------------------------------------------
-  // 3. FINAL SUMMARY
-  // ---------------------------------------------------------------------------
+  // Step 3: Record future API endpoint tests as NOT RUN
+  console.log('\n--- Suite C: HTTP Route Handler & Edge Gateway Tests ---');
+  markNotRun('API-01: POST /api/quotation-request Rate Limiting Verification', 'Route Handler scheduled for Phase 2B implementation');
+  markNotRun('API-02: Honeypot Anti-Bot Field (_company_fax) Silent Rejection', 'Route Handler scheduled for Phase 2B implementation');
+  markNotRun('API-03: Cloudflare / Vercel Edge IP Extraction & Hashing', 'Route Handler scheduled for Phase 2B implementation');
+  markNotRun('API-04: Client-side Form Hook Integration with /api/quotation-request', 'Form wiring scheduled for Phase 2B implementation');
+
+  // Step 4: Final Summary
   console.log('\n================================================================');
-  console.log(`TEST SUMMARY: ${passedCount} PASSED, ${failedCount} FAILED (Total: ${passedCount + failedCount})`);
+  console.log(`TEST SUMMARY: ${passedCount} PASSED | ${failedCount} FAILED | ${notRunCount} NOT RUN`);
   console.log('================================================================\n');
 
   if (failedCount > 0) {
@@ -384,7 +504,7 @@ async function runTests() {
   }
 }
 
-runTests().catch(err => {
+main().catch(err => {
   console.error('\nFatal exception in test suite:', err);
   process.exit(1);
 });
