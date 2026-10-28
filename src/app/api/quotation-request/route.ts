@@ -25,15 +25,6 @@ import {
   type QuotationApiInput,
 } from '@/lib/quotation/validation';
 
-export {
-  quotationApiSchema,
-  normalizeServiceCategory,
-  hashClientIp,
-  computePayloadHash,
-  extractClientIp,
-  type QuotationApiInput,
-};
-
 export async function POST(req: NextRequest) {
   try {
     // 1. Content-Type Check

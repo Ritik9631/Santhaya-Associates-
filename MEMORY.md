@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-10-28 | Phase: 2C Architecture Planning Completed | Implementation status: Phase 2B Verified; Phase 2C Planned (Halted for Review)
+Updated: 2026-10-29 | Phase: Stage 3A-3 Preparation Completed | Implementation status: Phase 1 Complete; Phase 2 Complete; Stage 3A-1 Verified; Stage 3A-2 Verified; Stage 3A-3 Planned & Prepared (Halted for Review)
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -26,6 +26,16 @@ Updated: 2026-10-28 | Phase: 2C Architecture Planning Completed | Implementation
 - Catalog Option A: Master `products_services` catalog for machinery, rentals, materials, transport, services; plus custom ad-hoc line items on quotes/invoices with immutable frozen price snapshots.
 - Staff Dashboard Architecture: 10 segregated navigation sections (Overview, Enquiries, Customers, Quotations, Billing, Catalog, Payments, Documents, Staff Admin, Settings). Public website has zero auth links.
 - Transactional Email: Provider-independent adapter pattern with durable database outbox queue and company Gmail inbox reception.
+- Automated Testing & Development Workflow Rule (Confirmed 2026-10-29):
+  1. The Antigravity agent is responsible for automatically performing all applicable development tests, security checks, regression tests, typechecks, lint checks, and production builds.
+  2. Automatically diagnose and fix test failures within the currently approved implementation scope, then rerun the relevant tests.
+  3. Do not require the project owner to manually perform routine testing after every development stage.
+  4. Provide concise phase-completion reports containing implementation status, automated test results, blockers, and the next recommended action.
+  5. The project owner will perform comprehensive manual functional and user-acceptance testing when the application is production-ready, before approving its public launch.
+  6. Continue to use safe development environments and non-destructive test data.
+  7. Require explicit human approval before applying database migrations, creating privileged staff accounts, sending real customer emails, changing production configuration, or deploying.
+  8. Do not bypass security requirements or mark untested functionality as verified.
+  9. Continue implementing only the currently approved development stage. Do not automatically begin unrelated stages.
 - Work in sequential phases with explicit human approval before proceeding.
 
 ## Implemented features
@@ -235,6 +245,217 @@ Updated: 2026-10-28 | Phase: 2C Architecture Planning Completed | Implementation
   1. Created comprehensive handover document at docs/DEVELOPMENT-HANDOVER.md detailing project phases, GitHub repository URL, Node.js version, clean setup instructions, required environment variables (names only, no secrets), Supabase dev reference (bkqneudnnhvvwmtggorz), applied vs pending migrations, verification commands, statutory Indian GST invoice numbering notes, outbox worker concurrency details, and exact steps for Phase 2D-B live database/Resend activation.
   2. Verified project health with typecheck, lint, and 41/41 Phase 2D tests passing.
   3. Staged and committed docs/DEVELOPMENT-HANDOVER.md and updated MEMORY.md for GitHub push.
+
+- 2026-10-29: Stage 3A-1 Authentication Foundation & Protected Routes Implemented and Verified:
+  1. Server Middleware Guard (`src/middleware.ts`): Intercepts `/staff/:path*`, explicitly permits unauthenticated `/staff/login`, redirects unauthenticated staff route attempts to `/staff/login` with preserved destination query (`redirectTo`).
+  2. Server-Side Session Guard (`src/lib/auth/session.ts`): Dual-barrier security verifying both Supabase Auth session (`getUser()`) and active database profile (`public.staff_profiles` where `is_active = true`). Throws redirects to `/staff/login?error=unauthorized` if profile is missing, or `/staff/login?error=inactive` if suspended.
+  3. Staff Authentication Placeholder (`src/app/(staff-auth)/staff/login/page.tsx`): Minimal Stage 3A-1 unauthenticated placeholder in isolated route group outside `staff/layout.tsx` to eliminate layout recursion; handles dynamic error banners for unauthorized, inactive, and session_expired states; renders `robots: { index: false, follow: false }`.
+  4. Staff Protected Layout & Dashboard (`src/app/staff/layout.tsx`, `src/app/staff/page.tsx`): Server component calling `requireStaffSession()`, displays authentic Santhaya Staff Portal branding, user identity, active role badge, and Stage 3 roadmap preview.
+  5. Decoupled Navigation: Updated `Header.tsx` and `Footer.tsx` to hide public navigation when path starts with `/staff`, maintaining clean boundary with zero login links on the public marketing site.
+  6. Next.js App Router Compliance: Cleaned non-standard schema re-exports from `src/app/api/quotation-request/route.ts` to satisfy strict Next.js App Router route typing.
+  7. Test Suite (`scripts/test-phase3a1-auth.mjs`, `npm.cmd run test:phase3a1`): 39 tests covering guard logic matrix, unauthenticated interception, redirect preservation, error banners, noindex tags, public site route availability, zero auth UI exposure, and database non-destructive invariants.
+  8. Full Verification Gates:
+     - `npm.cmd run test:phase3a1`: 39 PASSED, 0 FAILED.
+     - `npm.cmd run test:phase2d`: 41 PASSED, 0 FAILED.
+     - `npm.cmd run typecheck`: 0 errors.
+     - `npm.cmd run lint`: 0 errors, 0 warnings.
+     - `npm.cmd run build`: 12/12 routes compiled & prerendered cleanly.
+  9. Invariants Maintained: Zero SQL migrations executed, zero database records modified, zero staff accounts created, zero secrets exposed. Halted for human approval before Stage 3A-2.
+
+- 2026-10-29: Stage 3A-2 Staff Login UI, Credential Authentication & Logout Implemented and Verified:
+  1. Open-Redirect Sanitizer (`src/lib/auth/redirect.ts`): Rejection matrix covering 15 test vectors: external URLs, protocol-relative (`//`, `/\`), backslashes, JavaScript URIs, data URIs, URL-encoded bypasses (`%2F%2F`), path traversal (`/staff/../../`), and login loops.
+  2. Server Actions for Auth Lifecycle (`src/lib/auth/actions.ts`):
+     - `loginAction`: Input validation, salted HMAC-SHA256 IP and email rate limiting via existing `check_rate_limit` RPC (5 attempts/5min), Supabase Auth credential verification (`signInWithPassword`), dual-barrier validation against `public.staff_profiles` (`is_active = true`), immediate session revocation (`signOut()`) on missing or inactive profiles, generic error messaging preventing user enumeration, and sanitized redirect navigation.
+     - `logoutAction`: Revokes Supabase Auth session via `signOut()` and redirects to `/staff/login`.
+  3. Interactive Login Form (`src/app/(staff-auth)/staff/login/LoginForm.tsx`): Responsive UI with work email, password input with visibility toggle (accessible `aria-label`), submit state with spinner, inline field validation errors, and top-level generic error alert.
+  4. Login Page Integration (`src/app/(staff-auth)/staff/login/page.tsx`): Embeds `LoginForm`, handles URL `error` parameters (`unauthorized`, `inactive`, `session_expired`), preserves `redirectTo` param, returns `noindex, nofollow`, and retains clean link to public homepage.
+  5. Staff ERP Layout Logout Button (`src/app/staff/layout.tsx`): Integrates server-side logout form button into staff header alongside user profile badge; sets `dynamic = 'force-dynamic'` and `revalidate = 0`.
+  6. Anti-Cache Headers (`src/middleware.ts`): Emits `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate`, `Pragma: no-cache`, `Expires: 0`, and `X-Robots-Tag: noindex, nofollow` on all `/staff/*` routes to prevent back-button cache exposure after logout.
+  7. Automated Test Suite (`scripts/test-phase3a2-login.mjs`, `npm.cmd run test:phase3a2`): 55 tests covering open redirects, validation, rate limiting, dual-barrier mock authentication, logout revocation, live dev server endpoints, and non-destructive database invariants.
+  8. Full Verification Gates:
+     - `npm.cmd run test:phase3a2`: 55 PASSED, 0 FAILED.
+     - `npm.cmd run test:phase3a1`: 39 PASSED, 0 FAILED.
+     - `npm.cmd run test:phase2d`: 41 PASSED, 0 FAILED.
+     - `npm.cmd run typecheck`: 0 errors.
+     - `npm.cmd run lint`: 0 errors, 0 warnings.
+     - `npm.cmd run build`: 12/12 routes compiled & prerendered cleanly.
+  9. Strict Restrictions Preserved: Zero SQL migrations executed, zero database records modified, zero staff accounts created, zero secrets exposed. Halted for human approval before Stage 3A-3.
+
+- 2026-10-29: Stage 3A-3 Secure RBAC, Migration & Staff Administration Prepared:
+  1. Additive RBAC Migration Prepared (`supabase/migrations/20261029120000_stage3a_staff_auth_enhancements.sql`): Adds `'super_admin'` to `public.staff_role_enum`, abolishes broad direct table-level updates on `staff_profiles` in favor of column-level self-update (`full_name` only), and introduces atomic, hardened administrative RPCs (`admin_update_staff_role`, `admin_update_staff_status`, `admin_create_staff_profile`, `is_super_admin`).
+  2. Escalation & Privilege Protections: Enforces mathematical anti-self-escalation (`p_target_user_id = v_caller_id` rejected), ordinary admin ceiling (cannot grant or modify `admin`/`super_admin`), sole Super Admin demotion/deactivation lockout defense, and mandatory audit log insertion into `public.audit_logs`.
+  3. One-Time Super Admin Bootstrap Prepared (`scripts/bootstrap-super-admin.mjs`): Fully non-interactive, dry-run enabled, checks that zero Super Admins exist, targets approved project `bkqneudnnhvvwmtggorz`, ingests non-hardcoded credentials, reconciles orphaned auth users, and logs bootstrap event. Prepared only, NOT executed.
+  4. Comprehensive Architecture Design Documented (`docs/phase3/STAGE-3A3-RBAC-AND-ADMIN-DESIGN.md`).
+  5. Type Definitions Updated: Added `'super_admin'` to `StaffRole` union type in `src/types/database.ts`.
+  6. Verification Gates Passed:
+     - `npm.cmd run test:phase3a2`: 55 PASSED, 0 FAILED.
+     - `npm.cmd run test:phase3a1`: 39 PASSED, 0 FAILED.
+     - `npm.cmd run test:phase2d`: 41 PASSED, 0 FAILED.
+     - `npm.cmd run typecheck`: 0 errors.
+     - `npm.cmd run lint`: 0 errors, 0 warnings.
+     - `npm.cmd run build`: 12/12 routes compiled & prerendered cleanly.
+     - Bootstrap dry-run: Passed read-only preflight.
+  7. Invariants Maintained: Zero SQL migrations executed, zero database records modified, zero staff accounts created, zero secrets exposed, zero emails sent. Halted for human approval.
+
+- 2026-10-29: Automated Testing & Development Workflow Policy Codified:
+  1. Updated `AGENTS.md` and `MEMORY.md` with the 9 mandatory project-wide workflow rules.
+  2. Antigravity agent is confirmed responsible for automatically executing all unit, security, regression, typecheck, lint, and build verification gates and autonomously remediating failures within approved scope.
+  3. Relieved project owner from routine testing after every development stage; project owner will perform comprehensive manual functional and acceptance testing when the app is production-ready prior to public launch.
+  4. Preserved mandatory human approval gates for database migrations, staff user creation, email dispatches, configuration changes, and deployments.
+  5. Zero database changes, zero user creations, zero deployments, and zero git commits/pushes performed.
+
+- 2026-10-29: Stage 3A-3 Security Finalization & Stage 3A-5 Staff Management Interface Completed:
+  1. Concurrency Serialization via Transaction-Scoped Advisory Locking:
+     - Hardened supabase/migrations/20261029120000_stage3a_staff_auth_enhancements.sql with PERFORM pg_advisory_xact_lock(847291048291); in both admin_update_staff_role and admin_update_staff_status.
+     - Serializes all concurrent Super Admin demotion/deactivation transactions across all connections, preventing race conditions from reaching zero active Super Admins.
+     - Added zero-argument parameterless convenience overloads public.is_super_admin() and public.is_active_staff().
+     - Verified audit log INSERT statements in RPCs match the exact public.audit_logs schema (entity_type, entity_id, action, actor_type, actor_id, previous_state, new_state).
+  2. Safe Bootstrap Recovery & Legitimate Account Protection:
+     - Updated scripts/bootstrap-super-admin.mjs with isNewAuthUser check: rollback deletes ONLY newly created accounts and preserves pre-existing accounts during failure recovery.
+     - Set actor_id: null in pending bootstrap audit log to prevent foreign key violations before the staff profile exists.
+  3. Stage 3A-5 Staff Management ERP Interface Implemented:
+     - Server Actions (src/lib/auth/staff-actions.ts): inviteStaffAction (role ceilings: admin can only invite estimator/billing/viewer; super_admin can invite all roles), updateStaffRoleAction (super_admin only, anti-self-escalation), updateStaffStatusAction (anti-self-deactivation, role ceilings), updateOwnProfileNameAction (column-level update on full_name).
+     - Dashboard Shell (src/app/staff/layout.tsx, StaffSidebar.tsx): Responsive sidebar, mobile toggle, role-aware navigation badges, account summary, server-side logout.
+     - Master Overview (src/app/staff/page.tsx, ProfileNameEditor.tsx): ERP welcome banner, inline name editing, quick metrics, core module launchpad.
+     - Staff Directory (src/app/staff/team/page.tsx): Directory table with member details, role badges, status badges, join dates, and Manage links.
+     - Staff Invitation Form (src/app/staff/team/invite/page.tsx, InviteStaffForm.tsx): Dynamic role ceiling filtering, high-entropy password generation, zero external email policy, copyable temporary credentials banner.
+     - Staff Detail & Management (src/app/staff/team/[id]/page.tsx, StaffDetailManager.tsx): Role modification dropdown (Super Admin only), account suspension/reactivation toggle with confirmation dialogs, and immutable audit log history timeline.
+  4. Automated Verification Results (All 8 Suites Passed):
+     - npm.cmd run test:phase3a5: 45 PASSED, 0 FAILED.
+     - npm.cmd run test:phase3a3: 53 PASSED, 0 FAILED.
+     - npm.cmd run test:phase3a2: 55 PASSED, 0 FAILED.
+     - npm.cmd run test:phase3a1: 39 PASSED, 0 FAILED.
+     - npm.cmd run test:phase2d: 41 PASSED, 0 FAILED.
+     - npm.cmd run typecheck: 0 errors.
+     - npm.cmd run lint: 0 errors, 0 warnings.
+     - npm.cmd run build: 14/14 routes compiled and prerendered cleanly.
+     - Bootstrap dry-run: Read-only preflight passed cleanly against bkqneudnnhvvwmtggorz.
+  5. Invariants Maintained: Zero SQL migrations executed, zero database records modified, zero staff accounts created, zero secrets exposed, zero emails sent. Halted for explicit human approval for migration execution.
+
+- 2026-10-29: Phase 3A Invitation Hardened & Phase 3B Customer/Catalog Master Architecture Completed:
+  1. Invitation Flow Hardened (src/lib/auth/staff-actions.ts, InviteStaffForm.tsx):
+     - Tagged provisioned Auth accounts with must_change_password: true metadata.
+     - Integrated single-use cryptographic invitation setup link generation via Supabase Auth Admin generateLink().
+     - Dual-mode delivery presented in UI: Option A (Single-Use Setup Link, recommended) and Option B (Direct Temporary Credentials fallback with zero plaintext DB storage).
+  2. Phase 3B Master Architecture Prepared (docs/phase3/PHASE-3B-ARCHITECTURE.md):
+     - Designed customer management supporting direct registration without prior enquiries (Workflows B, C, D).
+     - Designed Option A master catalog (products_services table for construction machinery sales/rental, tender services, materials).
+     - Statutory Indian GST place-of-supply, HSN/SAC codes, and NUMERIC(15,2) decimal monetary accuracy.
+     - Separate staff navigation sections for Quotations and Billing.
+  3. Automated Gates Passed Cleanly: All 8 test suites, typecheck (0 errors), lint (0 errors), and build (14/14 routes compiled).
+  4. Invariants Maintained: Zero SQL migrations executed, zero database records modified, zero staff accounts created, zero emails sent. Halted at human approval gate.
+
+- 2026-10-29: Phase 3A & Phase 3B Activation Preflight Verified:
+  1. Target Environment Verified: Hard-checked against approved Supabase development project `bkqneudnnhvvwmtggorz`.
+  2. Database Status Inspected: Confirmed Phase 2B (5 tables) and Phase 2D (`email_outbox`) are present and operational; confirmed Phase 3A enum and Phase 3B `products_services` are not yet applied.
+  3. Preflight Quality Gates Passed (100%):
+     - `npm.cmd run test:phase2d`: 41/41 PASSED
+     - `npm.cmd run test:phase3a1`: 39/39 PASSED
+     - `npm.cmd run test:phase3a2`: 55/55 PASSED
+     - `npm.cmd run test:phase3a3`: 53/53 PASSED
+     - `npm.cmd run test:phase3a5`: 45/45 PASSED
+     - `npm.cmd run test:phase3b`: 47/47 PASSED
+     - `npm.cmd run typecheck`: 0 errors
+     - `npm.cmd run lint`: 0 errors, 0 warnings
+     - `npm.cmd run build`: 18/18 routes compiled cleanly
+     - `node scripts/bootstrap-super-admin.mjs --dry-run`: PASSED
+  4. Post-Migration Verification Scripts Created & Registered:
+     - `scripts/verify-phase3a-migration.mjs` (`npm run test:phase3a-status`)
+     - `scripts/verify-phase3b-migration.mjs` (`npm run test:phase3b-status`)
+     - `scripts/verify-super-admin.mjs` (`npm run test:super-admin`)
+  5. Security & Safety Invariants Preserved: Zero secrets exposed, zero public auth UI leaks, zero unauthorized database mutations. Prepared for authorized execution sequence.
+
+- 2026-10-29: Stage 3A Database Migrations Applied & Verified on Dev Sandbox (`bkqneudnnhvvwmtggorz`):
+  1. User executed Step A (`ALTER TYPE public.staff_role_enum ADD VALUE IF NOT EXISTS 'super_admin'`) and Step B (`supabase/migrations/20261029120001_stage3a_step_b_rbac_enhancements.sql`) in Supabase SQL Editor.
+  2. Executed `npm.cmd run test:phase3a-status`: ALL CHECKS PASSED.
+     - Confirmed `'super_admin'` is present in `public.staff_role_enum`.
+     - Confirmed anonymous SELECT on `public.staff_profiles` is blocked by RLS.
+     - Confirmed anonymous EXECUTE denied on all 5 RPCs (`is_super_admin`, `is_active_staff`, `admin_update_staff_role`, `admin_update_staff_status`, `admin_create_staff_profile`).
+     - Confirmed parameterless overloads `is_super_admin()` and `is_active_staff()` are compiled and functional.
+     - Confirmed `admin_update_staff_role` and `admin_update_staff_status` enforce UNAUTHENTICATED caller checks.
+     - Confirmed `admin_create_staff_profile` is compiled and enforces foreign key integrity with `auth.users`.
+     - Confirmed `staff_profiles` is accessible to `service_role` (0 records currently).
+  3. Regression Suites Verified Clean: `npm.cmd run test:phase3a3` (53/53 PASSED), `npm.cmd run test:phase3a5` (45/45 PASSED).
+  4. Invariants Preserved: Zero accounts created, zero emails dispatched, zero git commits/pushes. Ready for human-approved initial Super Admin bootstrap.
+
+- 2026-10-29: Phase 3C Full Quotation Management System Implemented & Verified:
+  1. Exact Decimal & Indian GST Engine (`src/lib/quotation/calculations.ts`):
+     - Exact half-up decimal rounding preventing IEEE 754 drift.
+     - Place of supply engine: Intra-state (Delhi to Delhi: 50% CGST + 50% SGST), Inter-state (Delhi to other states: 100% IGST), Non-GST support.
+     - Indian Rupee amount in words converter (`convertNumberToIndianWords`).
+     - Quotation lifecycle transition validator (`isAllowedStatusTransition`).
+  2. Database Architecture & Additive Migration (`supabase/migrations/20261029160000_phase3c_quotations.sql`):
+     - Tables: `quotations`, `quotation_versions`, `quotation_items`, `quotation_acceptances`, `quotation_delivery_logs`.
+     - Sequences & RPC: `quotation_number_seq`, `generate_quotation_number()`.
+     - Strict `NUMERIC(15,2)` decimal types and RLS policies restricting access to active staff only.
+     - Post-migration status verifier: `scripts/verify-phase3c-migration.mjs` (`npm run test:phase3c-status`).
+  3. Server Actions & Business Logic (`src/lib/quotation/actions.ts`):
+     - `createQuotationAction`, `issueQuotationAction`, `reviseQuotationAction`, `recordQuotationAcceptanceAction`, `updateQuotationStatusAction`, `recordQuotationDeliveryAction`.
+     - Version locking: locks previous version snapshot and timestamps issuance.
+     - Manual customer acceptance recording (channel, contact person, client PO number, notes).
+     - Delivery event tracking with Resend outbox queue integration.
+  4. User Interface & Printable PDF:
+     - `/staff/quotations` (directory, KPI cards, search, status filters).
+     - `/staff/quotations/new` & `QuotationForm.tsx` (customer selector, catalog picker, live GST calculation).
+     - `/staff/quotations/[id]` & `QuotationDetailView.tsx` (detail view, version history switcher, acceptance modal).
+     - `/staff/quotations/[id]/pdf` (print-optimized, branded official A4 PDF layout).
+     - Updated `StaffSidebar.tsx` activating `Quotations` navigation item.
+  5. Automated Verification Gates Passed (100%):
+     - `npm.cmd run test:phase3c`: 72/72 PASSED.
+     - `npm.cmd run test:phase3b`: 47/47 PASSED.
+     - `npm.cmd run test:phase3a5`: 45/45 PASSED.
+     - `npm.cmd run test:phase3a3`: 53/53 PASSED.
+     - `npm.cmd run test:phase3a2`: 55/55 PASSED
+     - `npm.cmd run test:phase3a1`: 39/39 PASSED.
+     - `npm.cmd run test:phase2d`: 41/41 PASSED.
+     - `npm.cmd run typecheck`: 0 errors.
+     - `npm.cmd run lint`: 0 errors, 0 warnings.
+     - `npm.cmd run build`: 20/20 routes compiled and prerendered cleanly.
+  6. Invariants Preserved: Zero unapproved SQL migrations executed, zero privileged accounts created, zero emails dispatched, zero deployments, zero git commits/pushes. Ready for human review and database approvals.
+
+- 2026-10-29: Phase 3D Billing, Invoicing & Payments System Implemented & Verified:
+  1. Statutory Invoicing & Calculation Engine (`src/lib/billing/calculations.ts`, `src/lib/billing/company-config.ts`):
+     - Configurable statutory company profile (`getCompanyBillingProfile()` with environment overrides; zero hardcoded Delhi assumptions).
+     - Financial year boundary calculator (`getCurrentFinancialYear()`, April 1 transition, e.g. Oct 2026 -> `26-27`).
+     - Exact Indian GST allocation: Intra-state (CGST + SGST) vs Inter-state (IGST).
+     - Full support for Bill of Supply (Section 31(3)(c)) & Non-GST supply (0% tax).
+     - Decimal precision with half-up rounding and nearest rupee grand totals.
+     - Payment balance reconciliation: tracks multiple partial payments, handles status transitions (`draft` -> `issued` -> `partially_paid` -> `paid`, `overdue`, `cancelled`).
+     - CGST Rule 46(b) gapless numbering format: `formatStatutoryInvoiceNumber()`.
+  2. Database Architecture & Additive Migration (`supabase/migrations/20261029180000_phase3d_billing_and_payments.sql`):
+     - Enums: `invoice_type_enum`, `invoice_status_enum`, `payment_method_enum`.
+     - Gapless sequence engine: `public.invoice_sequence_counters` and atomic stored procedure `allocate_invoice_number(p_fy, p_series)` with `FOR UPDATE` row lock.
+     - Tables: `public.invoices`, `public.invoice_items`, `public.invoice_payments`.
+     - Strict `NUMERIC(15,2)` decimal constraints and positive amount checks.
+     - Row Level Security (RLS) enabled on all 4 billing tables; access revoked from `PUBLIC` and `anon`; authenticated access governed by role (`super_admin`, `admin`, `billing_manager`).
+     - Post-migration status verifier: `scripts/verify-phase3d-migration.mjs` (`npm run test:phase3d-status`).
+  3. Server Actions & Business Workflows (`src/lib/billing/actions.ts`):
+     - `createInvoiceAction`: creates draft invoice for direct sales/services (Workflows C & D).
+     - `convertQuotationToInvoiceAction`: converts accepted quotation to draft invoice with snapshot preservation and duplicate conversion guard (Workflow B).
+     - `issueInvoiceAction`: allocates statutory gapless invoice number via stored procedure and locks invoice.
+     - `recordPaymentAction`: records payment receipts (`RCPT-YYYY-XXXXX`), reconciles balance, and updates status.
+     - `cancelInvoiceAction`: voids invoice with audit reason; forbids cancellation if payments exist.
+  4. User Interface & Statutory Printable PDF:
+     - `/staff/billing` (Directory & KPI cards: Invoiced, Collected, Balance, Overdue; Search & Status filters).
+     - `/staff/billing/new` & `InvoiceForm.tsx` (Direct invoice creation & Quotation conversion tab).
+     - `/staff/billing/[id]` & `InvoiceDetailView.tsx` (Detail view, payment recording modal, void modal).
+     - `/staff/billing/[id]/pdf` (Statutory A4 Tax Invoice / Bill of Supply printable layout).
+     - Updated `StaffSidebar.tsx` activating `GST Invoices` navigation item.
+  5. Automated Verification Gates Passed (100%):
+     - `npm.cmd run test:phase3d`: 35/35 PASSED.
+     - `npm.cmd run test:phase3c`: 72/72 PASSED.
+     - `npm.cmd run test:phase3b`: 47/47 PASSED.
+     - `npm.cmd run test:phase3a5`: 45/45 PASSED.
+     - `npm.cmd run test:phase3a3`: 53/53 PASSED.
+     - `npm.cmd run test:phase3a2`: 55/55 PASSED.
+     - `npm.cmd run test:phase3a1`: 39/39 PASSED.
+     - `npm.cmd run test:phase2d`: 41/41 PASSED.
+     - `npm.cmd run test:security`: 17/17 PASSED.
+     - Total Automated Assertions: 404 PASSED, 0 FAILED across all 9 test suites.
+     - `npm.cmd run typecheck`: 0 errors.
+     - `npm.cmd run lint`: 0 errors, 0 warnings.
+     - `npm.cmd run build`: 30/30 routes compiled and prerendered cleanly.
+  6. Invariants Preserved: Zero unapproved SQL migrations executed, zero privileged accounts created, zero emails dispatched, zero deployments, zero git commits/pushes. Ready for human review and database approvals.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

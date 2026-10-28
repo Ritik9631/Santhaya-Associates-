@@ -12,7 +12,20 @@
     "test:migration-status": "node scripts/verify-phase2-migration.mjs",
     "test:phase2d": "node scripts/test-phase2d-preparation.mjs",
     "test:phase2d-status": "node scripts/verify-phase2d-migration.mjs",
-    "test:security": "node scripts/test-phase2-security.mjs"
+    "test:phase3a1": "node scripts/test-phase3a1-auth.mjs",
+    "test:phase3a2": "node --experimental-strip-types scripts/test-phase3a2-login.mjs",
+    "test:phase3a3": "node scripts/test-phase3a3-security.mjs",
+    "test:security": "node scripts/test-phase2-security.mjs",
+    "test:phase3a5": "node scripts/test-phase3a5-staff.mjs",
+    "test:phase3a-status": "node scripts/verify-phase3a-migration.mjs",
+    "test:phase3b": "node scripts/test-phase3b-customer-catalog.mjs",
+    "test:phase3b-status": "node scripts/verify-phase3b-migration.mjs",
+    "test:phase3c": "node --experimental-strip-types scripts/test-phase3c-quotations.mjs",
+    "test:phase3c-status": "node scripts/verify-phase3c-migration.mjs",
+    "test:phase3d": "node --experimental-strip-types scripts/test-phase3d-billing.mjs",
+    "test:phase3d-status": "node scripts/verify-phase3d-migration.mjs",
+    "test:lifecycle": "node --experimental-strip-types scripts/test-phase3-lifecycle-integration.mjs",
+    "test:super-admin": "node scripts/verify-super-admin.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
