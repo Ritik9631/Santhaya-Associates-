@@ -9,6 +9,9 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test:connection": "node scripts/verify-supabase-connection.mjs",
+    "test:migration-status": "node scripts/verify-phase2-migration.mjs",
+    "test:phase2d": "node scripts/test-phase2d-preparation.mjs",
+    "test:phase2d-status": "node scripts/verify-phase2d-migration.mjs",
     "test:security": "node scripts/test-phase2-security.mjs"
   },
   "dependencies": {

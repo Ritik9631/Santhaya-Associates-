@@ -123,7 +123,7 @@ console.log('\n[PASS] Target Environment Allowlist Check:');
 console.log(`  Project Reference:         ${devProjectRef}`);
 console.log(`  Target Hostname:           ${extractedRef}.supabase.co`);
 console.log(`  Environment Mode:          ${supabaseEnv} (ALLOW_TEST_ENV=true)`);
-console.log(`  Credentials Status:        Masked (Anon: ${anonKey.slice(0, 8)}...len=${anonKey.length}, Service: ${serviceRoleKey.slice(0, 8)}...len=${serviceRoleKey.length})`);
+console.log('  Credentials Status:        Configured and Masked (Zero characters exposed)');
 
 // -----------------------------------------------------------------------------
 // 4. READ-ONLY CONNECTIVITY CHECK (Zero Writes, Zero Migrations)
@@ -179,7 +179,7 @@ async function verifyConnectivity() {
   // 3. Migration Status Check (Confirm Phase 2 schema is NOT yet applied)
   try {
     const { data, error } = await adminClient.from('quotation_requests').select('id').limit(1);
-    if (error && (error.code === 'PGRST204' || error.code === '42P01' || error.message.includes('relation'))) {
+    if (error && (error.code === 'PGRST204' || error.code === 'PGRST205' || error.code === '42P01' || error.message.includes('relation') || error.message.includes('find'))) {
       migrationApplied = false;
       console.log('  ✓ PASS: Migration Check (Confirmed: Phase 2 tables do not yet exist)');
     } else if (data) {

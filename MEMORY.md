@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-10-27 | Phase: 2 Planning | Implementation status: Phase 1 Completed & Approved; Phase 2 Planning
+Updated: 2026-10-28 | Phase: 2C Architecture Planning Completed | Implementation status: Phase 2B Verified; Phase 2C Planned (Halted for Review)
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -18,6 +18,14 @@ Updated: 2026-10-27 | Phase: 2 Planning | Implementation status: Phase 1 Complet
 - Stack: Next.js App Router + strict TypeScript + Tailwind + Lucide + Zod; Supabase PostgreSQL/Auth/RLS planned; Vercel hosting; GitHub; server-generated PDFs and transactional email later.
 - Brand palette: navy #10243B, gold #F4B323, white #FFFFFF; use actual company logo when supplied.
 - Indian GST invoicing planned; place-of-supply, tax classifications and invoice obligations require accountant validation.
+- Four independent workflows approved:
+  1. Workflow A: Website Enquiry -> Quotation -> Invoice
+  2. Workflow B: Direct Quotation Without Website Enquiry (phone/WhatsApp/in-person; enquiry_id nullable)
+  3. Workflow C: Direct Sale -> Invoice Without Quotation (direct machinery/materials purchase; quotation_id nullable)
+  4. Workflow D: Standalone Service Billing (equipment rental, transport, civil services; independent invoice flow)
+- Catalog Option A: Master `products_services` catalog for machinery, rentals, materials, transport, services; plus custom ad-hoc line items on quotes/invoices with immutable frozen price snapshots.
+- Staff Dashboard Architecture: 10 segregated navigation sections (Overview, Enquiries, Customers, Quotations, Billing, Catalog, Payments, Documents, Staff Admin, Settings). Public website has zero auth links.
+- Transactional Email: Provider-independent adapter pattern with durable database outbox queue and company Gmail inbox reception.
 - Work in sequential phases with explicit human approval before proceeding.
 
 ## Implemented features
@@ -88,16 +96,15 @@ Updated: 2026-10-27 | Phase: 2 Planning | Implementation status: Phase 1 Complet
 - [x] Phase 2B preparation: Prepared version-controlled SQL migration file (`supabase/migrations/20261026120000_phase2_schema_and_security.sql`).
 - [x] Phase 2B preparation: Completed final SQL security audit & remediated RPC/concurrency defects.
 - [x] Phase 2B preparation: Prepared isolated SQL test suite (`supabase/tests/20261026120000_phase2_security_tests.sql`).
-- [x] Phase 2B preparation: Prepared automated Node.js security test runner (`scripts/test-phase2-security.mjs`).
-- [ ] User review and approval to execute development database test run.
-- [ ] Phase 2B execution: apply database schema migrations and RLS policies on development Supabase instance.
-- [ ] Phase 2B execution: run and verify automated security test suite (SEC-01 through SEC-15).
-- [ ] Phase 2B execution: implement server-side validation pipeline and `/api/quotation-request` route handler.
-- [ ] Phase 2B execution: connect client form to live API endpoint and verify live submission receipt badge.
-- [ ] Phase 3 staff auth/roles/dashboard.
-- [ ] Phase 4 quotation PDFs and lifecycle.
-- [ ] Phase 5 GST invoices, orders and payment tracking after professional review.
-- [ ] Phase 6 security, accessibility, backup, compliance and deployment checks.
+- [x] User review and approval to execute development database test run.
+- [x] Phase 2B execution: applied database schema migrations and RLS policies on development Supabase instance (`bkqneudnnhvvwmtggorz`, verified 2026-10-28).
+- [x] Phase 2C architecture planning completed (`docs/PHASE-2C-ARCHITECTURE.md`, `docs/PHASE-2C-DATABASE-PLAN.md`, `docs/PHASE-2C-EMAIL-PLAN.md`, `docs/PHASE-2C-SECURITY-PLAN.md`, `docs/PHASE-2C-IMPLEMENTATION-ROADMAP.md`).
+- [ ] User review and approval of Phase 2C architecture deliverables.
+- [ ] Phase 2D execution: public enquiry persistence, honeypot/rate-limit API route, durable email outbox, and Gmail alert integration.
+- [ ] Phase 3A execution: staff authentication (admin-provisioned), private dashboard layout, enquiry review, and customer records.
+- [ ] Phase 3B execution: product catalog (Option A), direct & enquiry-based quotations, versioning, manual acceptance, PDF generator.
+- [ ] Phase 3C execution: billing & invoice management, quotation conversion, accountant GST review, invoice PDFs, and payments.
+- [ ] Phase 3D execution: comprehensive integration testing, financial rounding audit, email resilience, disaster recovery, and release readiness.
 
 ## Design decisions
 - Brand palette: Deep Navy `#10243B`, Industrial Gold `#F4B323`, Clean White `#FFFFFF`.
@@ -156,8 +163,74 @@ Updated: 2026-10-27 | Phase: 2 Planning | Implementation status: Phase 1 Complet
   2. Implemented dedicated read-only connectivity verification script `scripts/verify-supabase-connection.mjs` (`npm run test:connection`). Enforces exact match between URL hostname and allowlisted `DEV_SUPABASE_PROJECT_REF`, hard-aborts on production indicators, tests unauthenticated and service-role PostgREST handshake, verifies zero tables currently exist, and masks all credentials without logging or exposing secrets.
   3. Updated `scripts/test-phase2-security.mjs` to require explicit allowlisted `DEV_SUPABASE_PROJECT_REF`.
   4. Re-verified zero public auth UI across the application codebase (no login, signup, register, account, or dashboard links).
-  5. Tested verification script in awaiting-credentials state (`exit code 2`). Zero database migrations executed, zero tables created, zero database writes executed. Awaiting user to supply development sandbox credentials in `.env.local`.
+- 2026-10-28: Connected and verified Supabase development sandbox (`bkqneudnnhvvwmtggorz`):
+  1. Configured `.env.local` with development project details: `NEXT_PUBLIC_SUPABASE_URL=https://bkqneudnnhvvwmtggorz.supabase.co`, `DEV_SUPABASE_PROJECT_REF=bkqneudnnhvvwmtggorz`, `NEXT_PUBLIC_SUPABASE_ANON_KEY=[REDACTED_DEV_ANON_KEY]`, and user manually supplied server-only `SUPABASE_SERVICE_ROLE_KEY`. Confirmed `.env.local` is strictly ignored by Git.
+  2. Verified API key compatibility: confirmed `@supabase/supabase-js@2.118.0` has native built-in support for new-format keys (`sb_publishable_` and `sb_secret_`), attaching them properly to `apikey` headers without JWT parsing errors.
+  3. Hardened `scripts/verify-supabase-connection.mjs` to eliminate credential slice printing and ensure zero secret or anon key characters appear in logs.
+  4. Executed safe read-only connection check (`npm.cmd run test:connection`): PASS. PostgREST gateway successfully authenticated both anon and service-role requests; confirmed Phase 2 schema tables do not yet exist (0 tables created, zero database writes, zero migrations run).
+  5. Connection status: VERIFIED. Development project allowlist locked to `bkqneudnnhvvwmtggorz`. Ready for user review before proceeding with any Phase 2B migration steps.
+- 2026-10-28: Post-migration verification completed on Supabase development sandbox (`bkqneudnnhvvwmtggorz`):
+  1. User executed `20261026120000_phase2_schema_and_security.sql` in Supabase SQL Editor ("Success. No rows returned.").
+  2. Created `scripts/verify-phase2-migration.mjs` and registered npm script `test:migration-status`.
+  3. Executed `npm.cmd run test:migration-status`: ALL PASSED.
+     - Confirmed all 5 tables exist in schema cache: `staff_profiles`, `customers`, `quotation_requests`, `rate_limits`, `audit_logs`.
+     - Confirmed RLS is active on all 5 tables and direct anonymous `SELECT` is blocked.
+     - Confirmed `submit_quotation_request` RPC execution is revoked from anonymous users.
+  4. Executed `npm.cmd run test:connection`: Confirmed `Phase 2 Migrations Applied: YES`.
+  5. Inspected Supabase CLI migration history status: because the migration was applied via Dashboard SQL Editor, `supabase_migrations.schema_migrations` does not have an entry unless reconciled with `supabase migration repair --status applied 20261026120000`. The remote database schema itself is 100% verified and active.
+  6. Verified `npm.cmd run typecheck` (0 errors) and `npm.cmd run lint` (0 errors). Stopped per instruction awaiting user authorization.
+- 2026-10-28: Completed Phase 2C Final Consolidated Architecture Planning:
+  1. Inspected existing project code, verified tables, security test harnesses, and client utilities.
+  2. Defined 4 decoupled workflows: Workflow A (Website Enquiry -> Quote -> Invoice), Workflow B (Direct Quotation without Enquiry), Workflow C (Direct Sale without Quotation), Workflow D (Standalone Service Billing).
+  3. Formulated 10-section private Staff Dashboard architecture with complete public UI auth isolation.
+  4. Designed Catalog Option A: reusable saved items for machinery, rentals, materials, transport, services + custom ad-hoc items with frozen snapshots.
+  5. Formulated additive database plan (10 new tables, sequences, financial balance triggers, RLS policies, CLI migration history repair plan).
+  6. Formulated provider-independent transactional email plan with durable outbox queue and Gmail reception.
+  7. Formulated comprehensive security, threat modeling, anti-escalation, and private storage plan.
+  8. Created master phased implementation roadmap (Phase 2C -> 2D -> 3A -> 3B -> 3C -> 3D).
+  9. Produced 5 architecture documents in `docs/`: `PHASE-2C-ARCHITECTURE.md`, `PHASE-2C-DATABASE-PLAN.md`, `PHASE-2C-EMAIL-PLAN.md`, `PHASE-2C-SECURITY-PLAN.md`, `PHASE-2C-IMPLEMENTATION-ROADMAP.md`.
+  10. Enforced mandatory execution restrictions: zero migrations run, zero database records modified, zero emails sent, zero deployments. Halted for human review.
+- 2026-10-28: Completed Phase 2D-A Safe Implementation Preparation:
+  1. Implemented secure Next.js quotation enquiry API (`src/app/api/quotation-request/route.ts`) with Zod schema validation matching database column limits, anti-spam honeypot defense (`_company_fax`), rapid-submission risk flagging (< 2.5s), salted IP hashing, atomic token bucket rate limiting via `check_rate_limit` RPC, and SHA-256 payload normalization.
+  2. Prepared additive SQL migration (`supabase/migrations/20261028120000_phase2d_email_outbox.sql`) without applying it: defines `email_status_enum`, `public.email_outbox` table, partial polling index, RLS access revocation from public/anon/authenticated, service_role grants, and atomic stored procedure `submit_quotation_request_atomic`.
+  3. Implemented provider-independent transactional email subsystem (`src/lib/email/*`): `types.ts`, `templates/admin-enquiry-alert.ts` (brand-aligned Deep Navy `#10243B` and Industrial Gold `#F4B323` with plain-text fallback), `providers/resend-provider.ts` (Resend REST adapter), `providers/mock-provider.ts` (in-memory mock provider), and `factory.ts` (unified provider getter with test fallbacks).
+  4. Implemented durable outbox worker (`src/lib/email/outbox-worker.ts`) with authenticated execution via secret token, bounded concurrency, 5-stage exponential backoff (+1m, +5m, +15m, +1h -> dead_letter), crash recovery for stale processing jobs (> 10m), duplicate-delivery mitigation via provider idempotency keys, and PII-scrubbed logging.
+  5. Updated quotation intake form (`src/app/request-quotation/page.tsx`): wired to secure API endpoint `/api/quotation-request` with client-generated UUID v4 idempotency keys, render timing measurement, and honeypot field.
+  6. Updated `src/types/database.ts` with complete GenericSchema definitions (`email_outbox` table, `submit_quotation_request_atomic` RPC, `Relationships: []` on all tables, `Views`, `Enums`, `CompositeTypes`), achieving 100% type safety with `@supabase/supabase-js`.
+  7. Statutory Correction Recorded: PostgreSQL sequences (`nextval`) do NOT guarantee gapless numbering (transaction rollbacks and concurrent aborted sessions consume sequence numbers and leave gaps). For statutory Indian GST invoices, gapless numbering requires assigning sequence numbers strictly at the moment of invoice issuance (transition from draft to issued) and accounting for cancelled numbers in statutory returns (GSTR-1 Table 13) or via formal Credit Notes under CGST Act Section 34. Certified Chartered Accountant approval is mandatory before Phase 3C release.
+  8. Future Migration Reconciliation Plan Documented: `npx supabase migration repair --status applied 20261026120000` will reconcile the CLI metadata table `supabase_migrations.schema_migrations` without re-running DDL.
+  9. Executed full verification suite:
+     - `npm.cmd run test:phase2d`: 41 PASSED, 0 FAILED.
+     - `npm.cmd run typecheck`: 0 errors.
+     - `npm.cmd run lint`: 0 errors, 0 warnings.
+     - `npm.cmd run test:migration-status`: 5 tables verified in Supabase development sandbox `bkqneudnnhvvwmtggorz`, RLS active, anonymous RPC revoked.
+  10. Enforced mandatory restrictions: zero SQL migrations applied, zero database records modified, zero emails transmitted, zero deployments, and zero public authentication changes. Halted for human approval before Phase 2D-B.
+
+- 2026-10-28: Completed Phase 2D-B Updated Business Requirements, Security Corrections & Integration Preparation:
+  1. Resend Free-Tier Architecture & Safeguards: Established server-side Resend free-tier for company Gmail alerts (`INTERNAL_NOTIFICATION_EMAIL`), verified sender (`EMAIL_FROM_ADDRESS`), with configurable usage limits (`EMAIL_DAILY_LIMIT` default 80, `EMAIL_MONTHLY_LIMIT` default 2500) and non-destructive queue pausing when quotas are reached. Enquiry persistence is completely independent of email availability.
+  2. Staff Customer Contact Flexibility: Updated architecture and types so both `email` and `phone` are nullable in `customers`. Staff can create customers with neither contact method provided if statutory business identity fields (`company_name`, `billing_state`, `client_type`) are present.
+  3. Public Enquiry Single-Contact Rules: Enforced cross-field validation requiring at least one contact method (Phone-only ACCEPT, Email-only ACCEPT, Both ACCEPT, Neither REJECT, Invalid formats REJECT). Decoupled validation into `src/lib/quotation/validation.ts`.
+  4. Manual Phone & WhatsApp Quotation Delivery: Planned offline quotation delivery without customer email dependency. System generates unique reference (`QTN-YYYY-XXXXX`), allows PDF download, and records delivery details (`phone`, `whatsapp`, `in_person`, `printed`) manually without paid SMS or WhatsApp Business APIs.
+  5. Outbox Worker Concurrency Hardening: Remediated optimistic locking race condition in `src/lib/email/outbox-worker.ts` by appending `.select('id')` and validating that exactly 1 row was claimed (`claimedRows && claimedRows.length === 1`), skipping dispatch on 0-row updates. Prepared database procedure `claim_email_outbox_batch` with `FOR UPDATE SKIP LOCKED`.
+  6. Trusted Reverse-Proxy IP Security: Implemented `extractClientIp` to isolate untrusted `X-Forwarded-For` injection, requiring production edge proxies (Vercel/Cloudflare) to overwrite/sanitize forwarded headers.
+  7. Authenticated Cron Endpoint Implemented: Created `src/app/api/cron/process-outbox/route.ts` with constant-time secret comparison (`crypto.timingSafeEqual`), bounded batch sizing, quota-limit checks, and zero customer PII logging.
+  8. Prepared Additive Migration Updated: Updated `supabase/migrations/20261028120000_phase2d_email_outbox.sql` with `ALTER TABLE` statements for `quotation_requests` and `customers` to drop NOT NULL on email/phone, added `quotation_contact_check`, updated `submit_quotation_request_atomic`, and added `claim_email_outbox_batch`.
+  9. Executed full verification gates:
+     - `npm.cmd run test:phase2d`: 41/41 PASSED, 0 FAILED.
+     - `npm.cmd run typecheck`: 0 errors.
+     - `npm.cmd run lint`: 0 errors, 0 warnings.
+  10. Enforced mandatory restrictions: zero migrations applied, zero database writes, zero real emails sent, zero deployments. Halted for human review.
+
+
+- 2026-10-28: Safe First GitHub Connection, Commit & Push:
+  1. Inspected local Git repository on branch master with existing commit history intact.
+  2. Verified approved GitHub remote repository (https://github.com/Ritik9631/Santhaya-Associates-.git) via git ls-remote; confirmed remote repository is completely empty with zero existing branches or commits.
+  3. Configured origin remote pointing to https://github.com/Ritik9631/Santhaya-Associates-.git.
+  4. Executed comprehensive secret audit across repository, tracked files, untracked files, and documentation. Verified .gitignore covers .env*, confirmed zero credentials/passwords/secret keys in source code, migrations, tests, or documentation.
+  5. Verified project health gates: npm.cmd run typecheck (0 errors), npm.cmd run lint (0 errors), npm.cmd run test:phase2d (41/41 passed).
+  6. Staged reviewed application files, documentation, brand assets, tests, and prepared Phase 2D source migration without executing migrations, database writes, or email dispatches.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
+
 

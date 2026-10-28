@@ -15,6 +15,7 @@ export type StaffRole = 'admin' | 'estimator' | 'billing_manager' | 'viewer';
 export type CustomerType = 'government' | 'private_corporate' | 'contractor' | 'individual';
 export type ServiceCategory = 'construction_tenders' | 'construction_machinery' | 'manufacturing_machinery';
 export type QuotationRequestStatus = 'new' | 'under_review' | 'quotation_drafted' | 'rejected' | 'archived';
+export type EmailStatus = 'pending' | 'processing' | 'sent' | 'failed' | 'dead_letter';
 
 export interface Database {
   public: {
@@ -46,14 +47,15 @@ export interface Database {
           is_active?: boolean;
           updated_at?: string;
         };
+        Relationships: [];
       };
       customers: {
         Row: {
           id: string;
           company_name: string;
           primary_contact_person: string;
-          email: string;
-          phone: string;
+          email: string | null;
+          phone: string | null;
           gstin: string | null;
           billing_address: string | null;
           billing_state: string;
@@ -67,8 +69,8 @@ export interface Database {
           id?: string;
           company_name: string;
           primary_contact_person: string;
-          email: string;
-          phone: string;
+          email?: string | null;
+          phone?: string | null;
           gstin?: string | null;
           billing_address?: string | null;
           billing_state: string;
@@ -81,8 +83,8 @@ export interface Database {
         Update: {
           company_name?: string;
           primary_contact_person?: string;
-          email?: string;
-          phone?: string;
+          email?: string | null;
+          phone?: string | null;
           gstin?: string | null;
           billing_address?: string | null;
           billing_state?: string;
@@ -91,6 +93,7 @@ export interface Database {
           notes?: string | null;
           updated_at?: string;
         };
+        Relationships: [];
       };
       quotation_requests: {
         Row: {
@@ -99,13 +102,13 @@ export interface Database {
           customer_id: string | null;
           business_name: string;
           contact_person: string;
-          email: string;
-          phone: string;
+          email: string | null;
+          phone: string | null;
           gstin: string | null;
           service_category: ServiceCategory;
           requirement_details: string;
           quantity: string | null;
-          technical_specs: string | null;
+          technicalSpecs: string | null;
           delivery_location: string;
           notes: string | null;
           privacy_consent: boolean;
@@ -125,13 +128,13 @@ export interface Database {
           customer_id?: string | null;
           business_name: string;
           contact_person: string;
-          email: string;
-          phone: string;
+          email?: string | null;
+          phone?: string | null;
           gstin?: string | null;
           service_category: ServiceCategory;
           requirement_details: string;
           quantity?: string | null;
-          technical_specs?: string | null;
+          technicalSpecs?: string | null;
           delivery_location: string;
           notes?: string | null;
           privacy_consent: boolean;
@@ -146,13 +149,30 @@ export interface Database {
           updated_at?: string;
         };
         Update: {
+          reference_number?: string;
           customer_id?: string | null;
+          business_name?: string;
+          contact_person?: string;
+          email?: string | null;
+          phone?: string | null;
+          gstin?: string | null;
+          service_category?: ServiceCategory;
+          requirement_details?: string;
+          quantity?: string | null;
+          technicalSpecs?: string | null;
+          delivery_location?: string;
+          notes?: string | null;
+          privacy_consent?: boolean;
           status?: QuotationRequestStatus;
           assigned_staff_id?: string | null;
-          notes?: string | null;
+          submission_ip_hash?: string;
+          user_agent?: string | null;
+          idempotency_key?: string;
+          request_payload_hash?: string;
           risk_flag?: string | null;
           updated_at?: string;
         };
+        Relationships: [];
       };
       rate_limits: {
         Row: {
@@ -172,6 +192,7 @@ export interface Database {
           last_refilled_at?: string;
           expires_at?: string;
         };
+        Relationships: [];
       };
       audit_logs: {
         Row: {
@@ -198,8 +219,65 @@ export interface Database {
           new_state?: Json | null;
           created_at?: string;
         };
-        Update: never; // Immutable
+        Update: Record<string, never>; // Immutable
+        Relationships: [];
       };
+      email_outbox: {
+        Row: {
+          id: string;
+          recipient_email: string;
+          subject: string;
+          email_type: string;
+          payload: Json;
+          status: string;
+          attempts: number;
+          max_attempts: number;
+          next_retry_at: string;
+          provider_message_id: string | null;
+          error_message: string | null;
+          related_entity_type: string | null;
+          related_entity_id: string | null;
+          created_at: string;
+          processed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          recipient_email: string;
+          subject: string;
+          email_type: string;
+          payload: Json;
+          status?: string;
+          attempts?: number;
+          max_attempts?: number;
+          next_retry_at?: string;
+          provider_message_id?: string | null;
+          error_message?: string | null;
+          related_entity_type?: string | null;
+          related_entity_id?: string | null;
+          created_at?: string;
+          processed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          recipient_email?: string;
+          subject?: string;
+          email_type?: string;
+          payload?: Json;
+          status?: string;
+          attempts?: number;
+          max_attempts?: number;
+          next_retry_at?: string | null;
+          provider_message_id?: string | null;
+          error_message?: string | null;
+          related_entity_type?: string | null;
+          related_entity_id?: string | null;
+          processed_at?: string | null;
+        };
+        Relationships: [];
+      };
+    };
+    Views: {
+      [_ in never]: never;
     };
     Functions: {
       submit_quotation_request: {
@@ -225,8 +303,42 @@ export interface Database {
         Returns: {
           reference_number: string;
           created_at: string;
-          result_status: 'created' | 'replayed';
+          result_status: string;
         }[];
+      };
+      submit_quotation_request_atomic: {
+        Args: {
+          p_idempotency_key: string;
+          p_request_payload_hash: string;
+          p_business_name: string;
+          p_contact_person: string;
+          p_email: string | null;
+          p_phone: string | null;
+          p_gstin: string | null;
+          p_service_category: ServiceCategory;
+          p_requirement_details: string;
+          p_quantity: string | null;
+          p_technical_specs: string | null;
+          p_delivery_location: string;
+          p_notes: string | null;
+          p_privacy_consent: boolean;
+          p_submission_ip_hash: string;
+          p_user_agent: string | null;
+          p_risk_flag?: string;
+          p_admin_notification_email?: string;
+        };
+        Returns: {
+          reference_number: string;
+          created_at: string;
+          result_status: string;
+          outbox_id: string;
+        }[];
+      };
+      claim_email_outbox_batch: {
+        Args: {
+          p_batch_size?: number;
+        };
+        Returns: Database['public']['Tables']['email_outbox']['Row'][];
       };
       check_rate_limit: {
         Args: {
@@ -244,6 +356,16 @@ export interface Database {
         Args: Record<string, never>;
         Returns: number;
       };
+    };
+    Enums: {
+      staff_role_enum: StaffRole;
+      customer_type_enum: CustomerType;
+      service_category_enum: ServiceCategory;
+      quotation_request_status_enum: QuotationRequestStatus;
+      email_status_enum: EmailStatus;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 }
