@@ -87,6 +87,12 @@ it('Customer actions normalize empty state, state_code, phone, and email to null
   assert.ok(actionsCode.includes('normalizedEmail = email && email.trim() !== \'\' ? email.trim().toLowerCase() : null'), 'Email normalized to null when empty');
 });
 
+it('Migration file makes billing_state nullable without data loss', () => {
+  const sql = fs.readFileSync('supabase/migrations/20261031230000_make_customer_billing_state_nullable.sql', 'utf8');
+  assert.ok(sql.includes('ALTER TABLE public.customers'), 'Targets public.customers');
+  assert.ok(sql.includes('ALTER COLUMN billing_state DROP NOT NULL'), 'Drops NOT NULL constraint');
+});
+
 it('Quotation calculation accurately classifies all three conditions (intra-state, interstate, undetermined)', () => {
   const items = [{ item_name: 'Test Drill', quantity: 1, unit_rate: 10000, gst_rate: 18 }];
 

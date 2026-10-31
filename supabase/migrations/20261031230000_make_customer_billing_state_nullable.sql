@@ -3,7 +3,7 @@
 -- Batch: Acceptance Testing Fix BUG-010
 -- Author: Santhaya Engineering Team
 -- Date: 2026-10-31
--- Status: PENDING EXPLICIT HUMAN APPROVAL (DO NOT RUN WITHOUT APPROVAL)
+-- Status: APPLIED MANUALLY IN DEVELOPMENT SUPABASE (2026-11-01) — VERIFIED READ-ONLY (billing_state is_nullable = YES)
 
 -- 1. Alter public.customers column billing_state to drop NOT NULL constraint
 ALTER TABLE public.customers

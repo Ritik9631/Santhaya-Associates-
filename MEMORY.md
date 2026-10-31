@@ -514,7 +514,7 @@ Updated: 2026-10-31 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediatio
      - Removed hardcoded 'Tamil Nadu' and state code '33' defaults from `CustomerForm.tsx` and `src/lib/customers/actions.ts`. State and state code are optional for customer record creation.
      - Hardened Place of Supply logic: `calculateQuotationTotals` and `calculateInvoiceTotals` no longer fall back silently to company state code when Place of Supply is missing.
      - Added strict financial enforcement in `issueQuotationAction` and `issueInvoiceAction`: Issuance of taxable quotations or statutory tax invoices is blocked if `place_of_supply_state_code` is missing, preventing illegal or erroneous tax determination.
-     - Prepared minimal, versioned migration `supabase/migrations/20261031230000_make_customer_billing_state_nullable.sql` to drop `NOT NULL` from `public.customers.billing_state` (pending explicit user approval and execution).
+     - Prepared and verified migration `supabase/migrations/20261031230000_make_customer_billing_state_nullable.sql`. Applied manually by project owner in development Supabase project `bkqneudnnhvvwmtggorz` SQL Editor (2026-11-01); verified via read-only PostgREST OpenAPI schema cache (`billing_state` `is_nullable = YES`).
   3. BUG-011 (Remove Repetitive NAP from Top Utility Bar): Removed top contact utility bar from `Header.tsx` to streamline the desktop and tablet header while preserving complete clickable phone, email, and location details in `Footer.tsx` and Contact section.
   4. BUG-012 (Quotation Form Copy Polish): Replaced technical architecture note on `/request-quotation` with client-centric welcoming copy explaining review and follow-up procedures.
   5. BUG-013 (Quotation Intake Layout & Spacing): Optimized outer and section padding, enhanced responsive field grid, and added `scroll-mt-28` to form sections to prevent header occlusion during in-page navigation.
@@ -530,6 +530,12 @@ Updated: 2026-10-31 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediatio
      - `npm.cmd run build`: 26/26 routes compiled cleanly (including new `/staff/enquiries`).
      - `npm.cmd run test:batch2`: 16/16 regression assertions passed.
      - `npm.cmd run test`: Full test battery (over 570 assertions across 12 suites) passed with 0 failures.
+
+- 2026-11-01: Manual Development Database Migration Applied & Verified (BUG-010):
+  1. Manual Execution by Project Owner: Executed `ALTER TABLE public.customers ALTER COLUMN billing_state DROP NOT NULL;` in development Supabase project `bkqneudnnhvvwmtggorz` SQL Editor.
+  2. Cache Reload: Successfully executed `NOTIFY pgrst, 'reload schema';`.
+  3. Read-Only Schema Verification: Inspected live PostgREST OpenAPI schema specification (`https://bkqneudnnhvvwmtggorz.supabase.co/rest/v1/`). Verified that `billing_state` is completely removed from `definitions.customers.required` (`is_nullable = YES`).
+  4. Non-Destructive Testing: Staff customer creation now accepts optional state and state code without requiring a dummy or defaulted state.
 
 - 2026-11-01: Financial Calculation Hardening (Code-Only Place of Supply Safeguards):
   1. Undetermined Place of Supply: Missing, null, or invalid Place of Supply state codes are strictly classified as `tax_determination: 'undetermined'` across `src/lib/quotation/calculations.ts` and `src/lib/billing/calculations.ts`. Never defaulted to intra-state (CGST/SGST) or interstate (IGST).
