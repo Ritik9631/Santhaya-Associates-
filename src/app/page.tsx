@@ -1,6 +1,5 @@
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   FileCheck2,
   Truck,
@@ -8,11 +7,11 @@ import {
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
-  Clock,
-  Building2,
+  MapPin,
+  Phone,
+  Mail,
   Layers,
-  Wrench,
-  HelpCircle,
+  Sparkles,
 } from 'lucide-react';
 
 const jsonLdData = {
@@ -23,10 +22,17 @@ const jsonLdData = {
   slogan: 'Building Today • Powering Tomorrow',
   description:
     'Santhaya Associates Pvt. Ltd. — Specialized industrial enterprise partner for Government & Private Construction Tenders, Construction Machinery Supply, and Manufacturing Machinery Supply.',
+  url: 'https://santhaya.com',
+  logo: 'https://santhaya.com/santhaya-logo-header.png',
+  telephone: ['+919430986713', '+919608950748'],
+  email: 'heistofeverything@gmail.com',
   address: {
     '@type': 'PostalAddress',
+    streetAddress: 'Gopalpur',
+    addressLocality: 'Motihari',
+    addressRegion: 'Bihar',
+    postalCode: '845401',
     addressCountry: 'IN',
-    addressRegion: 'Delhi',
   },
   knowsAbout: [
     'Government Construction Tenders',
@@ -65,8 +71,8 @@ export default function HomePage() {
               </h1>
 
               <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl">
-                Santhaya Associates Pvt. Ltd. is your specialized industrial enterprise partner for
-                <strong> Government & Private Construction Tenders</strong>,{' '}
+                Santhaya Associates Pvt. Ltd. is your specialized industrial enterprise partner for{' '}
+                <strong>Government & Private Construction Tenders</strong>,{' '}
                 <strong>Construction Machinery Supply</strong>, and{' '}
                 <strong>Manufacturing Machinery Supply</strong>.
               </p>
@@ -106,39 +112,90 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right Column: Visual Reference Showcase */}
+            {/* Right Column: Premium Industrial Visual Composition (BUG-003) */}
             <div className="lg:col-span-5 flex justify-center">
-              <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-red-400" />
-                    <span className="w-3 h-3 rounded-full bg-amber-400" />
-                    <span className="w-3 h-3 rounded-full bg-green-400" />
+              <div className="w-full max-w-lg bg-navy-900/90 backdrop-blur-md rounded-2xl p-6 sm:p-7 border border-navy-700/80 shadow-2xl relative overflow-hidden space-y-4">
+                {/* Subtle blueprint grid overlay & gold glow */}
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:1.5rem_1.5rem] pointer-events-none" />
+                <div className="absolute -top-24 -right-24 w-52 h-52 bg-gold-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                {/* Technical Header Bar */}
+                <div className="relative z-10 flex items-center justify-between pb-3.5 border-b border-navy-800 text-xs">
+                  <div className="flex items-center gap-2 text-slate-300 font-mono tracking-wider text-[11px]">
+                    <Layers className="w-3.5 h-3.5 text-gold-400" />
+                    <span>OPERATIONAL CAPABILITY</span>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Official Visual Reference
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/30 text-emerald-300 text-[10px] font-semibold tracking-wide">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    DEPLOYMENT READY
                   </span>
                 </div>
 
-                {/* Brand Reference image — displayed intact with zero distortion */}
-                <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-white border border-slate-100 shadow-inner">
-                  <Image
-                    src="/full-brand-reference.png"
-                    alt="Santhaya Associates Pvt. Ltd. Official Brand Identity Reference"
-                    fill
-                    sizes="(max-width: 768px) 100vw, 400px"
-                    priority
-                    className="object-contain p-2"
-                  />
+                {/* 3 Industrial Capability Cards */}
+                <div className="relative z-10 space-y-3">
+                  {/* Card 1: Infrastructure Tenders */}
+                  <div className="p-3.5 rounded-xl bg-navy-950/70 border border-navy-800/80 hover:border-gold-500/30 transition-all flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-lg bg-gold-500/10 border border-gold-500/20 text-gold-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <FileCheck2 className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-xs sm:text-sm font-bold text-white truncate">Civil & Govt Tenders</h3>
+                        <span className="text-[10px] text-gold-400/90 font-mono">PWD / CPWD</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                        BOQ technical feasibility, bidding compliance, and infrastructure contract execution.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Construction Machinery Supply */}
+                  <div className="p-3.5 rounded-xl bg-navy-950/70 border border-navy-800/80 hover:border-gold-500/30 transition-all flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-lg bg-gold-500/10 border border-gold-500/20 text-gold-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Truck className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-xs sm:text-sm font-bold text-white truncate">Construction Machinery</h3>
+                        <span className="text-[10px] text-gold-400/90 font-mono">HEAVY FLEET</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                        Earthmoving machinery, lifting cranes, batching plants, and site transit equipment.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Manufacturing Machinery Supply */}
+                  <div className="p-3.5 rounded-xl bg-navy-950/70 border border-navy-800/80 hover:border-gold-500/30 transition-all flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-lg bg-gold-500/10 border border-gold-500/20 text-gold-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Cog className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-xs sm:text-sm font-bold text-white truncate">Manufacturing Units</h3>
+                        <span className="text-[10px] text-gold-400/90 font-mono">INDUSTRIAL</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                        High-precision CNC tooling, automated production machinery, and plant assembly units.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="text-center pt-1">
-                  <p className="text-xs font-bold text-navy-900 tracking-wide">
-                    SANTHAYA ASSOCIATES PVT. LTD.
-                  </p>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    Construction Tenders • Heavy Machinery • Manufacturing Units
-                  </p>
+                {/* Technical Bottom Metrics Bar */}
+                <div className="relative z-10 pt-3 border-t border-navy-800/80 grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 rounded-lg bg-navy-950/50">
+                    <p className="text-xs font-bold text-gold-400 font-mono">100%</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">BOQ Compliance</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-navy-950/50">
+                    <p className="text-xs font-bold text-gold-400 font-mono">Pan-India</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">Fleet Reach</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-navy-950/50">
+                    <p className="text-xs font-bold text-gold-400 font-mono">Statutory</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">GST Compliant</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -147,7 +204,7 @@ export default function HomePage() {
       </section>
 
       {/* 3 Core Services Section (Scope Locked) */}
-      <section id="services" className="py-20 bg-slate-50">
+      <section id="services" className="py-20 bg-slate-50 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
             <span className="text-xs font-bold tracking-widest text-gold-600 uppercase">
@@ -280,7 +337,7 @@ export default function HomePage() {
       </section>
 
       {/* How We Work Section */}
-      <section id="how-we-work" className="py-20 bg-white border-y border-slate-200">
+      <section id="how-we-work" className="py-20 bg-white border-y border-slate-200 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
             <span className="text-xs font-bold tracking-widest text-gold-600 uppercase">
@@ -330,23 +387,118 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA Banner Section */}
-      <section id="contact" className="py-16 bg-navy-900 text-white relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6 relative z-10">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
-            Initiate Your Tender Requirement or Machinery Sourcing
-          </h2>
-          <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto">
-            Submit your project specifications or machinery requirements. Our team will review the technical scope and prepare a comprehensive commercial quotation.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/request-quotation"
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-lg text-base font-bold bg-gold-500 hover:bg-gold-400 text-navy-950 transition-all duration-200 shadow-xl shadow-gold-500/20 group"
-            >
-              <span>Submit Quotation Request</span>
-              <ArrowRight className="w-5 h-5 text-navy-950 transition-transform group-hover:translate-x-1" />
-            </Link>
+      {/* Comprehensive Direct Business Contact Section (BUG-004, BUG-005, BUG-006) */}
+      <section id="contact" className="py-20 bg-navy-950 text-white relative overflow-hidden scroll-mt-24 border-t border-navy-800">
+        {/* Subtle grid pattern background */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:3rem_3rem] pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-12">
+          {/* Header */}
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <span className="text-xs font-bold tracking-widest text-gold-400 uppercase">
+              Direct Business Communication
+            </span>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight">
+              Contact Our Engineering & Procurement Desk
+            </h2>
+            <p className="text-sm sm:text-base text-slate-300">
+              Connect directly with our team for government tender bidding, civil contracting partnerships, and industrial machinery procurement.
+            </p>
+          </div>
+
+          {/* 3 Contact Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Card 1: Registered Office Address */}
+            <div className="p-6 rounded-2xl bg-navy-900/90 border border-navy-800 hover:border-gold-500/40 transition-all flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="w-11 h-11 rounded-xl bg-gold-500/10 border border-gold-500/20 text-gold-400 flex items-center justify-center">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-white">Registered Business Office</h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India
+                </p>
+              </div>
+              <p className="text-[11px] text-gold-400/80 font-medium pt-4 mt-4 border-t border-navy-800/80">
+                Official Corporate Registration
+              </p>
+            </div>
+
+            {/* Card 2: Phone Helplines */}
+            <div className="p-6 rounded-2xl bg-navy-900/90 border border-navy-800 hover:border-gold-500/40 transition-all flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="w-11 h-11 rounded-xl bg-gold-500/10 border border-gold-500/20 text-gold-400 flex items-center justify-center">
+                  <Phone className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-white">Direct Phone Helplines</h3>
+                <div className="space-y-1.5 text-xs sm:text-sm">
+                  <div>
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Primary Contact</span>
+                    <a
+                      href="tel:+919430986713"
+                      className="text-gold-400 hover:text-gold-300 font-bold transition-colors inline-block mt-0.5"
+                    >
+                      +91 9430986713
+                    </a>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Secondary Contact</span>
+                    <a
+                      href="tel:+919608950748"
+                      className="text-slate-200 hover:text-gold-300 font-medium transition-colors inline-block mt-0.5"
+                    >
+                      +91 9608950748
+                    </a>
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] text-gold-400/80 font-medium pt-4 mt-4 border-t border-navy-800/80">
+                Tender Support & Fleet Dispatch
+              </p>
+            </div>
+
+            {/* Card 3: Email Communication */}
+            <div className="p-6 rounded-2xl bg-navy-900/90 border border-navy-800 hover:border-gold-500/40 transition-all flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="w-11 h-11 rounded-xl bg-gold-500/10 border border-gold-500/20 text-gold-400 flex items-center justify-center">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-white">Commercial Inquiries & RFPs</h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Send project drawings, technical BOQs, and formal tender inquiries directly to our administrative desk:
+                </p>
+                <div className="pt-1">
+                  <a
+                    href="mailto:heistofeverything@gmail.com"
+                    className="text-gold-400 hover:text-gold-300 font-semibold text-xs sm:text-sm transition-colors break-all"
+                  >
+                    heistofeverything@gmail.com
+                  </a>
+                </div>
+              </div>
+              <p className="text-[11px] text-gold-400/80 font-medium pt-4 mt-4 border-t border-navy-800/80">
+                BOQ Review & Statutory Invoicing
+              </p>
+            </div>
+          </div>
+
+          {/* Submission Action Banner */}
+          <div className="p-8 rounded-2xl bg-navy-900 border border-navy-800 text-center space-y-4 max-w-4xl mx-auto">
+            <h3 className="text-xl sm:text-2xl font-bold text-white">
+              Need a Formal Line-Item Quotation?
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl mx-auto">
+              Use our structured quotation portal to submit your equipment quantities, site delivery constraints, or tender timelines for an official proposal.
+            </p>
+            <div className="pt-2">
+              <Link
+                href="/request-quotation"
+                className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg text-sm font-bold bg-gold-500 hover:bg-gold-400 text-navy-950 transition-all duration-200 shadow-xl shadow-gold-500/20 group"
+              >
+                <span>Request a Formal Quotation</span>
+                <ArrowRight className="w-4 h-4 text-navy-950 transition-transform group-hover:translate-x-1" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>

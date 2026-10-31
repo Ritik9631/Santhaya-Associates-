@@ -28,12 +28,12 @@ export default function AboutPage() {
           </p>
         </div>
 
-        {/* Brand & Mission section */}
+        {/* Brand & Mission section (BUG-002, BUG-005, BUG-007, BUG-008) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 space-y-6">
             <div className="space-y-4">
               <h2 className="text-2xl font-bold text-navy-900">
-                Building Today. Powering Tomorrow.
+                Precision Infrastructure & Machinery Procurement
               </h2>
               <p className="text-sm sm:text-base text-slate-700 leading-relaxed">
                 Modern construction and industrial manufacturing demand absolute reliability, robust procurement pipelines, and rigorous statutory compliance. Santhaya Associates Pvt. Ltd. was established to serve as a focused corporate vehicle addressing three essential pillars:
@@ -89,10 +89,10 @@ export default function AboutPage() {
                   SANTHAYA ASSOCIATES PVT. LTD.
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">
-                  Brand Identity & Visual Reference Certified
+                  Registered Legal Entity • Bihar, India
                 </p>
                 <div className="mt-3 inline-block px-3 py-1 rounded bg-navy-50 text-[11px] font-semibold text-navy-900">
-                  Primary Palette: Navy #10243B • Gold #F4B323
+                  Motihari, Purbi Champaran – 845401
                 </div>
               </div>
             </div>
@@ -106,7 +106,7 @@ export default function AboutPage() {
             <h3 className="text-base font-bold text-navy-900">Corporate Integrity & Disclosure</h3>
           </div>
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-            In accordance with Santhaya Associates governance guidelines, our online portal displays only verified capabilities and authentic corporate assets. Unverified claims, fabricated client testimonials, or artificial awards are strictly prohibited. Legal registration numbers, official office addresses, and tax identifiers are maintained as configurable placeholders pending formal board sign-off.
+            In accordance with Santhaya Associates governance guidelines, our online portal displays only verified capabilities and authentic corporate assets. Unverified claims, fabricated client testimonials, or artificial awards are strictly prohibited. All commercial documentation, BOQ assessments, and statutory invoicing adhere to established Indian procurement standards.
           </p>
         </div>
 

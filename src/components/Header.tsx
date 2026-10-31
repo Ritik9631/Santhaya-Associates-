@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Menu, X, ArrowRight, ShieldCheck, PhoneCall } from 'lucide-react';
+import { Menu, X, ArrowRight, MapPin, PhoneCall, Mail } from 'lucide-react';
 
 export default function Header() {
   const pathname = usePathname();
@@ -24,6 +24,10 @@ export default function Header() {
     return null;
   }
 
+  const isHomeActive = pathname === '/';
+  const isServicesActive = pathname === '/services';
+  const isAboutActive = pathname === '/about';
+
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all">
       {/* Top utility bar */}
@@ -36,15 +40,28 @@ export default function Header() {
             </span>
           </div>
           <div className="flex items-center gap-4 text-slate-400">
-            <span className="flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-gold-500" />
-              Verified Brand Assets
+            <span className="flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-gold-500" />
+              <span>Motihari, Bihar – 845401</span>
             </span>
-            <span className="hidden md:inline">|</span>
-            <span className="hidden md:flex items-center gap-1">
+            <span className="hidden md:inline text-navy-700">|</span>
+            <a
+              href="tel:+919430986713"
+              className="hidden md:flex items-center gap-1.5 hover:text-gold-400 transition-colors"
+              title="Call Santhaya Associates Primary Helpline"
+            >
               <PhoneCall className="w-3 h-3 text-gold-500" />
-              Inquiries: info@santhaya.com
-            </span>
+              <span>+91 9430986713</span>
+            </a>
+            <span className="hidden xl:inline text-navy-700">|</span>
+            <a
+              href="mailto:heistofeverything@gmail.com"
+              className="hidden xl:flex items-center gap-1.5 hover:text-gold-400 transition-colors"
+              title="Email Santhaya Associates"
+            >
+              <Mail className="w-3 h-3 text-gold-500" />
+              <span>heistofeverything@gmail.com</span>
+            </a>
           </div>
         </div>
       </div>
@@ -71,29 +88,50 @@ export default function Header() {
             </div>
           </Link>
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-8">
+          {/* Desktop Navigation Links (BUG-001) */}
+          <nav aria-label="Main Navigation" className="hidden lg:flex items-center gap-6 xl:gap-8">
+            <Link
+              href="/"
+              aria-current={isHomeActive ? 'page' : undefined}
+              className={`text-sm font-semibold transition-all py-2 relative ${
+                isHomeActive
+                  ? 'text-navy-950 font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-gold-500 after:rounded-full'
+                  : 'text-navy-900 hover:text-gold-600'
+              }`}
+            >
+              Home
+            </Link>
             <Link
               href="/services"
-              className="text-sm font-semibold text-navy-900 hover:text-gold-600 transition-colors py-2"
+              aria-current={isServicesActive ? 'page' : undefined}
+              className={`text-sm font-semibold transition-all py-2 relative ${
+                isServicesActive
+                  ? 'text-navy-950 font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-gold-500 after:rounded-full'
+                  : 'text-navy-900 hover:text-gold-600'
+              }`}
             >
               Services
             </Link>
             <Link
               href="/#how-we-work"
-              className="text-sm font-semibold text-navy-900 hover:text-gold-600 transition-colors py-2"
+              className="text-sm font-semibold text-navy-900 hover:text-gold-600 transition-colors py-2 relative"
             >
               How We Work
             </Link>
             <Link
               href="/about"
-              className="text-sm font-semibold text-navy-900 hover:text-gold-600 transition-colors py-2"
+              aria-current={isAboutActive ? 'page' : undefined}
+              className={`text-sm font-semibold transition-all py-2 relative ${
+                isAboutActive
+                  ? 'text-navy-950 font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-gold-500 after:rounded-full'
+                  : 'text-navy-900 hover:text-gold-600'
+              }`}
             >
               About Us
             </Link>
             <Link
               href="/#contact"
-              className="text-sm font-semibold text-navy-900 hover:text-gold-600 transition-colors py-2"
+              className="text-sm font-semibold text-navy-900 hover:text-gold-600 transition-colors py-2 relative"
             >
               Contact
             </Link>
@@ -149,15 +187,32 @@ export default function Header() {
               />
             </div>
             <div>
-              <p className="text-xs font-bold text-navy-900 tracking-wider">SANTHAYA ASSOCIATES</p>
-              <p className="text-[10px] text-slate-500">Building Today. Powering Tomorrow.</p>
+              <p className="text-xs font-bold text-navy-900 tracking-wider">SANTHAYA ASSOCIATES PVT. LTD.</p>
+              <p className="text-[10px] text-slate-500">Construction Tenders & Machinery Supply</p>
             </div>
           </div>
-          <nav className="flex flex-col space-y-2">
+          <nav aria-label="Mobile Navigation" className="flex flex-col space-y-1.5">
+            <Link
+              href="/"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-current={isHomeActive ? 'page' : undefined}
+              className={`px-3 py-2 rounded-md text-base font-semibold transition-colors ${
+                isHomeActive
+                  ? 'border-l-4 border-gold-500 bg-gold-50/70 text-navy-950 font-bold'
+                  : 'text-navy-900 hover:bg-slate-100 hover:text-gold-600'
+              }`}
+            >
+              Home
+            </Link>
             <Link
               href="/services"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-md text-base font-semibold text-navy-900 hover:bg-slate-100 hover:text-gold-600 transition-colors"
+              aria-current={isServicesActive ? 'page' : undefined}
+              className={`px-3 py-2 rounded-md text-base font-semibold transition-colors ${
+                isServicesActive
+                  ? 'border-l-4 border-gold-500 bg-gold-50/70 text-navy-950 font-bold'
+                  : 'text-navy-900 hover:bg-slate-100 hover:text-gold-600'
+              }`}
             >
               Services
             </Link>
@@ -171,7 +226,12 @@ export default function Header() {
             <Link
               href="/about"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3 py-2 rounded-md text-base font-semibold text-navy-900 hover:bg-slate-100 hover:text-gold-600 transition-colors"
+              aria-current={isAboutActive ? 'page' : undefined}
+              className={`px-3 py-2 rounded-md text-base font-semibold transition-colors ${
+                isAboutActive
+                  ? 'border-l-4 border-gold-500 bg-gold-50/70 text-navy-950 font-bold'
+                  : 'text-navy-900 hover:bg-slate-100 hover:text-gold-600'
+              }`}
             >
               About Us
             </Link>

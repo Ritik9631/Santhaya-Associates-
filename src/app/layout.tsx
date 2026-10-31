@@ -17,12 +17,13 @@ export const metadata: Metadata = {
     'Santhaya Associates Pvt. Ltd. — Specialized partner for government and private construction tenders, heavy construction machinery supply, and manufacturing machinery equipment. Building Today. Powering Tomorrow.',
   keywords: [
     'Santhaya Associates',
-    'Construction tenders',
+    'Santhaya Associates Pvt. Ltd.',
+    'Construction tenders Bihar',
     'Government tenders India',
     'Private construction tenders',
     'Construction machinery supply',
     'Manufacturing machinery supply',
-    'Heavy equipment quotation',
+    'Heavy equipment quotation Motihari',
   ],
   icons: {
     icon: '/santhaya-symbol.png',
@@ -35,10 +36,10 @@ export const metadata: Metadata = {
       'Building Today. Powering Tomorrow. Government & Private Construction Tenders, Construction Machinery Supply, and Manufacturing Machinery Supply.',
     images: [
       {
-        url: '/full-brand-reference.png',
-        width: 1254,
-        height: 1254,
-        alt: 'Santhaya Associates Pvt. Ltd. Brand Reference',
+        url: '/santhaya-logo-header.png',
+        width: 1045,
+        height: 795,
+        alt: 'Santhaya Associates Pvt. Ltd. Official Logo',
       },
     ],
   },

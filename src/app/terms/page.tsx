@@ -56,7 +56,7 @@ export default function TermsPage() {
           <section className="space-y-2">
             <h2 className="text-base font-bold text-navy-900">4. Jurisdiction</h2>
             <p>
-              Any disputes arising from commercial contracts or procurement engagements are subject to the exclusive jurisdiction of the competent courts in Delhi, India.
+              Any disputes arising from commercial contracts or procurement engagements are subject to the exclusive jurisdiction of the competent courts in Motihari, Bihar, India.
             </p>
           </section>
         </div>

@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const ARTIFACT_DIR = 'C:\\Users\\ritik\\.gemini\\antigravity-ide\\brain\\bf993f6a-d384-486b-9291-3ad4d951a4cb\\qa_screenshots';
+const ARTIFACT_DIR = process.env.ARTIFACT_DIR || path.resolve('.qa_screenshots');
 
 if (!fs.existsSync(ARTIFACT_DIR)) {
   fs.mkdirSync(ARTIFACT_DIR, { recursive: true });

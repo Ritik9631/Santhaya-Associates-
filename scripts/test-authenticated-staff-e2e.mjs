@@ -21,14 +21,10 @@ import path from 'node:path';
 import readline from 'node:readline';
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const ARTIFACT_DIR = 'C:\\Users\\ritik\\.gemini\\antigravity\\brain\\26a96ae2-7d28-4640-80b9-553f236fc3f0\\qa_screenshots';
+const ARTIFACT_DIR = process.env.ARTIFACT_DIR || path.resolve('.qa_screenshots');
 const DOCS_DIR = path.resolve('docs/qa/screenshots');
 
-[ARTIFACT_DIR, DOCS_DIR].forEach((dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
+[ARTIFACT_DIR, DOCS_DIR].forEach((dir) => { try { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); } catch (e) {} });
 
 function askHiddenPassword(query) {
   return new Promise((resolve) => {

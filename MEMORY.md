@@ -486,6 +486,28 @@ Updated: 2026-10-31 | Phase: Phase 6 Production Readiness & Handoff Complete | I
      - `docs/DEVELOPMENT-HANDOVER.md`
   6. Ready for Phase 7 production cutover and owner UAT.
 
+- 2026-10-31: Development Supabase Sandbox Restoration & Login Verification:
+  1. Restored development credentials in `.env.local` locked strictly to `bkqneudnnhvvwmtggorz`.
+  2. Verified `EMAIL_PROVIDER=mock` and confirmed zero production connections or live email dispatches.
+  3. Ran read-only connectivity test (`npm.cmd run test:connection`): anon gateway and service-role handshakes verified (PASS).
+  4. Ran Super Administrator verification (`npm.cmd run test:super-admin`): active Super Admin Heish (`heistofeverything@gmail.com`) confirmed in `staff_profiles` and matching `auth.users` record.
+  5. Tested Supabase Auth API & database rate-limiting RPC communication directly.
+  6. Restarted Next.js development server daemon on `http://localhost:3000` with `.env.local` reloaded; passed Stage 3A-1 (39/39) and Stage 3A-2 (55/55) test suites. Platform cleared for authenticated manual testing.
+
+- 2026-10-31: Batch 1 Public Website Bug Fixes, Refinement & Regression Testing (BUG-001 through BUG-008):
+  1. BUG-001 (Home Navigation): Added `Home` (`/`) navigation item to desktop and mobile drawer in `Header.tsx` with active gold indicator, accessible `aria-current="page"`, and responsive tablet spacing.
+  2. BUG-002 & BUG-007 (Tagline Repetition): Consolidated official tagline `Building Today • Powering Tomorrow` so it remains exclusively prominent in the homepage hero; eliminated redundant standalone repetitions from footer, mobile drawer, and About page.
+  3. BUG-003 (Hero Redesign): Replaced browser-window card, fake window controls, and design reference label with a modern industrial visual composition in dark navy and gold with SVG capability cards and technical metrics.
+  4. BUG-004 (Company NAP): Integrated confirmed company name `Santhaya Associates Pvt. Ltd.`, address `Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India`, clickable phone helplines (`tel:+919430986713`, `tel:+919608950748`), and business email (`mailto:heistofeverything@gmail.com`) across Footer, Contact section (`#contact`), and Schema.org structured data.
+  5. BUG-005 (Placeholder Elimination): Cleaned all internal development placeholders (`Verified Brand Assets`, `Official Visual Reference`, `Phase 1 Web Deployment`, `full-brand-reference.png`, `contact@santhaya.local`, `Pending Official Allocation`, `Pending formal confirmation`, `GSTIN: Verification in Progress`, and dummy emails) across public pages.
+  6. BUG-006 (Footer Refinement): Redesigned Footer into 4 logical columns (Company Identity, Our Services, Quick Links, Contact Information) with clean mobile stacking and `scroll-mt-24` contact anchor scrolling.
+  7. BUG-008 (Legal Business Identity Consistency): Standardized registered legal name `Santhaya Associates Pvt. Ltd.` consistently. Verified user-provided GSTIN `10ABVCS4277J1ZU` format and Modulo 36 checksum (`U`), while strictly withholding government-verified status or statutory invoice modification pending official GST registry verification.
+  8. Automated Verification Gates Passed (100%):
+     - `npm.cmd run typecheck`: 0 errors.
+     - `npm.cmd run lint`: 0 errors, 0 warnings.
+     - `npm.cmd run build`: 25/25 static routes compiled cleanly.
+     - `npm.cmd run test`: Full test battery (all 11 suites, over 550 assertions) passed with 0 failures.
+
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
 
