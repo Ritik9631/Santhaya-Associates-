@@ -225,6 +225,206 @@ export async function createQuotationAction(
 }
 
 /**
+ * Server Action: Update an existing draft quotation
+ * Strictly guards: Only draft quotations with unlocked versions can be edited.
+ */
+export async function updateDraftQuotationAction(
+  _prevState: ActionResponse | null,
+  formData: FormData
+): Promise<ActionResponse<{ quotationId: string }>> {
+  try {
+    const { user, profile } = await requireStaffSession();
+
+    if (!AUTHORIZED_CREATOR_ROLES.includes(profile.role)) {
+      return { error: 'Access denied: You do not have permission to edit quotations.' };
+    }
+
+    const quotationId = (formData.get('quotationId') as string)?.trim();
+    if (!quotationId) {
+      return { error: 'Quotation ID is required.' };
+    }
+
+    const customerId = (formData.get('customerId') as string)?.trim();
+    const rawSupplyCode = (formData.get('placeOfSupplyStateCode') as string)?.trim();
+    const placeOfSupplyStateCode = rawSupplyCode ? rawSupplyCode.padStart(2, '0') : '';
+    const isGstApplicable = formData.get('isGstApplicable') !== 'false';
+    const validityDays = parseInt((formData.get('validityDays') as string) || '30', 10);
+    const deliveryLocation = (formData.get('deliveryLocation') as string)?.trim();
+    const paymentTerms = (formData.get('paymentTerms') as string)?.trim() || '100% advance against Proforma Invoice or 30 days credit on approved LC';
+    const termsConditions = (formData.get('termsConditions') as string)?.trim() || null;
+    const notes = (formData.get('notes') as string)?.trim() || null;
+    const itemsRaw = formData.get('itemsJson') as string;
+
+    if (!customerId) return { error: 'Customer selection is required.' };
+    if (!deliveryLocation || deliveryLocation.length < 2) {
+      return { error: 'Delivery location / Site destination is required.' };
+    }
+
+    let items: LineItemInput[] = [];
+    try {
+      items = JSON.parse(itemsRaw || '[]');
+    } catch {
+      return { error: 'Invalid line items payload.' };
+    }
+
+    if (!items || items.length === 0) {
+      return { error: 'At least one line item is required to update a quotation.' };
+    }
+
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      if (!item.item_name || item.item_name.trim().length < 2) {
+        return { error: `Line item #${idx + 1}: Name is required.` };
+      }
+      if (Number(item.quantity) <= 0) {
+        return { error: `Line item #${idx + 1}: Quantity must be greater than zero.` };
+      }
+      if (Number(item.unit_rate) < 0) {
+        return { error: `Line item #${idx + 1}: Unit rate cannot be negative.` };
+      }
+    }
+
+    const adminClient = createAdminClient();
+
+    // Check quotation status
+    const { data: quote, error: quoteErr } = await adminClient
+      .from('quotations')
+      .select('id, quotation_number, status, current_version_number')
+      .eq('id', quotationId)
+      .single();
+
+    if (quoteErr || !quote) {
+      return { error: 'Quotation not found.' };
+    }
+
+    if (quote.status !== 'draft') {
+      return {
+        error: `Cannot edit ${quote.status} quotation. Only draft quotations can be edited. To update an issued quotation, create a revision (V${quote.current_version_number + 1}).`,
+      };
+    }
+
+    // Check active version lock
+    const { data: version, error: verErr } = await adminClient
+      .from('quotation_versions')
+      .select('id, is_locked, version_number')
+      .eq('quotation_id', quotationId)
+      .eq('version_number', quote.current_version_number)
+      .single();
+
+    if (verErr || !version) {
+      return { error: 'Active quotation version snapshot not found.' };
+    }
+
+    if (version.is_locked) {
+      return { error: 'Quotation version is locked and cannot be edited directly.' };
+    }
+
+    // Recalculate totals
+    const totals: QuotationTotals = calculateQuotationTotals(
+      items,
+      isGstApplicable,
+      placeOfSupplyStateCode
+    );
+
+    // Update Quotations header
+    const { error: updateQuoteErr } = await adminClient
+      .from('quotations')
+      .update({
+        customer_id: customerId,
+        place_of_supply_state_code: placeOfSupplyStateCode || undefined,
+        is_gst_applicable: isGstApplicable,
+        notes: notes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', quotationId);
+
+    if (updateQuoteErr) {
+      return { error: `Failed to update quotation: ${updateQuoteErr.message}` };
+    }
+
+    // Update Quotation Version
+    const { error: updateVerErr } = await adminClient
+      .from('quotation_versions')
+      .update({
+        validity_days: validityDays,
+        delivery_location: deliveryLocation,
+        payment_terms: paymentTerms,
+        terms_conditions: termsConditions,
+        subtotal_amount: totals.subtotal_amount,
+        discount_amount: totals.discount_amount,
+        taxable_amount: totals.taxable_amount,
+        cgst_amount: totals.cgst_amount,
+        sgst_amount: totals.sgst_amount,
+        igst_amount: totals.igst_amount,
+        total_tax_amount: totals.total_tax_amount,
+        round_off_amount: totals.round_off_amount,
+        grand_total_amount: totals.grand_total_amount,
+      })
+      .eq('id', version.id);
+
+    if (updateVerErr) {
+      return { error: `Failed to update quotation version: ${updateVerErr.message}` };
+    }
+
+    // Replace line items
+    await adminClient.from('quotation_items').delete().eq('quotation_version_id', version.id);
+
+    const lineItemRows = totals.items.map((item, idx) => ({
+      quotation_version_id: version.id,
+      product_service_id: item.product_service_id || null,
+      sort_order: idx + 1,
+      item_name: item.item_name,
+      description: item.description || null,
+      hsn_sac_code: item.hsn_sac_code || null,
+      unit: item.unit || 'unit',
+      quantity: item.quantity,
+      unit_rate: item.unit_rate,
+      discount_amount: item.discount_amount || 0,
+      taxable_amount: item.taxable_amount,
+      gst_rate: item.gst_rate || 0,
+      cgst_rate: item.cgst_rate || 0,
+      sgst_rate: item.sgst_rate || 0,
+      igst_rate: item.igst_rate || 0,
+      cgst_amount: item.cgst_amount || 0,
+      sgst_amount: item.sgst_amount || 0,
+      igst_amount: item.igst_amount || 0,
+      tax_amount: item.tax_amount,
+      line_total: item.line_total,
+    }));
+
+    const { error: insertItemsErr } = await adminClient.from('quotation_items').insert(lineItemRows);
+    if (insertItemsErr) {
+      return { error: `Failed to save updated line items: ${insertItemsErr.message}` };
+    }
+
+    // Audit log
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'quotations',
+      entity_id: quotationId,
+      action: 'quotation_draft_updated',
+      actor_type: 'staff',
+      actor_id: user.id,
+      new_state: {
+        quotation_number: quote.quotation_number,
+        grand_total: totals.grand_total_amount,
+        items_count: items.length,
+      },
+    });
+
+    revalidatePath('/staff/quotations');
+    revalidatePath(`/staff/quotations/${quotationId}`);
+
+    return {
+      success: true,
+      data: { quotationId },
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unexpected error editing quotation draft.';
+    return { error: message };
+  }
+}
+
+/**
  * Server Action: Issue quotation to client (Locks version, transitions draft -> issued)
  */
 export async function issueQuotationAction(quotationId: string): Promise<ActionResponse> {

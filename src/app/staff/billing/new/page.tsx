@@ -68,16 +68,16 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
       <div className="flex items-center gap-3">
         <Link
           href="/staff/billing"
-          className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition"
+          className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Receipt className="w-6 h-6 text-emerald-700" />
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <Receipt className="w-6 h-6 text-emerald-400" />
             Create GST Invoice
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-xs text-slate-400 mt-0.5">
             Issue a direct commercial tax invoice, bill of supply, or convert an accepted quotation.
           </p>
         </div>
@@ -94,4 +94,3 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
     </div>
   );
 }
-

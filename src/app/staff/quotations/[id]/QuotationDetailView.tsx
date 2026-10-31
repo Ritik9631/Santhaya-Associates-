@@ -17,6 +17,9 @@ import {
   UserCheck,
   History,
   FileSpreadsheet,
+  FileEdit,
+  ArrowLeft,
+  Lock,
 } from 'lucide-react';
 import {
   issueQuotationAction,
@@ -26,6 +29,9 @@ import {
   recordQuotationDeliveryAction,
 } from '@/lib/quotation/actions';
 import { convertNumberToIndianWords } from '@/lib/quotation/calculations';
+import { formatIndianDate, formatIndianDateTime } from '@/lib/utils/date';
+import { formatIndianRupee } from '@/lib/utils/currency';
+import { TaxBreakdownCard, type RateTaxSummary } from '@/components/ui/TaxBreakdownCard';
 import type { QuotationStatus, StaffRole } from '@/types/database';
 
 interface QuotationDetailViewProps {
@@ -64,18 +70,21 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
   const deliveryLogs = quotation.quotation_delivery_logs || [];
 
   const isCurrentVersion = activeVersionNumber === quotation.current_version_number;
-  const isIntraState = quotation.place_of_supply_state_code === '07';
+  // BUG-022: Supplier base state is Bihar (10). Intra-state is State 10.
+  const isIntraState = quotation.place_of_supply_state_code === '10';
+  const canEdit = ['super_admin', 'admin', 'estimator', 'billing_manager'].includes(userRole);
+  const isDraftEditable = quotation.status === 'draft' && isCurrentVersion && !activeVersion.is_locked;
 
   // Status badge styling
   const statusColors: Record<string, string> = {
-    draft: 'bg-amber-100 text-amber-800 border-amber-300',
-    issued: 'bg-blue-100 text-blue-800 border-blue-300',
-    revised: 'bg-purple-100 text-purple-800 border-purple-300',
-    accepted: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-    rejected: 'bg-rose-100 text-rose-800 border-rose-300',
-    expired: 'bg-slate-200 text-slate-700 border-slate-300',
-    cancelled: 'bg-red-100 text-red-800 border-red-300',
-    converted_to_invoice: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+    draft: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+    issued: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+    revised: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+    accepted: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    rejected: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+    expired: 'bg-slate-700 text-slate-300 border-slate-600',
+    cancelled: 'bg-red-500/20 text-red-300 border-red-500/40',
+    converted_to_invoice: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
   };
 
   const handleIssue = () => {
@@ -143,6 +152,33 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
     });
   };
 
+  // Group line items for tax rate breakdown in TaxBreakdownCard
+  const rateBreakdownMap = new Map<number, { taxableAmount: number; taxAmount: number }>();
+  lineItems.forEach((it: any) => {
+    const rate = Number(it.gst_rate) || 0;
+    const taxable = Number(it.taxable_amount) || 0;
+    const tax = Number(it.tax_amount) || 0;
+    const prev = rateBreakdownMap.get(rate) || { taxableAmount: 0, taxAmount: 0 };
+    rateBreakdownMap.set(rate, {
+      taxableAmount: prev.taxableAmount + taxable,
+      taxAmount: prev.taxAmount + tax,
+    });
+  });
+
+  const rateBreakdowns: RateTaxSummary[] = Array.from(rateBreakdownMap.entries()).map(([rate, vals]) => ({
+    gstRate: rate,
+    taxableAmount: vals.taxableAmount,
+    cgstAmount: isIntraState ? vals.taxAmount / 2 : 0,
+    sgstAmount: isIntraState ? vals.taxAmount / 2 : 0,
+    igstAmount: !isIntraState ? vals.taxAmount : 0,
+    totalTax: vals.taxAmount,
+  }));
+
+  const totalTaxAmount = Number(activeVersion.total_tax_amount || 0);
+  const cgstAmount = isIntraState ? totalTaxAmount / 2 : 0;
+  const sgstAmount = isIntraState ? totalTaxAmount / 2 : 0;
+  const igstAmount = !isIntraState ? totalTaxAmount : 0;
+
   return (
     <div className="space-y-6 max-w-6xl">
       {error && (
@@ -155,34 +191,66 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
         </div>
       )}
 
-      {/* Header Bar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900">{quotation.quotation_number}</h1>
-            <span
-              className={`text-xs uppercase font-bold tracking-wider px-2.5 py-1 rounded-full border ${
-                statusColors[quotation.status] || 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              {quotation.status.replace('_', ' ')}
-            </span>
-            <span className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-mono">
-              Version: {activeVersion.version_code || `V${activeVersionNumber}`}
-            </span>
+      {/* Header Bar — High Contrast Dark Theme */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-5">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/staff/quotations"
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+            title="Back to Quotations"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-white">{quotation.quotation_number}</h1>
+              <span
+                className={`text-xs uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full border ${
+                  statusColors[quotation.status] || 'bg-slate-700 text-slate-300'
+                }`}
+              >
+                {quotation.status.replace('_', ' ')}
+              </span>
+              <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded font-mono">
+                {activeVersion.version_code || `V${activeVersionNumber}`}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Client: <strong className="text-slate-200">{customer.company_name}</strong> • Place of Supply: State{' '}
+              <span className="font-mono text-gold-400">{quotation.place_of_supply_state_code || 'Unspecified'}</span>{' '}
+              ({isIntraState ? 'Bihar / Intra-State (CGST + SGST)' : 'Inter-State (IGST)'}) • Created:{' '}
+              {formatIndianDate(quotation.created_at)}
+            </p>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Client: <strong className="text-slate-800">{customer.company_name}</strong> | Place of Supply: State{' '}
-            <span className="font-mono">{quotation.place_of_supply_state_code}</span> ({isIntraState ? 'Delhi / Intra-State' : 'Inter-State'})
-          </p>
         </div>
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* BUG-020: Edit Draft Quotation */}
+          {isDraftEditable && canEdit && (
+            <Link
+              href={`/staff/quotations/${quotation.id}/edit`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gold-400 hover:bg-gold-300 text-slate-900 rounded-lg text-xs font-bold transition shadow-sm"
+            >
+              <FileEdit className="w-3.5 h-3.5" />
+              Edit Draft
+            </Link>
+          )}
+
+          {!isDraftEditable && quotation.status !== 'draft' && (
+            <div
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800/80 border border-slate-700 text-slate-400 rounded-lg text-xs"
+              title="Issued quotations are immutable snapshots. Create a new revision to change commercial terms."
+            >
+              <Lock className="w-3 h-3 text-slate-500" />
+              <span>Locked Snapshot</span>
+            </div>
+          )}
+
           <Link
             href={`/staff/quotations/${quotation.id}/pdf`}
             target="_blank"
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition"
           >
             <Printer className="w-3.5 h-3.5" />
             PDF / Print View
@@ -190,24 +258,24 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
 
           <button
             onClick={() => setShowDeliveryModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-200 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition"
           >
             <Send className="w-3.5 h-3.5" />
             Log Delivery
           </button>
 
-          {quotation.status === 'draft' && isCurrentVersion && (
+          {quotation.status === 'draft' && isCurrentVersion && canEdit && (
             <button
               onClick={handleIssue}
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#10243B] text-white rounded-lg text-xs font-semibold hover:bg-slate-800 shadow transition disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold shadow transition disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
-              Issue Quotation
+              {isPending ? 'Issuing...' : 'Issue Quotation'}
             </button>
           )}
 
-          {(quotation.status === 'issued' || quotation.status === 'revised') && isCurrentVersion && (
+          {(quotation.status === 'issued' || quotation.status === 'revised') && isCurrentVersion && canEdit && (
             <>
               <button
                 onClick={() => setShowAcceptModal(true)}
@@ -221,7 +289,7 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
               <button
                 onClick={handleRevise}
                 disabled={isPending}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700 shadow transition disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700 shadow transition disabled:opacity-50"
               >
                 <Copy className="w-3.5 h-3.5" />
                 Create Revision (R{quotation.current_version_number})
@@ -238,11 +306,11 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
             </>
           )}
 
-          {quotation.status !== 'cancelled' && quotation.status !== 'accepted' && (
+          {quotation.status !== 'cancelled' && quotation.status !== 'accepted' && canEdit && (
             <button
               onClick={() => handleStatusChange('cancelled')}
               disabled={isPending}
-              className="px-2.5 py-2 text-slate-500 hover:text-red-700 text-xs font-medium"
+              className="px-2.5 py-2 text-slate-400 hover:text-red-400 text-xs font-medium"
             >
               Cancel Quote
             </button>
@@ -252,9 +320,9 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
 
       {/* Version Selector Bar (If multiple versions exist) */}
       {versions.length > 1 && (
-        <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2 text-purple-900 font-semibold">
-            <History className="w-4 h-4 text-purple-700" />
+        <div className="bg-purple-950/30 border border-purple-500/30 rounded-xl p-4 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 text-purple-300 font-semibold">
+            <History className="w-4 h-4 text-purple-400" />
             <span>Revision History ({versions.length} versions generated):</span>
           </div>
 
@@ -265,8 +333,8 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
                 onClick={() => setActiveVersionNumber(v.version_number)}
                 className={`px-3 py-1.5 rounded-lg font-medium transition ${
                   activeVersionNumber === v.version_number
-                    ? 'bg-purple-700 text-white shadow-sm'
-                    : 'bg-white text-purple-800 hover:bg-purple-100 border border-purple-200'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'bg-slate-900 text-purple-300 hover:bg-slate-800 border border-purple-500/30'
                 }`}
               >
                 {v.version_code || `R${v.version_number - 1}`}
@@ -286,14 +354,14 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
           </h3>
           <div>
             <p className="text-sm font-bold text-slate-900">{customer.company_name}</p>
-            <p className="text-slate-600 font-medium">Attn: {customer.primary_contact_person}</p>
+            <p className="text-slate-600 font-medium">Attn: {customer.primary_contact_person || 'Purchasing Department'}</p>
             {customer.billing_address && (
-              <p className="text-slate-500 mt-1 whitespace-pre-line">{customer.billing_address}</p>
+              <p className="text-slate-500 mt-1 whitespace-pre-line leading-relaxed">{customer.billing_address}</p>
             )}
           </div>
           <div className="space-y-1 text-slate-600 pt-2 border-t border-slate-100">
-            {customer.gstin && <p><span className="font-semibold text-slate-700">GSTIN:</span> {customer.gstin}</p>}
-            {customer.pan && <p><span className="font-semibold text-slate-700">PAN:</span> {customer.pan}</p>}
+            {customer.gstin && <p><span className="font-semibold text-slate-700">GSTIN:</span> <span className="font-mono">{customer.gstin}</span></p>}
+            {customer.pan && <p><span className="font-semibold text-slate-700">PAN:</span> <span className="font-mono">{customer.pan}</span></p>}
             {customer.phone && <p><span className="font-semibold text-slate-700">Phone:</span> {customer.phone}</p>}
             {customer.email && <p><span className="font-semibold text-slate-700">Email:</span> {customer.email}</p>}
           </div>
@@ -304,11 +372,11 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
           <h3 className="font-bold text-[#10243B] uppercase tracking-wider text-[11px] pb-2 border-b border-slate-100">
             Commercial Parameters
           </h3>
-          <p><span className="font-semibold text-slate-700">Delivery Destination:</span> {activeVersion.delivery_location}</p>
-          <p><span className="font-semibold text-slate-700">Payment Terms:</span> {activeVersion.payment_terms}</p>
+          <p><span className="font-semibold text-slate-700">Delivery Destination:</span> {activeVersion.delivery_location || 'Ex-Works / Unspecified'}</p>
+          <p><span className="font-semibold text-slate-700">Payment Terms:</span> {activeVersion.payment_terms || 'Standard 30 Days'}</p>
           <p>
-            <span className="font-semibold text-slate-700">Validity:</span> {activeVersion.validity_days} Days (Expires:{' '}
-            {activeVersion.expires_at})
+            <span className="font-semibold text-slate-700">Validity:</span> {activeVersion.validity_days || 30} Days (Expires:{' '}
+            {activeVersion.expires_at ? formatIndianDate(activeVersion.expires_at) : '30 days from issue'})
           </p>
           <p>
             <span className="font-semibold text-slate-700">Lock Status:</span>{' '}
@@ -320,27 +388,27 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
           </p>
         </div>
 
-        {/* Totals Quick Card */}
+        {/* Quick Grand Total Card */}
         <div className="bg-slate-900 text-white border border-slate-800 rounded-xl p-5 shadow-sm text-xs space-y-2 flex flex-col justify-between">
           <div>
-            <h3 className="font-bold text-[#F4B323] uppercase tracking-wider text-[11px] pb-2 border-b border-slate-800">
-              Quotation Financial Total
+            <h3 className="font-bold text-gold-400 uppercase tracking-wider text-[11px] pb-2 border-b border-slate-800">
+              Quotation Total
             </h3>
             <div className="space-y-1.5 mt-2">
               <div className="flex justify-between text-slate-400">
                 <span>Taxable Value:</span>
-                <span>₹{Number(activeVersion.taxable_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <span className="font-mono text-slate-200">{formatIndianRupee(activeVersion.taxable_amount || 0)}</span>
               </div>
               <div className="flex justify-between text-slate-400">
                 <span>Total GST:</span>
-                <span>₹{Number(activeVersion.total_tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <span className="font-mono text-slate-200">{formatIndianRupee(activeVersion.total_tax_amount || 0)}</span>
               </div>
             </div>
           </div>
           <div className="pt-2 border-t border-slate-800">
             <span className="text-[11px] text-slate-400">Grand Total (Rounded):</span>
-            <p className="text-xl font-bold text-[#F4B323]">
-              ₹{Number(activeVersion.grand_total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            <p className="text-xl font-bold text-gold-400 font-mono">
+              {formatIndianRupee(activeVersion.grand_total_amount || 0)}
             </p>
           </div>
         </div>
@@ -350,53 +418,53 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
         <h3 className="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center justify-between">
           <span>Itemized Products & Services ({lineItems.length} items)</span>
-          <span className="text-xs text-slate-500 font-mono">Snapshot: {activeVersion.version_code}</span>
+          <span className="text-xs text-slate-500 font-mono">Snapshot: {activeVersion.version_code || 'V1'}</span>
         </h3>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border border-slate-200">
+          <table className="min-w-[850px] w-full text-left text-xs border border-slate-200">
             <thead className="bg-slate-50 text-slate-700">
               <tr>
-                <th className="py-2 px-3 font-semibold text-center w-10">#</th>
-                <th className="py-2 px-3 font-semibold">Item & Details</th>
-                <th className="py-2 px-3 font-semibold text-center w-20">HSN/SAC</th>
-                <th className="py-2 px-3 font-semibold text-center w-16">Qty</th>
-                <th className="py-2 px-3 font-semibold text-center w-16">Unit</th>
-                <th className="py-2 px-3 font-semibold text-right w-24">Rate (₹)</th>
-                <th className="py-2 px-3 font-semibold text-right w-20">Discount</th>
-                <th className="py-2 px-3 font-semibold text-right w-24">Taxable (₹)</th>
-                <th className="py-2 px-3 font-semibold text-right w-24">GST (₹)</th>
-                <th className="py-2 px-3 font-semibold text-right w-28">Total (₹)</th>
+                <th className="py-2.5 px-3 font-semibold text-center w-10">#</th>
+                <th className="py-2.5 px-3 font-semibold min-w-[200px]">Item & Details</th>
+                <th className="py-2.5 px-3 font-semibold text-center w-24">HSN/SAC</th>
+                <th className="py-2.5 px-3 font-semibold text-right w-20">Qty</th>
+                <th className="py-2.5 px-3 font-semibold text-center w-16">Unit</th>
+                <th className="py-2.5 px-3 font-semibold text-right w-28">Rate (₹)</th>
+                <th className="py-2.5 px-3 font-semibold text-right w-24">Discount</th>
+                <th className="py-2.5 px-3 font-semibold text-right w-28">Taxable (₹)</th>
+                <th className="py-2.5 px-3 font-semibold text-right w-24">GST (₹)</th>
+                <th className="py-2.5 px-3 font-semibold text-right w-32">Total (₹)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {lineItems.map((item: any, idx: number) => (
                 <tr key={item.id || idx} className="hover:bg-slate-50/60">
-                  <td className="py-2 px-3 text-center text-slate-500">{idx + 1}</td>
-                  <td className="py-2 px-3">
+                  <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{idx + 1}</td>
+                  <td className="py-2.5 px-3">
                     <p className="font-semibold text-slate-900">{item.item_name}</p>
                     {item.description && (
                       <p className="text-[11px] text-slate-500 mt-0.5">{item.description}</p>
                     )}
                   </td>
-                  <td className="py-2 px-3 text-center text-slate-600 font-mono">{item.hsn_sac_code || '—'}</td>
-                  <td className="py-2 px-3 text-center font-medium text-slate-900">{Number(item.quantity).toFixed(2)}</td>
-                  <td className="py-2 px-3 text-center text-slate-600 uppercase">{item.unit}</td>
-                  <td className="py-2 px-3 text-right font-medium text-slate-900">
-                    ₹{Number(item.unit_rate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <td className="py-2.5 px-3 text-center text-slate-600 font-mono">{item.hsn_sac_code || '—'}</td>
+                  <td className="py-2.5 px-3 text-right font-medium text-slate-900 font-mono">{Number(item.quantity).toFixed(2)}</td>
+                  <td className="py-2.5 px-3 text-center text-slate-600 uppercase">{item.unit}</td>
+                  <td className="py-2.5 px-3 text-right font-mono text-slate-900">
+                    {formatIndianRupee(item.unit_rate || 0)}
                   </td>
-                  <td className="py-2 px-3 text-right text-slate-600">
-                    {Number(item.discount_amount) > 0 ? `₹${Number(item.discount_amount).toFixed(2)}` : '—'}
+                  <td className="py-2.5 px-3 text-right font-mono text-emerald-700">
+                    {Number(item.discount_amount) > 0 ? formatIndianRupee(item.discount_amount) : '—'}
                   </td>
-                  <td className="py-2 px-3 text-right font-medium text-slate-900">
-                    ₹{Number(item.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-900">
+                    {formatIndianRupee(item.taxable_amount || 0)}
                   </td>
-                  <td className="py-2 px-3 text-right text-slate-700">
-                    ₹{Number(item.tax_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    <span className="block text-[10px] text-slate-400">@{item.gst_rate}%</span>
+                  <td className="py-2.5 px-3 text-right font-mono text-slate-700">
+                    {formatIndianRupee(item.tax_amount || 0)}
+                    <span className="block text-[10px] text-slate-400 font-sans">@{item.gst_rate}%</span>
                   </td>
-                  <td className="py-2 px-3 text-right font-bold text-slate-900">
-                    ₹{Number(item.line_total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                    {formatIndianRupee(item.line_total || 0)}
                   </td>
                 </tr>
               ))}
@@ -404,6 +472,33 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
           </table>
         </div>
       </div>
+
+      {/* Statutory Tax Breakdown Card (BUG-028) */}
+      <TaxBreakdownCard
+        title="Quotation Statutory Tax & Financial Summary"
+        subtotalAmount={Number(activeVersion.taxable_amount || 0)}
+        discountAmount={0}
+        taxableAmount={Number(activeVersion.taxable_amount || 0)}
+        cgstAmount={cgstAmount}
+        sgstAmount={sgstAmount}
+        igstAmount={igstAmount}
+        totalTaxAmount={totalTaxAmount}
+        roundOffAmount={Number(activeVersion.round_off_amount || 0)}
+        grandTotalAmount={Number(activeVersion.grand_total_amount || 0)}
+        amountInWords={convertNumberToIndianWords(activeVersion.grand_total_amount || 0)}
+        isGstApplicable={quotation.is_gst_applicable}
+        taxDetermination={
+          !quotation.is_gst_applicable
+            ? 'not_applicable'
+            : !quotation.place_of_supply_state_code
+            ? 'undetermined'
+            : isIntraState
+            ? 'intra_state'
+            : 'inter_state'
+        }
+        rateBreakdown={rateBreakdowns}
+        isDark={false}
+      />
 
       {/* Acceptance Record Section (If accepted) */}
       {acceptances.length > 0 && (
@@ -618,4 +713,3 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
     </div>
   );
 }
-

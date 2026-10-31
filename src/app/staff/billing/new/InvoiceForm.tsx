@@ -4,26 +4,51 @@ import React, { useState, useTransition, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createInvoiceAction,
+  updateDraftInvoiceAction,
   convertQuotationToInvoiceAction,
-  type ActionResponse,
 } from '@/lib/billing/actions';
 import {
   calculateInvoiceTotals,
   isValidIndianStateCode,
   type InvoiceLineItemInput,
 } from '@/lib/billing/calculations';
-import type { CompanyBillingProfile } from '@/lib/billing/company-config';
+import { getPaymentInstructions, type CompanyBillingProfile } from '@/lib/billing/company-config';
 import type { InvoiceType } from '@/types/database';
 import {
   Plus,
   Trash2,
   FileCheck,
   AlertCircle,
-  HelpCircle,
   RefreshCw,
   Sparkles,
-  ArrowRight,
+  ArrowLeft,
 } from 'lucide-react';
+import Link from 'next/link';
+import {
+  formInputClasses,
+  formSelectClasses,
+  formTextareaClasses,
+  formLabelClasses,
+  tableInputClasses,
+  tableSelectClasses,
+} from '@/components/ui/form-styles';
+import { TaxBreakdownCard } from '@/components/ui/TaxBreakdownCard';
+
+export interface InitialInvoiceData {
+  id: string;
+  invoice_number?: string | null;
+  customer_id: string;
+  invoice_type: InvoiceType;
+  invoice_date: string;
+  due_date: string;
+  placeOfSupplyStateCode: string;
+  delivery_location?: string | null;
+  client_po_reference?: string | null;
+  terms_conditions?: string | null;
+  payment_instructions?: string | null;
+  notes?: string | null;
+  items: InvoiceLineItemInput[];
+}
 
 interface InvoiceFormProps {
   customers: Array<{
@@ -49,6 +74,8 @@ interface InvoiceFormProps {
   defaultCustomerId?: string;
   defaultQuotationId?: string;
   companyProfile: CompanyBillingProfile;
+  isEdit?: boolean;
+  initialData?: InitialInvoiceData;
 }
 
 export default function InvoiceForm({
@@ -58,26 +85,36 @@ export default function InvoiceForm({
   defaultCustomerId,
   defaultQuotationId,
   companyProfile,
+  isEdit = false,
+  initialData,
 }: InvoiceFormProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'direct' | 'convert'>(defaultQuotationId ? 'convert' : 'direct');
+  const [activeTab, setActiveTab] = useState<'direct' | 'convert'>(
+    isEdit ? 'direct' : (defaultQuotationId ? 'convert' : 'direct')
+  );
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
 
   // Direct Invoice Form State
-  const [customerId, setCustomerId] = useState(defaultCustomerId || (customers[0]?.id || ''));
-  const [invoiceType, setInvoiceType] = useState<InvoiceType>('tax_invoice');
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [dueDate, setDueDate] = useState(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
-  const [clientPoReference, setClientPoReference] = useState('');
-  const [deliveryLocation, setDeliveryLocation] = useState('');
+  const defaultCustId = initialData?.customer_id || defaultCustomerId || (customers[0]?.id || '');
+  const [customerId, setCustomerId] = useState(defaultCustId);
+  const [invoiceType, setInvoiceType] = useState<InvoiceType>(initialData?.invoice_type || 'tax_invoice');
+  const [invoiceDate, setInvoiceDate] = useState(
+    initialData?.invoice_date || new Date().toISOString().split('T')[0]
+  );
+  const [dueDate, setDueDate] = useState(
+    initialData?.due_date || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+  );
+  const [clientPoReference, setClientPoReference] = useState(initialData?.client_po_reference || '');
+  const [deliveryLocation, setDeliveryLocation] = useState(initialData?.delivery_location || '');
   const [termsConditions, setTermsConditions] = useState(
-    'Payment due within 30 days from invoice date. Overdue amounts subject to 18% annual interest.'
+    initialData?.terms_conditions ||
+      'Payment due within 30 days from invoice date. Subject to Motihari, Bihar jurisdiction.'
   );
   const [paymentInstructions, setPaymentInstructions] = useState(
-    `Bank: ${companyProfile.bankDetails.bankName}\nA/C: ${companyProfile.bankDetails.accountNumber}\nIFSC: ${companyProfile.bankDetails.ifscCode}\nUPI: ${companyProfile.bankDetails.upiId}`
+    initialData?.payment_instructions || getPaymentInstructions(companyProfile)
   );
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(initialData?.notes || '');
 
   // Selected customer object
   const selectedCustomer = useMemo(
@@ -86,23 +123,27 @@ export default function InvoiceForm({
   );
 
   const [placeOfSupplyStateCode, setPlaceOfSupplyStateCode] = useState(
-    selectedCustomer?.state_code || ''
+    initialData?.placeOfSupplyStateCode ?? (selectedCustomer?.state_code || '')
   );
 
   // Line items state
-  const [items, setItems] = useState<InvoiceLineItemInput[]>([
-    {
-      product_service_id: null,
-      item_name: '',
-      description: '',
-      hsn_sac_code: '8429',
-      unit: 'month',
-      quantity: 1,
-      unit_rate: 50000,
-      discount_amount: 0,
-      gst_rate: 18,
-    },
-  ]);
+  const [items, setItems] = useState<InvoiceLineItemInput[]>(
+    initialData?.items && initialData.items.length > 0
+      ? initialData.items
+      : [
+          {
+            product_service_id: null,
+            item_name: '',
+            description: '',
+            hsn_sac_code: '8429',
+            unit: 'month',
+            quantity: 1,
+            unit_rate: 50000,
+            discount_amount: 0,
+            gst_rate: 18,
+          },
+        ]
+  );
 
   // Convert Quotation Form State
   const [selectedQuotationId, setSelectedQuotationId] = useState(
@@ -162,71 +203,97 @@ export default function InvoiceForm({
         ...copy[index],
         product_service_id: cat.id,
         item_name: cat.name,
-        hsn_sac_code: cat.hsn_sac_code || copy[index].hsn_sac_code,
+        hsn_sac_code: cat.hsn_sac_code || '',
         unit: cat.unit_of_measurement || 'unit',
-        unit_rate: cat.default_unit_price || copy[index].unit_rate,
-        gst_rate: cat.applicable_gst_rate !== null ? cat.applicable_gst_rate : copy[index].gst_rate,
+        unit_rate: cat.default_unit_price || 0,
+        gst_rate: cat.applicable_gst_rate !== null ? cat.applicable_gst_rate : 18,
       };
       return copy;
     });
   };
 
-  // Real-time calculations
-  const totals = useMemo(() => {
-    return calculateInvoiceTotals(
-      items,
-      invoiceType,
-      placeOfSupplyStateCode,
-      companyProfile.stateCode
-    );
-  }, [items, invoiceType, placeOfSupplyStateCode, companyProfile.stateCode]);
+  // Live Totals Calculation with verified Bihar (10) supplier state
+  const effectiveSupplyCode = placeOfSupplyStateCode || selectedCustomer?.state_code || '';
+  const totals = calculateInvoiceTotals(
+    items,
+    invoiceType,
+    effectiveSupplyCode,
+    companyProfile.stateCode || '10'
+  );
+
+  // Group line items by rate for breakdown
+  const rateBreakdownMap = new Map<number, { taxable: number; tax: number; cgst: number; sgst: number; igst: number }>();
+  totals.items.forEach((it) => {
+    const rate = it.gst_rate || 0;
+    const cur = rateBreakdownMap.get(rate) || { taxable: 0, tax: 0, cgst: 0, sgst: 0, igst: 0 };
+    cur.taxable += it.taxable_amount;
+    cur.tax += it.tax_amount;
+    cur.cgst += it.cgst_amount || 0;
+    cur.sgst += it.sgst_amount || 0;
+    cur.igst += it.igst_amount || 0;
+    rateBreakdownMap.set(rate, cur);
+  });
+
+  const rateBreakdownList = Array.from(rateBreakdownMap.entries()).map(([rate, vals]) => ({
+    gstRate: rate,
+    taxableAmount: vals.taxable,
+    cgstAmount: vals.cgst,
+    sgstAmount: vals.sgst,
+    igstAmount: vals.igst,
+    totalTax: vals.tax,
+  }));
 
   // Handle Direct Invoice Submission
   const handleDirectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError(null);
 
+    const formData = new FormData();
+    if (isEdit && initialData?.id) {
+      formData.append('invoiceId', initialData.id);
+    }
+    formData.append('customerId', customerId);
+    formData.append('invoiceType', invoiceType);
+    formData.append('invoiceDate', invoiceDate);
+    formData.append('dueDate', dueDate);
+    formData.append('placeOfSupplyStateCode', placeOfSupplyStateCode);
+    formData.append('deliveryLocation', deliveryLocation);
+    formData.append('clientPoReference', clientPoReference);
+    formData.append('termsConditions', termsConditions);
+    formData.append('paymentInstructions', paymentInstructions);
+    formData.append('notes', notes);
+    formData.append('itemsJson', JSON.stringify(items));
+
     startTransition(async () => {
-      const formData = new FormData();
-      formData.append('customerId', customerId);
-      formData.append('invoiceType', invoiceType);
-      formData.append('invoiceDate', invoiceDate);
-      formData.append('dueDate', dueDate);
-      formData.append('placeOfSupplyStateCode', placeOfSupplyStateCode);
-      formData.append('clientPoReference', clientPoReference);
-      formData.append('deliveryLocation', deliveryLocation);
-      formData.append('termsConditions', termsConditions);
-      formData.append('paymentInstructions', paymentInstructions);
-      formData.append('notes', notes);
-      formData.append('itemsJson', JSON.stringify(items));
-
-      const res: ActionResponse<{ invoiceId: string }> = await createInvoiceAction(null, formData);
-
-      if (res.error) {
-        setServerError(res.error);
-      } else if (res.data?.invoiceId) {
-        router.push(`/staff/billing/${res.data.invoiceId}`);
+      if (isEdit) {
+        const res = await updateDraftInvoiceAction(null, formData);
+        if (res.error) {
+          setServerError(res.error);
+        } else if (res.data?.invoiceId) {
+          router.push(`/staff/billing/${res.data.invoiceId}`);
+        }
+      } else {
+        const res = await createInvoiceAction(null, formData);
+        if (res.error) {
+          setServerError(res.error);
+        } else if (res.data?.invoiceId) {
+          router.push(`/staff/billing/${res.data.invoiceId}`);
+        }
       }
     });
   };
 
-  // Handle Quotation Conversion Submission
+  // Handle Convert Quotation Submission
   const handleConvertSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError(null);
 
-    if (!selectedQuotationId) {
-      setServerError('Please select an accepted quotation to convert.');
-      return;
-    }
+    const formData = new FormData();
+    formData.append('quotationId', selectedQuotationId);
+    formData.append('invoiceType', convertInvoiceType);
 
     startTransition(async () => {
-      const formData = new FormData();
-      formData.append('quotationId', selectedQuotationId);
-      formData.append('invoiceType', convertInvoiceType);
-
       const res = await convertQuotationToInvoiceAction(null, formData);
-
       if (res.error) {
         setServerError(res.error);
       } else if (res.data?.invoiceId) {
@@ -237,70 +304,72 @@ export default function InvoiceForm({
 
   return (
     <div className="space-y-6">
-      {/* Mode Switcher Tabs */}
-      <div className="flex border-b border-slate-200">
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('direct');
-            setServerError(null);
-          }}
-          className={`py-3 px-5 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'direct'
-              ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-emerald-600" />
-          Direct GST Invoice
-        </button>
+      {/* Mode Switcher Tabs (Only shown in creation mode) */}
+      {!isEdit && (
+        <div className="flex border-b border-slate-800">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('direct');
+              setServerError(null);
+            }}
+            className={`py-3 px-5 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+              activeTab === 'direct'
+                ? 'border-emerald-500 text-emerald-400 bg-slate-900/60'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            Direct GST Invoice
+          </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('convert');
-            setServerError(null);
-          }}
-          className={`py-3 px-5 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'convert'
-              ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <RefreshCw className="w-4 h-4 text-blue-600" />
-          Convert from Accepted Quotation
-          {acceptedQuotations.length > 0 && (
-            <span className="ml-1.5 px-2 py-0.5 text-xs bg-emerald-100 text-emerald-800 rounded-full font-medium">
-              {acceptedQuotations.length} available
-            </span>
-          )}
-        </button>
-      </div>
-
-      {serverError && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-          <div className="text-sm text-rose-800 font-medium">{serverError}</div>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('convert');
+              setServerError(null);
+            }}
+            className={`py-3 px-5 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+              activeTab === 'convert'
+                ? 'border-emerald-500 text-emerald-400 bg-slate-900/60'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <RefreshCw className="w-4 h-4 text-blue-400" />
+            Convert from Accepted Quotation
+            {acceptedQuotations.length > 0 && (
+              <span className="ml-1.5 px-2 py-0.5 text-xs bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-full font-medium">
+                {acceptedQuotations.length} available
+              </span>
+            )}
+          </button>
         </div>
       )}
 
-      {/* ----------------- TAB 1: DIRECT INVOICE FORM ----------------- */}
+      {serverError && (
+        <div className="p-4 bg-rose-950/70 border border-rose-800/80 rounded-xl text-rose-200 flex items-start gap-3 text-xs">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <div className="font-medium">{serverError}</div>
+        </div>
+      )}
+
+      {/* ----------------- DIRECT INVOICE FORM (OR EDIT DRAFT) ----------------- */}
       {activeTab === 'direct' && (
         <form onSubmit={handleDirectSubmit} className="space-y-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-5">
             <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
               1. Customer & Statutory Supply Information
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                  Customer / Entity *
+                <label className={formLabelClasses}>
+                  Customer / Entity <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={customerId}
                   onChange={(e) => handleCustomerChange(e.target.value)}
-                  className="w-full text-sm rounded-lg border border-slate-300 p-2.5 bg-white focus:ring-2 focus:ring-emerald-500"
+                  className={formSelectClasses}
                   required
                 >
                   <option value="" disabled>Select customer...</option>
@@ -313,13 +382,13 @@ export default function InvoiceForm({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                  Invoice Type *
+                <label className={formLabelClasses}>
+                  Invoice Type <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={invoiceType}
                   onChange={(e) => setInvoiceType(e.target.value as InvoiceType)}
-                  className="w-full text-sm rounded-lg border border-slate-300 p-2.5 bg-white focus:ring-2 focus:ring-emerald-500"
+                  className={formSelectClasses}
                 >
                   <option value="tax_invoice">Tax Invoice (Standard GST)</option>
                   <option value="bill_of_supply">Bill of Supply (Composition/Exempt)</option>
@@ -328,8 +397,8 @@ export default function InvoiceForm({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                  Place of Supply State Code *
+                <label className={formLabelClasses}>
+                  Place of Supply (State Code) <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -337,21 +406,21 @@ export default function InvoiceForm({
                     maxLength={2}
                     value={placeOfSupplyStateCode}
                     onChange={(e) => setPlaceOfSupplyStateCode(e.target.value)}
-                    placeholder="07"
-                    className="w-20 text-sm rounded-lg border border-slate-300 p-2.5 text-center font-mono focus:ring-2 focus:ring-emerald-500"
+                    placeholder="10"
+                    className="w-20 text-sm font-mono rounded-lg border border-slate-300 bg-white text-slate-900 p-2.5 focus:ring-2 focus:ring-[#10243B] uppercase text-center font-bold"
                     required
                   />
-                  <div className="text-xs text-slate-500 flex items-center">
+                  <div className="flex-1 flex items-center text-xs">
                     {!placeOfSupplyStateCode || !isValidIndianStateCode(placeOfSupplyStateCode) ? (
-                      <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-1 rounded">
-                        Undetermined (State Code Required)
+                      <span className="text-amber-800 font-semibold bg-amber-100 border border-amber-300 px-2.5 py-1 rounded">
+                        Undetermined Code
                       </span>
-                    ) : placeOfSupplyStateCode === companyProfile.stateCode ? (
-                      <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-1 rounded">
-                        Intra-State (CGST + SGST)
+                    ) : placeOfSupplyStateCode === (companyProfile.stateCode || '10') ? (
+                      <span className="text-emerald-800 font-semibold bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded">
+                        Intra-State (CGST+SGST)
                       </span>
                     ) : (
-                      <span className="text-blue-700 font-semibold bg-blue-50 px-2 py-1 rounded">
+                      <span className="text-blue-800 font-semibold bg-blue-100 border border-blue-300 px-2.5 py-1 rounded">
                         Inter-State (IGST)
                       </span>
                     )}
@@ -360,35 +429,35 @@ export default function InvoiceForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                  Invoice Date *
+                <label className={formLabelClasses}>
+                  Invoice Date <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
                   value={invoiceDate}
                   onChange={(e) => setInvoiceDate(e.target.value)}
-                  className="w-full text-sm rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-emerald-500"
+                  className={formInputClasses}
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                  Payment Due Date *
+                <label className={formLabelClasses}>
+                  Payment Due Date <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full text-sm rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-emerald-500"
+                  className={formInputClasses}
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                <label className={formLabelClasses}>
                   Client PO Reference
                 </label>
                 <input
@@ -396,13 +465,13 @@ export default function InvoiceForm({
                   value={clientPoReference}
                   onChange={(e) => setClientPoReference(e.target.value)}
                   placeholder="e.g. PO-2026/8492"
-                  className="w-full text-sm rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-emerald-500"
+                  className={formInputClasses}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              <label className={formLabelClasses}>
                 Site / Delivery Destination
               </label>
               <input
@@ -410,25 +479,26 @@ export default function InvoiceForm({
                 value={deliveryLocation}
                 onChange={(e) => setDeliveryLocation(e.target.value)}
                 placeholder="Project Site, Expressway Sector 18, Noida"
-                className="w-full text-sm rounded-lg border border-slate-300 p-2.5 focus:ring-2 focus:ring-emerald-500"
+                className={formInputClasses}
               />
             </div>
           </div>
 
           {/* Line Items Table */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h2 className="text-base font-bold text-slate-900">2. Line Items & Tax Breakdown</h2>
-                <p className="text-xs text-slate-500">
-                  Item rates, units, discounts, and HSN/SAC codes.
+                <h2 className="text-base font-bold text-slate-900">
+                  2. Invoice Line Items & Tax Rates
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Input machinery supply, equipment rental periods, or tender service items.
                 </p>
               </div>
-
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#10243B] text-white rounded-lg hover:bg-slate-800 transition"
               >
                 <Plus className="w-3.5 h-3.5" /> Add Item
               </button>
@@ -438,31 +508,32 @@ export default function InvoiceForm({
               {items.map((item, idx) => (
                 <div
                   key={idx}
-                  className="p-4 rounded-lg border border-slate-200 bg-slate-50/50 space-y-3 relative"
+                  className="p-4 rounded-lg border border-slate-200 bg-slate-50/70 space-y-3 relative"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-500 uppercase">Item #{idx + 1}</span>
+                    <span className="text-xs font-bold text-slate-700 uppercase">Item #{idx + 1}</span>
                     {items.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(idx)}
-                        className="text-rose-600 hover:text-rose-800 p-1 rounded"
+                        className="text-rose-600 hover:text-rose-800 text-xs font-semibold inline-flex items-center gap-1"
                         title="Delete item"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Remove
                       </button>
                     )}
                   </div>
 
                   {catalogItems.length > 0 && (
                     <div className="w-full sm:w-1/2">
-                      <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
                         Autofill from Catalog
                       </label>
                       <select
                         onChange={(e) => handleSelectCatalogItem(idx, e.target.value)}
                         value={item.product_service_id || ''}
-                        className="w-full text-xs rounded border border-slate-300 p-1.5 bg-white"
+                        className={tableSelectClasses}
                       >
                         <option value="">-- Choose machinery or service --</option>
                         {catalogItems.map((cat) => (
@@ -476,21 +547,21 @@ export default function InvoiceForm({
 
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <div className="sm:col-span-2">
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Item / Machinery Name *
+                      <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
+                        Item / Machinery Name <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
                         value={item.item_name}
                         onChange={(e) => handleItemChange(idx, 'item_name', e.target.value)}
                         placeholder="e.g. 20-Ton Hydraulic Excavator Monthly Rental"
-                        className="w-full text-sm rounded border border-slate-300 p-2 focus:ring-1 focus:ring-emerald-500"
+                        className={tableInputClasses}
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                         HSN / SAC Code
                       </label>
                       <input
@@ -498,12 +569,12 @@ export default function InvoiceForm({
                         value={item.hsn_sac_code || ''}
                         onChange={(e) => handleItemChange(idx, 'hsn_sac_code', e.target.value)}
                         placeholder="8429 / 9973"
-                        className="w-full text-sm rounded border border-slate-300 p-2 font-mono uppercase focus:ring-1 focus:ring-emerald-500"
+                        className={tableInputClasses}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                         Unit
                       </label>
                       <input
@@ -511,69 +582,72 @@ export default function InvoiceForm({
                         value={item.unit || ''}
                         onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
                         placeholder="month / day / unit"
-                        className="w-full text-sm rounded border border-slate-300 p-2 focus:ring-1 focus:ring-emerald-500"
+                        className={tableInputClasses}
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Quantity *
+                      <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
+                        Quantity <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="number"
-                        step="any"
-                        min="0.0001"
+                        step="0.01"
+                        min="0.01"
                         value={item.quantity}
-                        onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                        className="w-full text-sm rounded border border-slate-300 p-2 text-right focus:ring-1 focus:ring-emerald-500"
+                        onChange={(e) => handleItemChange(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                        className={tableInputClasses}
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Unit Rate (₹) *
+                      <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
+                        Unit Rate (₹) <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="number"
-                        step="any"
+                        step="0.01"
                         min="0"
                         value={item.unit_rate}
-                        onChange={(e) => handleItemChange(idx, 'unit_rate', e.target.value)}
-                        className="w-full text-sm rounded border border-slate-300 p-2 text-right focus:ring-1 focus:ring-emerald-500"
+                        onChange={(e) => handleItemChange(idx, 'unit_rate', parseFloat(e.target.value) || 0)}
+                        className={tableInputClasses}
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                         Discount (₹)
                       </label>
                       <input
                         type="number"
-                        step="any"
+                        step="0.01"
                         min="0"
-                        value={item.discount_amount || 0}
-                        onChange={(e) => handleItemChange(idx, 'discount_amount', e.target.value)}
-                        className="w-full text-sm rounded border border-slate-300 p-2 text-right focus:ring-1 focus:ring-emerald-500"
+                        value={item.discount_amount}
+                        onChange={(e) => handleItemChange(idx, 'discount_amount', parseFloat(e.target.value) || 0)}
+                        className={tableInputClasses}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        GST Rate (%) {invoiceType !== 'tax_invoice' && '(0% Exempt)'}
+                      <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
+                        GST Tax Rate (%)
                       </label>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
+                      <select
+                        value={item.gst_rate}
+                        onChange={(e) => handleItemChange(idx, 'gst_rate', parseFloat(e.target.value) || 0)}
                         disabled={invoiceType !== 'tax_invoice'}
-                        value={invoiceType === 'tax_invoice' ? item.gst_rate || 18 : 0}
-                        onChange={(e) => handleItemChange(idx, 'gst_rate', e.target.value)}
-                        className="w-full text-sm rounded border border-slate-300 p-2 text-right disabled:bg-slate-100 focus:ring-1 focus:ring-emerald-500"
-                      />
+                        className={tableSelectClasses}
+                      >
+                        <option value={0}>0% (Exempt)</option>
+                        <option value={5}>5% (Concessional)</option>
+                        <option value={12}>12% (Standard Low)</option>
+                        <option value={18}>18% (Standard Rate)</option>
+                        <option value={28}>28% (Special Rate)</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -581,144 +655,92 @@ export default function InvoiceForm({
             </div>
           </div>
 
-          {/* Statutory Calculations & Grand Total Summary */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
-                Statutory Terms & Payment Instructions
-              </h3>
+          {/* 3. Live Financial Summary Card */}
+          <TaxBreakdownCard
+            title="3. Live Invoice Financial & GST Totals"
+            subtotalAmount={totals.subtotal_amount}
+            discountAmount={totals.discount_amount}
+            taxableAmount={totals.taxable_amount}
+            cgstAmount={totals.cgst_amount}
+            sgstAmount={totals.sgst_amount}
+            igstAmount={totals.igst_amount}
+            totalTaxAmount={totals.total_tax_amount}
+            roundOffAmount={totals.round_off_amount}
+            grandTotalAmount={totals.grand_total_amount}
+            amountInWords={totals.amount_in_words}
+            isGstApplicable={invoiceType === 'tax_invoice'}
+            taxDetermination={totals.tax_determination}
+            rateBreakdown={rateBreakdownList}
+            isDark={true}
+          />
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Terms & Conditions
-                </label>
-                <textarea
-                  rows={2}
-                  value={termsConditions}
-                  onChange={(e) => setTermsConditions(e.target.value)}
-                  className="w-full text-xs rounded border border-slate-300 p-2 font-sans"
-                />
-              </div>
+          {/* 4. Commercial Terms & Instructions */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
+              4. Payment Instructions & Remarks
+            </h2>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Bank Settlement Details (Printed on Invoice)
-                </label>
-                <textarea
-                  rows={3}
-                  value={paymentInstructions}
-                  onChange={(e) => setPaymentInstructions(e.target.value)}
-                  className="w-full text-xs rounded border border-slate-300 p-2 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Internal Staff Notes
-                </label>
-                <input
-                  type="text"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Notes visible to staff only"
-                  className="w-full text-xs rounded border border-slate-300 p-2"
-                />
-              </div>
+            <div>
+              <label className={formLabelClasses}>
+                Commercial Terms & Conditions
+              </label>
+              <textarea
+                rows={2}
+                value={termsConditions}
+                onChange={(e) => setTermsConditions(e.target.value)}
+                className={formTextareaClasses}
+              />
             </div>
 
-            <div className="bg-slate-900 text-white rounded-xl p-5 shadow-sm space-y-3 flex flex-col justify-between">
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-800 pb-2">
-                  Tax & Commercial Summary
-                </h3>
-
-                <div className="flex justify-between text-xs text-slate-300">
-                  <span>Subtotal:</span>
-                  <span>₹{totals.subtotal_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </div>
-
-                {totals.discount_amount > 0 && (
-                  <div className="flex justify-between text-xs text-emerald-400">
-                    <span>Discount:</span>
-                    <span>-₹{totals.discount_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-between text-xs text-slate-300 border-t border-slate-800 pt-1">
-                  <span>Taxable Value:</span>
-                  <span>₹{totals.taxable_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </div>
-
-                {totals.tax_determination === 'undetermined' ? (
-                  <div className="bg-amber-950/60 border border-amber-600/60 text-amber-300 p-2.5 rounded text-xs space-y-1 my-1">
-                    <p className="font-semibold text-amber-200">⚠️ Tax Determination Pending (Undetermined)</p>
-                    <p className="text-[11px] text-amber-300/90 leading-relaxed">
-                      Place of Supply state code is missing or invalid. GST cannot be determined or issued until a valid 2-digit State Code is provided.
-                    </p>
-                  </div>
-                ) : totals.is_intra_state ? (
-                  <>
-                    <div className="flex justify-between text-xs text-slate-300">
-                      <span>CGST (Central Tax):</span>
-                      <span>₹{totals.cgst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-slate-300">
-                      <span>SGST (State Tax):</span>
-                      <span>₹{totals.sgst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </>
-                ) : totals.tax_determination === 'inter_state' ? (
-                  <div className="flex justify-between text-xs text-slate-300">
-                    <span>IGST (Integrated Tax):</span>
-                    <span>₹{totals.igst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                ) : null}
-
-                {totals.round_off_amount !== 0 && (
-                  <div className="flex justify-between text-xs text-slate-400">
-                    <span>Round-off:</span>
-                    <span>{totals.round_off_amount > 0 ? `+₹${totals.round_off_amount}` : `-₹${Math.abs(totals.round_off_amount)}`}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-between text-lg font-bold text-white border-t border-slate-700 pt-2">
-                  <span>Grand Total:</span>
-                  <span>
-                    {totals.tax_determination === 'undetermined' && invoiceType === 'tax_invoice' ? (
-                      <span className="text-amber-300 text-sm font-medium">
-                        ₹{totals.taxable_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} + GST (Pending)
-                      </span>
-                    ) : (
-                      `₹${totals.grand_total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                    )}
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-slate-400 italic font-serif">
-                  {totals.amount_in_words}
-                </p>
-              </div>
-
-              <div className="pt-4 border-t border-slate-800">
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-sm transition-colors shadow flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <FileCheck className="w-4 h-4" />
-                  {isPending ? 'Saving Draft...' : 'Save Draft Invoice'}
-                </button>
-                <p className="text-[10px] text-slate-400 text-center mt-2">
-                  Rule 46(b) Notice: Statutory invoice number will be gaplessly allocated upon formal issuance.
-                </p>
-              </div>
+            <div>
+              <label className={formLabelClasses}>
+                Bank Payment Coordinates
+              </label>
+              <textarea
+                rows={3}
+                value={paymentInstructions}
+                onChange={(e) => setPaymentInstructions(e.target.value)}
+                className={formTextareaClasses}
+              />
             </div>
+
+            <div>
+              <label className={formLabelClasses}>
+                Internal Remarks (Staff Only)
+              </label>
+              <textarea
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Purchase orders, contract milestone notes, credit approvals..."
+                className={formTextareaClasses}
+              />
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          <div className="flex items-center justify-between pt-4">
+            <Link
+              href={isEdit && initialData?.id ? `/staff/billing/${initialData.id}` : '/staff/billing'}
+              className="text-sm font-semibold text-slate-400 hover:text-white transition"
+            >
+              Cancel
+            </Link>
+
+            <button
+              type="submit"
+              disabled={isPending}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-semibold text-sm transition shadow disabled:opacity-50"
+            >
+              <FileCheck className="w-4 h-4" />
+              <span>{isPending ? 'Saving...' : isEdit ? 'Save Changes to Draft' : 'Save Draft Invoice'}</span>
+            </button>
           </div>
         </form>
       )}
 
-      {/* ----------------- TAB 2: CONVERT QUOTATION FORM ----------------- */}
-      {activeTab === 'convert' && (
+      {/* ----------------- CONVERT QUOTATION FORM ----------------- */}
+      {activeTab === 'convert' && !isEdit && (
         <form onSubmit={handleConvertSubmit} className="max-w-2xl bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-6">
           <div>
             <h2 className="text-base font-bold text-slate-900">
@@ -731,24 +753,24 @@ export default function InvoiceForm({
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                Select Accepted Quotation *
+              <label className={formLabelClasses}>
+                Select Accepted Quotation <span className="text-red-500">*</span>
               </label>
               {acceptedQuotations.length === 0 ? (
-                <div className="p-4 bg-amber-50 text-amber-800 text-xs rounded-lg border border-amber-200">
+                <div className="p-4 bg-amber-50 text-amber-900 text-xs rounded-lg border border-amber-200">
                   No accepted quotations currently available for conversion. Issue and accept quotations in the Quotations module first.
                 </div>
               ) : (
                 <select
                   value={selectedQuotationId}
                   onChange={(e) => setSelectedQuotationId(e.target.value)}
-                  className="w-full text-sm rounded-lg border border-slate-300 p-2.5 bg-white focus:ring-2 focus:ring-emerald-500"
+                  className={formSelectClasses}
                   required
                 >
-                  <option value="" disabled>Choose quotation...</option>
+                  <option value="" disabled>Select accepted quotation...</option>
                   {acceptedQuotations.map((q) => (
                     <option key={q.id} value={q.id}>
-                      {q.quotation_number} — {q.customers?.company_name} (Status: {q.status})
+                      {q.quotation_number} — {q.customer_name} (₹{Number(q.grand_total_amount).toLocaleString('en-IN')})
                     </option>
                   ))}
                 </select>
@@ -756,32 +778,36 @@ export default function InvoiceForm({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                Invoice Classification
+              <label className={formLabelClasses}>
+                Target Invoice Type <span className="text-red-500">*</span>
               </label>
               <select
                 value={convertInvoiceType}
                 onChange={(e) => setConvertInvoiceType(e.target.value as InvoiceType)}
-                className="w-full text-sm rounded-lg border border-slate-300 p-2.5 bg-white focus:ring-2 focus:ring-emerald-500"
+                className={formSelectClasses}
               >
                 <option value="tax_invoice">Tax Invoice (Standard GST)</option>
-                <option value="bill_of_supply">Bill of Supply (Exempt / Nil-Rated)</option>
+                <option value="bill_of_supply">Bill of Supply</option>
                 <option value="non_gst">Non-GST Invoice</option>
               </select>
             </div>
           </div>
 
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-            <p className="text-xs text-slate-500">
-              Creates a linked draft invoice. Prevents duplicate conversion.
-            </p>
+          <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+            <Link
+              href="/staff/billing"
+              className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition"
+            >
+              Cancel
+            </Link>
+
             <button
               type="submit"
               disabled={isPending || acceptedQuotations.length === 0}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-semibold text-sm transition-colors shadow disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-semibold text-sm transition shadow disabled:opacity-50"
             >
-              {isPending ? 'Converting...' : 'Convert to Invoice'}
-              <ArrowRight className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${isPending ? 'animate-spin' : ''}`} />
+              <span>{isPending ? 'Converting...' : 'Generate Invoice from Quotation'}</span>
             </button>
           </div>
         </form>

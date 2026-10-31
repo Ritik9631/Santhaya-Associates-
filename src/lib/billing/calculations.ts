@@ -5,6 +5,7 @@
  * SAFETY INVARIANTS:
  * 1. ZERO FLOATING-POINT ERRORS: Monetary operations performed with decimal precision and half-up rounding.
  * 2. STATUTORY INDIAN GST RULES:
+ *    - Base supplier state is Bihar (State Code 10).
  *    - Tax Invoices: Intra-State -> CGST (50%) + SGST (50%), Inter-State -> IGST (100%).
  *    - Bill of Supply & Non-GST: 0% tax, no tax split.
  * 3. GAPLESS NUMBERING HELPER: CGST Rule 46(b) format: SERIES/FY/XXXX.
@@ -14,63 +15,75 @@
 export type InvoiceType = 'tax_invoice' | 'bill_of_supply' | 'non_gst';
 export type InvoiceStatus = 'draft' | 'issued' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled' | 'refunded';
 
+export interface CompanyBankDetails {
+  isConfigured: boolean;
+  accountName: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  branchName: string;
+  upiId: string;
+}
+
 export interface CompanyBillingProfile {
   legalName: string;
   tradeName: string;
+  tagline: string;
   gstin: string;
-  pan: string;
-  cin?: string;
+  pan: string | null;
+  cin: string | null;
   stateName: string;
-  stateCode: string;
+  stateCode: string; // Statutory 2-digit Indian state code (10 for Bihar)
   registeredAddress: string;
   phone: string;
+  phoneSecondary: string;
   email: string;
   website: string;
-  bankDetails: {
-    accountName: string;
-    bankName: string;
-    accountNumber: string;
-    ifscCode: string;
-    branchName: string;
-    upiId: string;
-  };
+  bankDetails: CompanyBankDetails;
 }
 
 export function getCompanyBillingProfile(): CompanyBillingProfile {
-  const stateCode = (process.env.COMPANY_STATE_CODE || '07').trim().padStart(2, '0');
-  const gstin = (process.env.COMPANY_GSTIN || '07AAAAA0000A1Z5').trim().toUpperCase();
+  const stateCode = (process.env.COMPANY_STATE_CODE || '10').trim().padStart(2, '0');
+  const gstin = (process.env.COMPANY_GSTIN || '10ABVCS4277J1ZU').trim().toUpperCase();
+
+  const hasConfiguredBank = Boolean(
+    process.env.COMPANY_BANK_ACCOUNT_NO && process.env.COMPANY_BANK_IFSC
+  );
 
   return {
     legalName: process.env.COMPANY_LEGAL_NAME || 'Santhaya Associates Pvt. Ltd.',
     tradeName: process.env.COMPANY_TRADE_NAME || 'Santhaya Associates',
+    tagline: 'Building Today • Powering Tomorrow',
     gstin,
-    pan: process.env.COMPANY_PAN || 'AAAAA0000A',
-    cin: process.env.COMPANY_CIN || 'U45200DL2026PTC000000',
-    stateName: process.env.COMPANY_STATE_NAME || 'Delhi',
+    pan: process.env.COMPANY_PAN || null, // Never fabricate fake PAN
+    cin: process.env.COMPANY_CIN || null, // Never fabricate fake CIN
+    stateName: process.env.COMPANY_STATE_NAME || 'Bihar',
     stateCode,
     registeredAddress:
       process.env.COMPANY_REGISTERED_ADDRESS ||
-      'Corporate Office: Barakhamba Road, Connaught Place, New Delhi - 110001, India',
-    phone: process.env.COMPANY_PHONE || '+91 96319 82431',
-    email: process.env.COMPANY_EMAIL || 'billing@santhaya.com',
+      'Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India',
+    phone: process.env.COMPANY_PHONE || '+91 9430986713',
+    phoneSecondary: process.env.COMPANY_PHONE_SECONDARY || '+91 9608950748',
+    email: process.env.COMPANY_EMAIL || 'heistofeverything@gmail.com',
     website: process.env.NEXT_PUBLIC_SITE_URL || 'https://santhaya.com',
     bankDetails: {
-      accountName: process.env.COMPANY_BANK_ACCOUNT_NAME || 'Santhaya Associates Pvt. Ltd.',
-      bankName: process.env.COMPANY_BANK_NAME || 'State Bank of India',
-      accountNumber: process.env.COMPANY_BANK_ACCOUNT_NO || '398472910482',
-      ifscCode: process.env.COMPANY_BANK_IFSC || 'SBIN0000691',
-      branchName: process.env.COMPANY_BANK_BRANCH || 'Main Branch, New Delhi',
-      upiId: process.env.COMPANY_UPI_ID || 'santhaya.associates@sbi',
+      isConfigured: hasConfiguredBank,
+      accountName: process.env.COMPANY_BANK_ACCOUNT_NAME || (hasConfiguredBank ? 'Santhaya Associates Pvt. Ltd.' : ''),
+      bankName: process.env.COMPANY_BANK_NAME || '',
+      accountNumber: process.env.COMPANY_BANK_ACCOUNT_NO || '',
+      ifscCode: process.env.COMPANY_BANK_IFSC || '',
+      branchName: process.env.COMPANY_BANK_BRANCH || '',
+      upiId: process.env.COMPANY_UPI_ID || '',
     },
   };
 }
 
 export function getCurrentFinancialYear(date = new Date()): {
-  fullYear: string;
-  shortYear: string;
-  code: string;
+  fullYear: string;  // e.g. "2026-2027"
+  shortYear: string; // e.g. "2026-27"
+  code: string;      // e.g. "26-27"
 } {
-  const month = date.getMonth();
+  const month = date.getMonth(); // 0 = Jan, 3 = April
   const year = date.getFullYear();
 
   let startYear = year;
@@ -130,35 +143,79 @@ export function convertNumberToIndianWords(amount: number): string {
     return res;
   }
 
-  const intPart = Math.floor(Math.abs(amount));
-  if (intPart === 0) return 'Rupees Zero Only';
+  const absAmount = Math.abs(amount);
+  const wholePart = Math.floor(absAmount);
+  const decimalPart = Math.round((absAmount - wholePart) * 100);
 
-  let remaining = intPart;
+  let remaining = wholePart;
+  const crore = Math.floor(remaining / 10000000);
+  remaining %= 10000000;
+  const lakh = Math.floor(remaining / 100000);
+  remaining %= 100000;
+  const thousand = Math.floor(remaining / 1000);
+  remaining %= 1000;
+  const hundredAndRest = remaining;
+
   const parts: string[] = [];
 
-  if (remaining >= 10000000) {
-    const crores = Math.floor(remaining / 10000000);
-    parts.push(convertThreeDigits(crores) + ' Crore');
-    remaining %= 10000000;
+  if (crore > 0) parts.push(convertTwoDigits(crore) + ' Crore');
+  if (lakh > 0) parts.push(convertTwoDigits(lakh) + ' Lakh');
+  if (thousand > 0) parts.push(convertTwoDigits(thousand) + ' Thousand');
+  if (hundredAndRest > 0) parts.push(convertThreeDigits(hundredAndRest));
+
+  let rupeesText = parts.filter(Boolean).join(' ').trim();
+  if (!rupeesText) rupeesText = 'Zero';
+
+  let paiseText = '';
+  if (decimalPart > 0) {
+    paiseText = ` and ${convertTwoDigits(decimalPart)} Paise`;
   }
 
-  if (remaining >= 100000) {
-    const lakhs = Math.floor(remaining / 100000);
-    parts.push(convertTwoDigits(lakhs) + ' Lakh');
-    remaining %= 100000;
+  return `Rupees ${rupeesText}${paiseText} Only`;
+}
+
+export function formatStatutoryInvoiceNumber(
+  series: string,
+  fyCode: string,
+  sequenceNumber: number
+): string {
+  const cleanSeries = series.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const seqPadded = sequenceNumber.toString().padStart(4, '0');
+  return `${cleanSeries}/${fyCode}/${seqPadded}`;
+}
+
+export function isValidIndianStateCode(code: string | null | undefined): boolean {
+  if (!code) return false;
+  const trimmed = code.trim();
+  if (!/^\d{2}$/.test(trimmed)) return false;
+  const num = parseInt(trimmed, 10);
+  return (num >= 1 && num <= 38) || num === 97;
+}
+
+export type BillingTaxDetermination = 'intra_state' | 'inter_state' | 'undetermined' | 'not_applicable';
+
+export function determineBillingTaxStatus(
+  invoiceType: InvoiceType,
+  placeOfSupplyStateCode?: string,
+  companyStateCode?: string
+): BillingTaxDetermination {
+  if (invoiceType === 'bill_of_supply' || invoiceType === 'non_gst') {
+    return 'not_applicable';
   }
 
-  if (remaining >= 1000) {
-    const thousands = Math.floor(remaining / 1000);
-    parts.push(convertTwoDigits(thousands) + ' Thousand');
-    remaining %= 1000;
+  if (!placeOfSupplyStateCode || !isValidIndianStateCode(placeOfSupplyStateCode)) {
+    return 'undetermined';
   }
 
-  if (remaining > 0) {
-    parts.push(convertThreeDigits(remaining));
+  const profile = getCompanyBillingProfile();
+  const baseCompanyCode = (companyStateCode || profile.stateCode).trim().padStart(2, '0');
+  const normalizedSupplyCode = placeOfSupplyStateCode.trim().padStart(2, '0');
+
+  if (normalizedSupplyCode === baseCompanyCode) {
+    return 'intra_state';
   }
 
-  return 'Rupees ' + parts.join(' ') + ' Only';
+  return 'inter_state';
 }
 
 export interface InvoiceLineItemInput {
@@ -173,7 +230,7 @@ export interface InvoiceLineItemInput {
   gst_rate?: number | string;
 }
 
-export interface CalculatedInvoiceLineItem {
+export interface InvoiceCalculatedLineItem {
   product_service_id: string | null;
   item_name: string;
   description: string | null;
@@ -194,72 +251,14 @@ export interface CalculatedInvoiceLineItem {
   line_total: number;
 }
 
-export type TaxDeterminationStatus = 'intra_state' | 'inter_state' | 'undetermined' | 'not_applicable';
-
-/**
- * Validates whether a state code is a recognized Indian GST 2-digit state code.
- * Standard GST state codes range from 01 (Jammu & Kashmir) to 38 (Ladakh), plus 97 (Other Territory).
- */
-export function isValidIndianStateCode(code: string | null | undefined): boolean {
-  if (!code) return false;
-  const trimmed = code.trim().padStart(2, '0');
-  if (!/^\d{2}$/.test(trimmed)) return false;
-  const num = parseInt(trimmed, 10);
-  return (num >= 1 && num <= 38) || num === 97;
-}
-
-/**
- * Determines statutory Indian GST classification for an invoice without defaulting unknown states.
- * Missing or invalid Place of Supply is strictly 'undetermined'.
- */
-export function determineBillingTaxStatus(
-  invoiceType: InvoiceType,
-  placeOfSupplyStateCode?: string | null,
-  companyStateCode?: string
-): TaxDeterminationStatus {
-  if (invoiceType !== 'tax_invoice') return 'not_applicable';
-  if (!placeOfSupplyStateCode || !isValidIndianStateCode(placeOfSupplyStateCode)) {
-    return 'undetermined';
-  }
-  const profile = getCompanyBillingProfile();
-  const baseCompanyCode = (companyStateCode || profile.stateCode).trim().padStart(2, '0');
-  const normSupply = placeOfSupplyStateCode.trim().padStart(2, '0');
-  return normSupply === baseCompanyCode ? 'intra_state' : 'inter_state';
-}
-
-export interface InvoiceCalculatedTotals {
-  invoice_type: InvoiceType;
-  place_of_supply_state_code: string;
-  company_state_code: string;
-  is_intra_state: boolean;
-  is_inter_state: boolean;
-  tax_determination: TaxDeterminationStatus;
-  is_tax_determined: boolean;
-  tax_determination_message?: string;
-  subtotal_amount: number;
-  discount_amount: number;
-  taxable_amount: number;
-  cgst_amount: number;
-  sgst_amount: number;
-  igst_amount: number;
-  total_tax_amount: number;
-  round_off_amount: number;
-  grand_total_amount: number;
-  items: CalculatedInvoiceLineItem[];
-  amount_in_words: string;
-}
-
 export function calculateInvoiceLineItem(
   item: InvoiceLineItemInput,
-  invoiceType: InvoiceType,
-  placeOfSupplyStateCode: string,
+  invoiceType: InvoiceType = 'tax_invoice',
+  placeOfSupplyStateCode?: string,
   companyStateCode?: string
-): CalculatedInvoiceLineItem {
-  const profile = getCompanyBillingProfile();
-  const baseCompanyCode = (companyStateCode || profile.stateCode).trim().padStart(2, '0');
-  const normalizedSupplyCode = placeOfSupplyStateCode ? placeOfSupplyStateCode.trim().padStart(2, '0') : '';
+): InvoiceCalculatedLineItem {
   const isTaxInvoice = invoiceType === 'tax_invoice';
-  const taxDetermination = determineBillingTaxStatus(invoiceType, normalizedSupplyCode, baseCompanyCode);
+  const taxDetermination = determineBillingTaxStatus(invoiceType, placeOfSupplyStateCode, companyStateCode);
 
   const quantity = parseDecimalSafe(item.quantity, 1);
   const unitRate = parseDecimalSafe(item.unit_rate, 0);
@@ -313,6 +312,29 @@ export function calculateInvoiceLineItem(
     tax_amount: taxAmount,
     line_total: lineTotal,
   };
+}
+
+export interface InvoiceCalculatedTotals {
+  invoice_type: InvoiceType;
+  place_of_supply_state_code: string;
+  company_state_code: string;
+  is_intra_state: boolean;
+  is_inter_state: boolean;
+  tax_determination: BillingTaxDetermination;
+  is_tax_determined: boolean;
+  tax_determination_message?: string;
+  subtotal_amount: number;
+  discount_amount: number;
+  taxable_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
+  total_tax_amount: number;
+  unrounded_grand_total: number;
+  round_off_amount: number;
+  grand_total_amount: number;
+  amount_in_words: string;
+  items: InvoiceCalculatedLineItem[];
 }
 
 export function calculateInvoiceTotals(
@@ -381,10 +403,11 @@ export function calculateInvoiceTotals(
     sgst_amount: sgstAmount,
     igst_amount: igstAmount,
     total_tax_amount: totalTaxAmount,
+    unrounded_grand_total: unroundedGrandTotal,
     round_off_amount: roundOffAmount,
     grand_total_amount: grandTotalRounded,
-    items: calculatedItems,
     amount_in_words: amountInWords,
+    items: calculatedItems,
   };
 }
 
@@ -392,49 +415,43 @@ export function reconcileInvoiceBalance(
   grandTotal: number,
   paidAmount: number,
   currentStatus: InvoiceStatus,
-  dueDateStr?: string
+  dueDate: Date | string = new Date()
 ): {
   balanceAmount: number;
   newStatus: InvoiceStatus;
+  isOverdue: boolean;
 } {
-  const roundedGrandTotal = roundToTwoDecimals(grandTotal);
-  const roundedPaid = roundToTwoDecimals(paidAmount);
-  const balanceAmount = Math.max(0, roundToTwoDecimals(roundedGrandTotal - roundedPaid));
+  const total = roundToTwoDecimals(Math.max(0, grandTotal));
+  const paid = roundToTwoDecimals(Math.max(0, paidAmount));
+  const balance = roundToTwoDecimals(Math.max(0, total - paid));
 
-  if (currentStatus === 'cancelled' || currentStatus === 'refunded') {
-    return { balanceAmount, newStatus: currentStatus };
+  if (currentStatus === 'cancelled') {
+    return { balanceAmount: balance, newStatus: 'cancelled', isOverdue: false };
   }
-
+  if (currentStatus === 'refunded') {
+    return { balanceAmount: balance, newStatus: 'refunded', isOverdue: false };
+  }
   if (currentStatus === 'draft') {
-    return { balanceAmount, newStatus: 'draft' };
+    return { balanceAmount: total, newStatus: 'draft', isOverdue: false };
   }
 
-  let newStatus: InvoiceStatus = 'issued';
+  const due = typeof dueDate === 'string' ? new Date(dueDate) : dueDate;
+  const isOverdue = balance > 0 && due < new Date();
 
-  if (balanceAmount <= 0 && roundedPaid > 0) {
+  let newStatus: InvoiceStatus;
+  if (balance === 0 && total > 0) {
     newStatus = 'paid';
-  } else if (roundedPaid > 0 && balanceAmount > 0) {
+  } else if (paid > 0 && balance > 0) {
     newStatus = 'partially_paid';
+  } else if (isOverdue) {
+    newStatus = 'overdue';
   } else {
-    if (dueDateStr) {
-      const dueDate = new Date(dueDateStr);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (dueDate < today) {
-        newStatus = 'overdue';
-      }
-    }
+    newStatus = 'issued';
   }
 
-  return { balanceAmount, newStatus };
-}
-
-export function formatStatutoryInvoiceNumber(
-  series = 'SA',
-  fyCode?: string,
-  sequenceNumber = 1
-): string {
-  const activeFy = fyCode || getCurrentFinancialYear().code;
-  const seqStr = sequenceNumber.toString().padStart(4, '0');
-  return `${series.trim()}/${activeFy.trim()}/${seqStr}`;
+  return {
+    balanceAmount: balance,
+    newStatus,
+    isOverdue,
+  };
 }

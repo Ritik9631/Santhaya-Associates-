@@ -55,7 +55,7 @@ async function runTestSuite() {
   assert(roundToTwoDecimals(100.005) === 100.01, 'Half-up rounding correctly rounds 100.005 -> 100.01');
   assert(roundToTwoDecimals(100.004) === 100.00, 'Half-up rounding correctly rounds 100.004 -> 100.00');
 
-  // Intra-State GST (Delhi 07 to Delhi 07): 18% GST -> 9% CGST + 9% SGST
+  // Intra-State GST (Bihar 10 to Bihar 10): 18% GST -> 9% CGST + 9% SGST
   const intraItem = calculateLineItem(
     {
       item_name: 'Excavator 20T Rental',
@@ -65,7 +65,7 @@ async function runTestSuite() {
       gst_rate: 18.00,
     },
     true,
-    '07'
+    '10'
   );
 
   assert(intraItem.taxable_amount === 100000.00, 'Intra-state taxable amount is ₹100,000.00');
@@ -77,7 +77,7 @@ async function runTestSuite() {
   assert(intraItem.tax_amount === 18000.00, 'Total tax amount is ₹18,000.00');
   assert(intraItem.line_total === 118000.00, 'Line total is ₹118,000.00');
 
-  // Inter-State GST (Delhi 07 to UP 09): 18% GST -> 18% IGST
+  // Inter-State GST (Bihar 10 to UP 09): 18% GST -> 18% IGST
   const interItem = calculateLineItem(
     {
       item_name: 'Heavy Bulldozer Supply',
@@ -106,7 +106,7 @@ async function runTestSuite() {
       gst_rate: 18.00,
     },
     false, // Non-GST
-    '07'
+    '10'
   );
   assert(nonGstItem.tax_amount === 0.00, 'Non-GST quotation applies 0 tax amount');
   assert(nonGstItem.line_total === 50000.00, 'Non-GST line total equals taxable amount');
@@ -119,7 +119,7 @@ async function runTestSuite() {
       { item_name: 'Item C (28%)', quantity: 1, unit_rate: 25000, discount_amount: 5000, gst_rate: 28 },
     ],
     true,
-    '07'
+    '10'
   );
 
   // Item A: 20000 + 18% (3600) = 23600
@@ -209,7 +209,7 @@ async function runTestSuite() {
   assert(migrationSql.includes('CREATE TABLE IF NOT EXISTS public.quotation_acceptances'), 'Creates public.quotation_acceptances table');
   assert(migrationSql.includes('CREATE TABLE IF NOT EXISTS public.quotation_delivery_logs'), 'Creates public.quotation_delivery_logs table');
   assert(migrationSql.includes('NUMERIC(15, 2)'), 'Enforces NUMERIC(15, 2) decimal precision on monetary amounts');
-  assert(migrationSql.includes('ENABLE ROW LEVEL SECURITY'), 'Enables RLS on all 5 quotation tables');
+  assert(migrationSql.includes('ENABLE ROW LEVEL SECURITY'), 'Enforces RLS on all 5 quotation tables');
   assert(migrationSql.includes('REVOKE ALL ON public.quotations FROM PUBLIC, anon'), 'Revokes quotation access from PUBLIC and anon');
   assert(migrationSql.includes('CREATE OR REPLACE FUNCTION public.generate_quotation_number()'), 'Creates generate_quotation_number() stored procedure');
   assert(migrationSql.includes('SET search_path = public, pg_temp'), 'generate_quotation_number enforces search_path hardening');

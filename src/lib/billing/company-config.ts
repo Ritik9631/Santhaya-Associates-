@@ -1,66 +1,98 @@
 /**
- * Santhaya Associates — Statutory Company & Billing Configuration
+ * Santhaya Associates — Authoritative Statutory Supplier Configuration
  * File: src/lib/billing/company-config.ts
  *
- * Configurable, validated company statutory profile for GST Invoicing and Compliance.
- * Does NOT hardcode Delhi or fixed GSTIN; reads environment overrides with compliant fallbacks.
+ * Authoritative, verified company statutory profile for Quotations, Invoicing, and GST Compliance.
+ * Reflects verified registered business details in Motihari, Bihar (State Code 10).
+ * Does not invent fake PAN, CIN, or banking credentials.
  */
+
+export interface CompanyBankDetails {
+  isConfigured: boolean;
+  accountName: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  branchName: string;
+  upiId: string;
+}
 
 export interface CompanyBillingProfile {
   legalName: string;
   tradeName: string;
+  tagline: string;
   gstin: string;
-  pan: string;
-  cin?: string;
+  pan: string | null;
+  cin: string | null;
   stateName: string;
-  stateCode: string; // Statutory 2-digit Indian state code
+  stateCode: string; // Statutory 2-digit Indian state code (10 for Bihar)
   registeredAddress: string;
   phone: string;
+  phoneSecondary: string;
   email: string;
   website: string;
-  bankDetails: {
-    accountName: string;
-    bankName: string;
-    accountNumber: string;
-    ifscCode: string;
-    branchName: string;
-    upiId: string;
-  };
+  bankDetails: CompanyBankDetails;
 }
 
 export function getCompanyBillingProfile(): CompanyBillingProfile {
-  const stateCode = (process.env.COMPANY_STATE_CODE || '07').trim().padStart(2, '0');
-  const gstin = (process.env.COMPANY_GSTIN || '07AAAAA0000A1Z5').trim().toUpperCase();
+  const stateCode = (process.env.COMPANY_STATE_CODE || '10').trim().padStart(2, '0');
+  const gstin = (process.env.COMPANY_GSTIN || '10ABVCS4277J1ZU').trim().toUpperCase();
+
+  const hasConfiguredBank = Boolean(
+    process.env.COMPANY_BANK_ACCOUNT_NO && process.env.COMPANY_BANK_IFSC
+  );
 
   return {
     legalName: process.env.COMPANY_LEGAL_NAME || 'Santhaya Associates Pvt. Ltd.',
     tradeName: process.env.COMPANY_TRADE_NAME || 'Santhaya Associates',
+    tagline: 'Building Today • Powering Tomorrow',
     gstin,
-    pan: process.env.COMPANY_PAN || 'AAAAA0000A',
-    cin: process.env.COMPANY_CIN || 'U45200DL2026PTC000000',
-    stateName: process.env.COMPANY_STATE_NAME || 'Delhi',
+    pan: process.env.COMPANY_PAN || null, // Never fabricate fake PAN
+    cin: process.env.COMPANY_CIN || null, // Never fabricate fake CIN
+    stateName: process.env.COMPANY_STATE_NAME || 'Bihar',
     stateCode,
     registeredAddress:
       process.env.COMPANY_REGISTERED_ADDRESS ||
-      'Corporate Office: Barakhamba Road, Connaught Place, New Delhi - 110001, India',
-    phone: process.env.COMPANY_PHONE || '+91 96319 82431',
-    email: process.env.COMPANY_EMAIL || 'billing@santhaya.com',
+      'Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India',
+    phone: process.env.COMPANY_PHONE || '+91 9430986713',
+    phoneSecondary: process.env.COMPANY_PHONE_SECONDARY || '+91 9608950748',
+    email: process.env.COMPANY_EMAIL || 'heistofeverything@gmail.com',
     website: process.env.NEXT_PUBLIC_SITE_URL || 'https://santhaya.com',
     bankDetails: {
-      accountName: process.env.COMPANY_BANK_ACCOUNT_NAME || 'Santhaya Associates Pvt. Ltd.',
-      bankName: process.env.COMPANY_BANK_NAME || 'State Bank of India',
-      accountNumber: process.env.COMPANY_BANK_ACCOUNT_NO || '398472910482',
-      ifscCode: process.env.COMPANY_BANK_IFSC || 'SBIN0000691',
-      branchName: process.env.COMPANY_BANK_BRANCH || 'Main Branch, New Delhi',
-      upiId: process.env.COMPANY_UPI_ID || 'santhaya.associates@sbi',
+      isConfigured: hasConfiguredBank,
+      accountName: process.env.COMPANY_BANK_ACCOUNT_NAME || (hasConfiguredBank ? 'Santhaya Associates Pvt. Ltd.' : ''),
+      bankName: process.env.COMPANY_BANK_NAME || '',
+      accountNumber: process.env.COMPANY_BANK_ACCOUNT_NO || '',
+      ifscCode: process.env.COMPANY_BANK_IFSC || '',
+      branchName: process.env.COMPANY_BANK_BRANCH || '',
+      upiId: process.env.COMPANY_UPI_ID || '',
     },
   };
 }
 
 /**
+ * Returns formatted bank payment instructions.
+ * If bank details are not configured in environment, returns safe instruction without fabricated accounts.
+ */
+export function getPaymentInstructions(profile = getCompanyBillingProfile()): string {
+  if (profile.bankDetails.isConfigured) {
+    return [
+      `Beneficiary: ${profile.bankDetails.accountName}`,
+      `Bank: ${profile.bankDetails.bankName}`,
+      `Account No: ${profile.bankDetails.accountNumber}`,
+      `IFSC Code: ${profile.bankDetails.ifscCode}`,
+      profile.bankDetails.branchName ? `Branch: ${profile.bankDetails.branchName}` : null,
+      profile.bankDetails.upiId ? `UPI ID: ${profile.bankDetails.upiId}` : null,
+    ].filter(Boolean).join('\n');
+  }
+
+  return 'Bank transfer details provided upon quotation acceptance / formal contract execution.\nFor RTGS/NEFT remittance coordinates, contact accounts at heistofeverything@gmail.com.';
+}
+
+/**
  * Validates Indian Financial Year format and calculates active FY.
  * In India, FY runs from April 1 to March 31.
- * e.g. Oct 29, 2026 -> FY "2026-27" (or code "26-27")
+ * e.g. Oct 2026 -> FY "2026-27" (or code "26-27")
  */
 export function getCurrentFinancialYear(date = new Date()): {
   fullYear: string;  // e.g. "2026-2027"
@@ -88,4 +120,3 @@ export function getCurrentFinancialYear(date = new Date()): {
     code: `${startShort}-${endShort}`,
   };
 }
-

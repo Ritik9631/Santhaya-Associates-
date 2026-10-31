@@ -35,9 +35,9 @@ export default async function StaffLayout({
   const roleDisplay = roleLabels[profile.role] || profile.role;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Staff Header Bar */}
-      <header className="border-b border-slate-800 bg-slate-900/95 sticky top-0 z-40 backdrop-blur-md">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans print:bg-white print:text-black print:min-h-0 print:block">
+      {/* Top Staff Header Bar (Hidden in Print) */}
+      <header className="border-b border-slate-800 bg-slate-900/95 sticky top-0 z-40 backdrop-blur-md print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo & Portal Identity */}
@@ -100,16 +100,18 @@ export default async function StaffLayout({
       </header>
 
       {/* Main Container with Sidebar + Content */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
-        <StaffSidebar userRole={profile.role} userName={profile.full_name} />
+      <div className="flex-1 flex max-w-7xl w-full mx-auto print:max-w-none print:w-full print:block">
+        <div className="print:hidden">
+          <StaffSidebar userRole={profile.role} userName={profile.full_name} />
+        </div>
 
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8 overflow-x-hidden">
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8 overflow-x-hidden print:p-0 print:m-0 print:overflow-visible print:w-full">
           {children}
         </main>
       </div>
 
-      {/* Security & Confidentiality Footer */}
-      <footer className="border-t border-slate-800/60 bg-slate-950 py-4 text-center text-xs text-slate-400">
+      {/* Security & Confidentiality Footer (Hidden in Print) */}
+      <footer className="border-t border-slate-800/60 bg-slate-950 py-4 text-center text-xs text-slate-400 print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />

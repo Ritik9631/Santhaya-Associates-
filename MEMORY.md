@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-11-01 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediation | Implementation status: Batches 1, 2, and BUG-017 Complete & Verified (590+ automated tests passing); Phase 7 Planned
+Updated: 2026-11-01 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediation | Implementation status: Batches 1, 2, BUG-017, and Batch 3 (BUG-018 through BUG-028) Complete & Verified (610+ automated tests passing); Phase 7 Planned
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -557,6 +557,35 @@ Updated: 2026-11-01 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediatio
      - `npm.cmd run lint`: Passed with 0 warnings or errors.
      - `npm.cmd run build`: 26/26 routes compiled and optimized cleanly.
      - Zero unapproved migrations executed; zero persistent test customer records created.
+
+- 2026-11-01: Batch 3 Consolidated Implementation — ERP UI Contrast, Document Editing, Financial Accuracy & PDF Formatting (BUG-018 through BUG-028):
+  1. BUG-018 (Form Contrast WCAG AA Compliance): Created reusable `src/components/ui/form-styles.ts` with dark text (`text-slate-900`), crisp borders (`border-slate-300`), focus rings (`focus:ring-amber-500 focus:border-amber-500`), and dark placeholders. Applied across `QuotationForm.tsx` and `InvoiceForm.tsx`.
+  2. BUG-019 & BUG-019A (A4 PDF Print Optimization & Chrome Suppression):
+     - Added `print:hidden` to staff layout header, sidebar, and footer in `src/app/staff/layout.tsx`. Main content container expands to full width (`print:w-full print:p-0 print:m-0 print:overflow-visible print:bg-white`).
+     - Refactored `src/app/staff/billing/[id]/pdf/page.tsx` and `src/app/staff/quotations/[id]/pdf/page.tsx` with CSS `@page { size: A4 portrait; margin: 8mm 10mm; }`, enlarged logo (`h-14` / `h-16`), single-page compact geometry, and authoritative Bihar supplier coordinates.
+  3. BUG-020 (Draft Quotation & Invoice Editing):
+     - Server Actions: Implemented `updateDraftQuotationAction` in `src/lib/quotation/actions.ts` (blocks modification for non-drafts or locked versions; updates line items and audit log). Implemented `updateDraftInvoiceAction` in `src/lib/billing/actions.ts` (enforces Rule 46 immutability for issued invoices; updates draft items and audit log).
+     - Server Routes: Built `/staff/quotations/[id]/edit` and `/staff/billing/[id]/edit` pages with draft status guards.
+     - Detail Views: Added "Edit Draft" buttons on `QuotationDetailView.tsx` and `InvoiceDetailView.tsx` visible exclusively when `status === 'draft'`.
+     - Directory Pages: Added "Edit" action links on draft rows in quotations and billing tables.
+  4. BUG-021 & BUG-026 (ERP Header & Heading Contrast): Replaced dark navy headings with high-contrast text (`text-white font-bold`) across `/staff/billing`, `/staff/quotations`, `InvoiceDetailView.tsx`, and `QuotationDetailView.tsx`.
+  5. BUG-022 (Authoritative Bihar Supplier Coordinates & Safe Payment Instructions):
+     - Consolidated authoritative supplier coordinates in `src/lib/billing/company-config.ts` and `src/lib/quotation/calculations.ts`: Bihar (`10`), Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India, GSTIN `10ABVCS4277J1ZU`.
+     - `getPaymentInstructions()` returns safe instruction without fabricated bank details (`isConfigured: false`).
+  6. BUG-023 (ERP Table Sizing & Numeric Alignment): Set line item tables to `min-w-[850px]` with right-aligned `font-mono` numbers for Unit Rate, Quantity, GST%, Tax Amount, and Line Total.
+  7. BUG-024 (Indian Rupee Currency Formatting): Created `src/lib/utils/currency.ts` providing `formatIndianRupee` (`₹X,XX,XXX.XX`) and `formatCompactRupee` (`₹62.26 Cr`, `₹12.50 L`, `₹50.00 K`, `₹950.00`) returning strings safe for JSX. Wired into KPI cards and tables.
+  8. BUG-025 (Overdue KPI Neutral Styling): Rendered reassuring neutral/emerald state when `overdueCount === 0` ("All payments on schedule") instead of alarmist red styling.
+  9. BUG-027 (Indian Standard Date Formatting): Created `src/lib/utils/date.ts` providing `formatIndianDate` (`DD MMM YYYY`, parsing YYYY-MM-DD directly without UTC boundary shifts) and `formatIndianDateTime`. Applied across detail and print views.
+  10. BUG-028 (Statutory Tax Breakdown Card): Built reusable `src/components/ui/TaxBreakdownCard.tsx` showing taxable subtotal, rate-wise CGST/SGST/IGST breakdown, status badge, and amount in words. Integrated into forms and detail views.
+  11. Automated Verification Gates Passed (100%):
+      - `npm.cmd run test:batch3`: 18/18 assertions passed.
+      - `npm.cmd run test:batch2`: 17/17 assertions passed.
+      - `npm.cmd run test:phase3c`: 72/72 assertions passed.
+      - `npm.cmd run test:phase3d`: 37/37 assertions passed.
+      - `npm.cmd run test`: Full test battery (all 13 test suites, 610+ assertions) passed with 0 failures.
+      - `npm.cmd run typecheck`: 0 errors.
+      - `npm.cmd run lint`: 0 warnings, 0 errors.
+      - `npm.cmd run build`: 26/26 routes compiled and optimized cleanly.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

@@ -2,14 +2,22 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { createQuotationAction } from '@/lib/quotation/actions';
+import { createQuotationAction, updateDraftQuotationAction } from '@/lib/quotation/actions';
 import {
   calculateQuotationTotals,
   type LineItemInput,
   type QuotationTotals,
 } from '@/lib/quotation/calculations';
-import { Plus, Trash2, Calculator, CheckCircle2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, AlertCircle, ArrowLeft, FileCheck } from 'lucide-react';
 import Link from 'next/link';
+import {
+  formInputClasses,
+  formSelectClasses,
+  formLabelClasses,
+  tableInputClasses,
+  tableSelectClasses,
+} from '@/components/ui/form-styles';
+import { TaxBreakdownCard } from '@/components/ui/TaxBreakdownCard';
 
 interface CustomerOption {
   id: string;
@@ -31,11 +39,27 @@ interface CatalogOption {
   item_type: string;
 }
 
+export interface InitialQuotationData {
+  id: string;
+  quotation_number: string;
+  customer_id: string;
+  place_of_supply_state_code: string | null;
+  is_gst_applicable: boolean;
+  validity_days: number;
+  delivery_location: string;
+  payment_terms: string;
+  terms_conditions?: string | null;
+  notes?: string | null;
+  items: LineItemInput[];
+}
+
 interface QuotationFormProps {
   customers: CustomerOption[];
   catalogItems: CatalogOption[];
   defaultCustomerId?: string;
   defaultEnquiryId?: string;
+  isEdit?: boolean;
+  initialData?: InitialQuotationData;
 }
 
 export default function QuotationForm({
@@ -43,38 +67,49 @@ export default function QuotationForm({
   catalogItems,
   defaultCustomerId,
   defaultEnquiryId,
+  isEdit = false,
+  initialData,
 }: QuotationFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   // Form State
-  const defaultCust = customers.find((c) => c.id === defaultCustomerId) || customers[0];
-  const [customerId, setCustomerId] = useState(defaultCustomerId || (customers[0]?.id || ''));
-  const [enquiryId, setEnquiryId] = useState(defaultEnquiryId || '');
-  const [placeOfSupplyStateCode, setPlaceOfSupplyStateCode] = useState(defaultCust?.state_code || '');
-  const [isGstApplicable, setIsGstApplicable] = useState(true);
-  const [validityDays, setValidityDays] = useState(30);
-  const [deliveryLocation, setDeliveryLocation] = useState('');
-  const [paymentTerms, setPaymentTerms] = useState(
-    '100% advance against Proforma Invoice or 30 days credit on approved LC'
+  const defaultCust = customers.find((c) => c.id === (initialData?.customer_id || defaultCustomerId)) || customers[0];
+  const [customerId, setCustomerId] = useState(
+    initialData?.customer_id || defaultCustomerId || (customers[0]?.id || '')
   );
-  const [termsConditions, setTermsConditions] = useState('');
-  const [notes, setNotes] = useState('');
+  const [enquiryId, setEnquiryId] = useState(defaultEnquiryId || '');
+  const [placeOfSupplyStateCode, setPlaceOfSupplyStateCode] = useState(
+    initialData?.place_of_supply_state_code ?? (defaultCust?.state_code || '')
+  );
+  const [isGstApplicable, setIsGstApplicable] = useState(initialData?.is_gst_applicable ?? true);
+  const [validityDays, setValidityDays] = useState(initialData?.validity_days ?? 30);
+  const [deliveryLocation, setDeliveryLocation] = useState(initialData?.delivery_location || '');
+  const [paymentTerms, setPaymentTerms] = useState(
+    initialData?.payment_terms ||
+      '100% advance against Proforma Invoice or 30 days credit on approved LC'
+  );
+  const [termsConditions, setTermsConditions] = useState(initialData?.terms_conditions || '');
+  const [notes, setNotes] = useState(initialData?.notes || '');
 
   // Line items state
-  const [items, setItems] = useState<LineItemInput[]>([
-    {
-      item_name: '',
-      description: '',
-      hsn_sac_code: '',
-      unit: 'unit',
-      quantity: 1,
-      unit_rate: 0,
-      discount_amount: 0,
-      gst_rate: 18,
-    },
-  ]);
+  const [items, setItems] = useState<LineItemInput[]>(
+    initialData?.items && initialData.items.length > 0
+      ? initialData.items
+      : [
+          {
+            item_name: '',
+            description: '',
+            hsn_sac_code: '',
+            unit: 'unit',
+            quantity: 1,
+            unit_rate: 0,
+            discount_amount: 0,
+            gst_rate: 18,
+          },
+        ]
+  );
 
   // Update place of supply when customer changes
   const handleCustomerChange = (id: string) => {
@@ -130,41 +165,60 @@ export default function QuotationForm({
   const handleUpdateItem = (index: number, field: keyof LineItemInput, value: any) => {
     setItems((prev) => {
       const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
+      copy[index] = {
+        ...copy[index],
+        [field]:
+          field === 'quantity' || field === 'unit_rate' || field === 'discount_amount' || field === 'gst_rate'
+            ? parseFloat(value) || 0
+            : value,
+      };
       return copy;
     });
   };
 
-  // Compute live totals
+  // Recalculate live totals using supplier state Bihar (10)
   const totals: QuotationTotals = calculateQuotationTotals(
     items,
     isGstApplicable,
     placeOfSupplyStateCode
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Group line items by rate for breakdown
+  const rateBreakdownMap = new Map<number, { taxable: number; tax: number; cgst: number; sgst: number; igst: number }>();
+  totals.items.forEach((it) => {
+    const rate = it.gst_rate || 0;
+    const cur = rateBreakdownMap.get(rate) || { taxable: 0, tax: 0, cgst: 0, sgst: 0, igst: 0 };
+    cur.taxable += it.taxable_amount;
+    cur.tax += it.tax_amount;
+    cur.cgst += it.cgst_amount || 0;
+    cur.sgst += it.sgst_amount || 0;
+    cur.igst += it.igst_amount || 0;
+    rateBreakdownMap.set(rate, cur);
+  });
+
+  const rateBreakdownList = Array.from(rateBreakdownMap.entries()).map(([rate, vals]) => ({
+    gstRate: rate,
+    taxableAmount: vals.taxable,
+    cgstAmount: vals.cgst,
+    sgstAmount: vals.sgst,
+    igstAmount: vals.igst,
+    totalTax: vals.tax,
+  }));
+
+  // Handle Form Submission
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 
-    if (!customerId) {
-      setError('Please select or create a customer.');
-      return;
-    }
-    if (!deliveryLocation) {
-      setError('Please provide a delivery location or site address.');
-      return;
-    }
-    if (items.some((i) => !i.item_name.trim())) {
-      setError('All line items must have a valid item name.');
-      return;
-    }
-
     const formData = new FormData();
+    if (isEdit && initialData?.id) {
+      formData.append('quotationId', initialData.id);
+    }
     formData.append('customerId', customerId);
     if (enquiryId) formData.append('enquiryId', enquiryId);
     formData.append('placeOfSupplyStateCode', placeOfSupplyStateCode);
-    formData.append('isGstApplicable', isGstApplicable ? 'true' : 'false');
-    formData.append('validityDays', validityDays.toString());
+    formData.append('isGstApplicable', String(isGstApplicable));
+    formData.append('validityDays', String(validityDays));
     formData.append('deliveryLocation', deliveryLocation);
     formData.append('paymentTerms', paymentTerms);
     if (termsConditions) formData.append('termsConditions', termsConditions);
@@ -172,49 +226,60 @@ export default function QuotationForm({
     formData.append('itemsJson', JSON.stringify(items));
 
     startTransition(async () => {
-      const res = await createQuotationAction(null, formData);
-      if (res.error) {
-        setError(res.error);
-      } else if (res.data?.quotationId) {
-        router.push(`/staff/quotations/${res.data.quotationId}`);
+      if (isEdit) {
+        const res = await updateDraftQuotationAction(null, formData);
+        if (res.error) {
+          setError(res.error);
+        } else if (res.data?.quotationId) {
+          router.push(`/staff/quotations/${res.data.quotationId}`);
+        }
+      } else {
+        const res = await createQuotationAction(null, formData);
+        if (res.error) {
+          setError(res.error);
+        } else if (res.data?.quotationId) {
+          router.push(`/staff/quotations/${res.data.quotationId}`);
+        }
       }
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
           <div>
-            <h4 className="font-semibold text-sm">Unable to create quotation</h4>
+            <h4 className="font-semibold text-sm">{isEdit ? 'Quotation update failed' : 'Quotation creation failed'}</h4>
             <p className="text-sm mt-0.5">{error}</p>
           </div>
         </div>
       )}
 
-      {/* 1. Client & Commercial Scope */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <h3 className="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center justify-between">
-          <span>1. Customer & Place of Supply</span>
+      {/* 1. Customer Selection & Quotation Header */}
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <h3 className="text-sm font-bold text-[#10243B] uppercase tracking-wider">
+            1. Client & Commercial Coordinates
+          </h3>
           <Link
             href="/staff/customers/new"
             className="text-xs font-semibold text-[#10243B] hover:underline"
           >
             + Register New Customer
           </Link>
-        </h3>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className={formLabelClasses}>
               Select Client / Organization <span className="text-red-500">*</span>
             </label>
             <select
               value={customerId}
               onChange={(e) => handleCustomerChange(e.target.value)}
               required
-              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#10243B]"
+              className={formSelectClasses}
             >
               <option value="" disabled>-- Select Existing Customer --</option>
               {customers.map((c) => (
@@ -226,21 +291,23 @@ export default function QuotationForm({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className={formLabelClasses}>
               Place of Supply (State Code) <span className="text-red-500">*</span>
             </label>
             <select
               value={placeOfSupplyStateCode}
               onChange={(e) => setPlaceOfSupplyStateCode(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#10243B]"
+              className={formSelectClasses}
             >
               <option value="">-- Place of Supply Pending (Required for Taxable Quote) --</option>
-              <option value="07">07 — Delhi (Intra-State: CGST + SGST)</option>
+              <option value="10">10 — Bihar (Intra-State: CGST + SGST)</option>
+              <option value="07">07 — Delhi (Inter-State: IGST)</option>
               <option value="09">09 — Uttar Pradesh (Inter-State: IGST)</option>
               <option value="06">06 — Haryana (Inter-State: IGST)</option>
-              <option value="10">10 — Bihar (Inter-State: IGST)</option>
-              <option value="08">08 — Rajasthan (Inter-State: IGST)</option>
+              <option value="20">20 — Jharkhand (Inter-State: IGST)</option>
               <option value="19">19 — West Bengal (Inter-State: IGST)</option>
+              <option value="21">21 — Odisha (Inter-State: IGST)</option>
+              <option value="08">08 — Rajasthan (Inter-State: IGST)</option>
               <option value="27">27 — Maharashtra (Inter-State: IGST)</option>
               <option value="23">23 — Madhya Pradesh (Inter-State: IGST)</option>
               <option value="24">24 — Gujarat (Inter-State: IGST)</option>
@@ -250,7 +317,7 @@ export default function QuotationForm({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 pt-4 border-t border-slate-100">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className={formLabelClasses}>
               GST Application
             </label>
             <div className="flex items-center gap-3 mt-2">
@@ -269,7 +336,7 @@ export default function QuotationForm({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className={formLabelClasses}>
               Validity Period (Days)
             </label>
             <input
@@ -278,12 +345,12 @@ export default function QuotationForm({
               max="180"
               value={validityDays}
               onChange={(e) => setValidityDays(parseInt(e.target.value, 10) || 30)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#10243B]"
+              className={formInputClasses}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className={formLabelClasses}>
               Delivery Destination / Site <span className="text-red-500">*</span>
             </label>
             <input
@@ -292,7 +359,7 @@ export default function QuotationForm({
               placeholder="e.g. Project Site, Sector 62, Noida"
               value={deliveryLocation}
               onChange={(e) => setDeliveryLocation(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#10243B]"
+              className={formInputClasses}
             />
           </div>
         </div>
@@ -300,11 +367,13 @@ export default function QuotationForm({
 
       {/* 2. Quotation Line Items Table */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900">2. Itemized Products & Services</h3>
+            <h3 className="text-sm font-bold text-[#10243B] uppercase tracking-wider">
+              2. Machinery, Rentals & Service Line Items
+            </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Add catalog items or custom line items with exact decimal pricing and GST.
+              Select standard machinery from master catalog or input custom procurement items.
             </p>
           </div>
           <button
@@ -321,56 +390,59 @@ export default function QuotationForm({
           {items.map((item, index) => (
             <div
               key={index}
-              className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3 relative group"
+              className="p-4 border border-slate-200 rounded-lg bg-slate-50/70 space-y-3 relative"
             >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+              <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700">Line Item #{index + 1}</span>
-                {catalogItems.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500">Pick from Catalog:</span>
-                    <select
-                      onChange={(e) => handleSelectCatalogItem(index, e.target.value)}
-                      defaultValue=""
-                      className="bg-white border border-slate-300 rounded text-xs px-2 py-1 text-slate-700 focus:outline-none"
-                    >
-                      <option value="" disabled>-- Select Catalog Item --</option>
-                      {catalogItems.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          [{c.sku}] {c.name} (₹{c.default_unit_price})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
                 {items.length > 1 && (
                   <button
                     type="button"
                     onClick={() => handleRemoveItem(index)}
-                    className="text-red-600 hover:text-red-800 p-1 rounded"
-                    title="Remove item"
+                    className="text-red-600 hover:text-red-800 text-xs font-semibold inline-flex items-center gap-1"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Remove
                   </button>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
+              {catalogItems.length > 0 && (
+                <div className="w-full md:w-1/3">
                   <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
-                    Item / Service Name <span className="text-red-500">*</span>
+                    Autofill From Master Catalog
+                  </label>
+                  <select
+                    onChange={(e) => handleSelectCatalogItem(index, e.target.value)}
+                    defaultValue=""
+                    className={tableSelectClasses}
+                  >
+                    <option value="">-- Choose Machinery / Item --</option>
+                    {catalogItems.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name} ({cat.sku}) — ₹{cat.default_unit_price.toLocaleString('en-IN')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                <div className="md:col-span-3">
+                  <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
+                    Item Description / Title <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Hydraulic Excavator 20T Supply"
+                    placeholder="e.g. 20-Ton Hydraulic Excavator with Operator"
                     value={item.item_name}
                     onChange={(e) => handleUpdateItem(index, 'item_name', e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-sm text-slate-900"
+                    className={tableInputClasses}
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                <div className="md:col-span-3">
+                  <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                     HSN / SAC Code
                   </label>
                   <input
@@ -378,14 +450,14 @@ export default function QuotationForm({
                     placeholder="e.g. 84295200"
                     value={item.hsn_sac_code || ''}
                     onChange={(e) => handleUpdateItem(index, 'hsn_sac_code', e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-sm font-mono text-slate-900"
+                    className={tableInputClasses}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                     Quantity <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -395,24 +467,24 @@ export default function QuotationForm({
                     required
                     value={item.quantity}
                     onChange={(e) => handleUpdateItem(index, 'quantity', e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-sm text-slate-900"
+                    className={tableInputClasses}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                     Unit
                   </label>
                   <input
                     type="text"
                     value={item.unit || 'unit'}
                     onChange={(e) => handleUpdateItem(index, 'unit', e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-sm text-slate-900"
+                    className={tableInputClasses}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                     Unit Rate (₹) <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -422,12 +494,12 @@ export default function QuotationForm({
                     required
                     value={item.unit_rate}
                     onChange={(e) => handleUpdateItem(index, 'unit_rate', e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                    className={tableInputClasses}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                     Discount (₹)
                   </label>
                   <input
@@ -436,25 +508,25 @@ export default function QuotationForm({
                     min="0"
                     value={item.discount_amount || 0}
                     onChange={(e) => handleUpdateItem(index, 'discount_amount', e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-sm text-slate-900"
+                    className={tableInputClasses}
                   />
                 </div>
 
                 {isGstApplicable && (
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                    <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                       GST Rate (%)
                     </label>
                     <select
                       value={item.gst_rate || 18}
                       onChange={(e) => handleUpdateItem(index, 'gst_rate', e.target.value)}
-                      className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 text-sm text-slate-900"
+                      className={tableSelectClasses}
                     >
-                      <option value="0">0%</option>
-                      <option value="5">5%</option>
-                      <option value="12">12%</option>
-                      <option value="18">18%</option>
-                      <option value="28">28%</option>
+                      <option value="0">0% (Nil)</option>
+                      <option value="5">5% (Concessional)</option>
+                      <option value="12">12% (Standard Low)</option>
+                      <option value="18">18% (Standard Services/Machinery)</option>
+                      <option value="28">28% (Luxury/Special)</option>
                     </select>
                   </div>
                 )}
@@ -463,7 +535,7 @@ export default function QuotationForm({
                   <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
                     Line Total (₹)
                   </label>
-                  <div className="w-full bg-slate-100 border border-slate-300 rounded px-2.5 py-1.5 text-sm font-bold text-slate-900 text-right">
+                  <div className="w-full bg-slate-100 border border-slate-300 rounded px-2.5 py-2 text-xs font-bold text-slate-900 text-right font-mono">
                     ₹{totals.items[index]?.line_total.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}
                   </div>
                 </div>
@@ -473,150 +545,94 @@ export default function QuotationForm({
         </div>
       </div>
 
-      {/* 3. Live Financial Summary & Indian Word Total */}
-      <div className="bg-slate-900 text-white border border-slate-800 rounded-xl p-6 shadow-md">
-        <h3 className="text-base font-bold text-[#F4B323] mb-4 pb-2 border-b border-slate-800 flex items-center gap-2">
-          <Calculator className="w-4 h-4" />
-          <span>3. Live Quotation Totals & GST Allocation</span>
-        </h3>
+      {/* 3. Live Financial Summary Card */}
+      <TaxBreakdownCard
+        title="3. Live Quotation Financial & GST Totals"
+        subtotalAmount={totals.subtotal_amount}
+        discountAmount={totals.discount_amount}
+        taxableAmount={totals.taxable_amount}
+        cgstAmount={totals.cgst_amount}
+        sgstAmount={totals.sgst_amount}
+        igstAmount={totals.igst_amount}
+        totalTaxAmount={totals.total_tax_amount}
+        roundOffAmount={totals.round_off_amount}
+        grandTotalAmount={totals.grand_total_amount}
+        amountInWords={totals.amount_in_words}
+        isGstApplicable={isGstApplicable}
+        taxDetermination={totals.tax_determination}
+        rateBreakdown={rateBreakdownList}
+        isDark={true}
+      />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
-                Amount in Words:
-              </p>
-              <p className="text-sm font-semibold text-amber-200 mt-1 italic bg-slate-800/60 p-3 rounded-lg border border-slate-700">
-                {totals.amount_in_words}
-              </p>
-            </div>
-            <div className="text-xs text-slate-400 space-y-1">
-              <p>
-                • Supply Nature:{' '}
-                {!isGstApplicable
-                  ? 'Non-GST Commercial Quotation'
-                  : totals.tax_determination === 'intra_state'
-                  ? 'Intra-State (Delhi to Delhi: CGST + SGST)'
-                  : totals.tax_determination === 'inter_state'
-                  ? 'Inter-State (IGST)'
-                  : 'Undetermined (Place of Supply Pending)'}
-              </p>
-              <p>• Rounding: Standard statutory round-off applied.</p>
-            </div>
-          </div>
-
-          <div className="space-y-2 bg-slate-800/40 p-4 rounded-lg border border-slate-700/60 text-xs">
-            <div className="flex justify-between text-slate-300">
-              <span>Gross Subtotal:</span>
-              <span className="font-semibold text-white">₹{totals.subtotal_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-            </div>
-            {totals.discount_amount > 0 && (
-              <div className="flex justify-between text-emerald-400">
-                <span>Total Discount:</span>
-                <span>- ₹{totals.discount_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-slate-200 pt-1 border-t border-slate-700">
-              <span className="font-semibold">Taxable Subtotal:</span>
-              <span className="font-semibold">₹{totals.taxable_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-            </div>
-
-            {isGstApplicable && (
-              <>
-                {totals.tax_determination === 'undetermined' ? (
-                  <div className="bg-amber-950/60 border border-amber-600/60 text-amber-300 p-2.5 rounded text-xs space-y-1 my-1">
-                    <p className="font-semibold text-amber-200">⚠️ Tax Determination Pending (Undetermined)</p>
-                    <p className="text-[11px] text-amber-300/90 leading-relaxed">
-                      Place of Supply is not specified or invalid. GST cannot be determined or issued until a valid 2-digit State Code is provided.
-                    </p>
-                  </div>
-                ) : totals.is_intra_state ? (
-                  <>
-                    <div className="flex justify-between text-slate-400">
-                      <span>Central GST (CGST):</span>
-                      <span>₹{totals.cgst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-400">
-                      <span>State GST (SGST):</span>
-                      <span>₹{totals.sgst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex justify-between text-slate-400">
-                    <span>Integrated GST (IGST):</span>
-                    <span>₹{totals.igst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-              </>
-            )}
-
-            <div className="flex justify-between items-center text-sm font-bold text-[#F4B323] pt-3 border-t-2 border-slate-700">
-              <span className="text-white">Grand Total (INR):</span>
-              <span className="text-lg">
-                {totals.tax_determination === 'undetermined' && isGstApplicable ? (
-                  <span className="text-amber-300 text-sm font-medium">
-                    ₹{totals.taxable_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} + GST (Pending)
-                  </span>
-                ) : (
-                  `₹${totals.grand_total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                )}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Terms, Conditions & Notes */}
+      {/* 4. Commercial & Payment Terms */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
-        <h3 className="text-base font-bold text-slate-900 pb-2 border-b border-slate-100">
+        <h3 className="text-sm font-bold text-[#10243B] uppercase tracking-wider pb-2 border-b border-slate-100">
           4. Commercial Terms & Internal Notes
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              Payment Terms
-            </label>
-            <input
-              type="text"
-              value={paymentTerms}
-              onChange={(e) => setPaymentTerms(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 text-sm text-slate-900"
-            />
-          </div>
+        <div>
+          <label className={formLabelClasses}>
+            Payment Terms
+          </label>
+          <input
+            type="text"
+            value={paymentTerms}
+            onChange={(e) => setPaymentTerms(e.target.value)}
+            className={formInputClasses}
+          />
+        </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              Special Terms & Conditions (Optional)
-            </label>
-            <textarea
-              rows={2}
-              value={termsConditions}
-              onChange={(e) => setTermsConditions(e.target.value)}
-              placeholder="e.g. Transit insurance included, unloading at client scope."
-              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 text-sm text-slate-900"
-            />
-          </div>
+        <div>
+          <label className={formLabelClasses}>
+            Quotation Terms & Conditions (Visible to Client)
+          </label>
+          <textarea
+            rows={3}
+            placeholder="Statutory warranties, delivery schedule, escalation clauses..."
+            value={termsConditions}
+            onChange={(e) => setTermsConditions(e.target.value)}
+            className={formInputClasses}
+          />
+        </div>
+
+        <div>
+          <label className={formLabelClasses}>
+            Internal Remarks / Estimator Notes (Staff Only)
+          </label>
+          <textarea
+            rows={2}
+            placeholder="Subcontractor cost assumptions, tender margin notes..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={formInputClasses}
+          />
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center justify-end gap-3 pt-4">
+      {/* Form Submission Actions */}
+      <div className="flex items-center justify-between pt-4">
         <Link
-          href="/staff/quotations"
-          className="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+          href={isEdit && initialData?.id ? `/staff/quotations/${initialData.id}` : '/staff/quotations'}
+          className="text-sm font-semibold text-slate-400 hover:text-white transition"
         >
           Cancel
         </Link>
+
         <button
           type="submit"
           disabled={isPending}
-          className="px-6 py-2.5 bg-[#10243B] text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition shadow disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#10243B] text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition shadow disabled:opacity-50"
         >
-          {isPending ? 'Generating Quotation Draft...' : 'Create Quotation Draft'}
+          {isPending ? (
+            <span>{isEdit ? 'Saving Changes...' : 'Generating Quotation...'}</span>
+          ) : (
+            <>
+              <FileCheck className="w-4 h-4 text-gold-400" />
+              <span>{isEdit ? 'Save Changes to Draft' : 'Save as Draft Quotation'}</span>
+            </>
+          )}
         </button>
       </div>
     </form>
   );
 }
-

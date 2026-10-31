@@ -6,15 +6,15 @@
  * 1. ZERO FLOATING-POINT ERRORS: All monetary operations are performed in integer paise (1/100 INR)
  *    or exact arbitrary precision decimal arithmetic to prevent IEEE 754 inaccuracies.
  * 2. INDIAN GST RULES:
- *    - Company Base State: Delhi (State Code '07').
- *    - Intra-State (Delhi to Delhi): CGST (Half rate) + SGST (Half rate), IGST = 0.
- *    - Inter-State (Delhi to Other States/UTs): IGST (Full rate), CGST = 0, SGST = 0.
+ *    - Company Base State: Bihar (State Code '10').
+ *    - Intra-State (Bihar to Bihar): CGST (Half rate) + SGST (Half rate), IGST = 0.
+ *    - Inter-State (Bihar to Other States/UTs): IGST (Full rate), CGST = 0, SGST = 0.
  *    - Non-GST Quotation: Zero tax applicable.
  * 3. STATUTORY ROUNDING: Standard half-up decimal rounding to exactly 2 decimal places.
  */
 
-export const COMPANY_STATE_CODE = '07'; // Delhi
-export const COMPANY_STATE_NAME = 'Delhi';
+export const COMPANY_STATE_CODE = '10'; // Bihar
+export const COMPANY_STATE_NAME = 'Bihar';
 
 export type TaxDeterminationStatus = 'intra_state' | 'inter_state' | 'undetermined' | 'not_applicable';
 

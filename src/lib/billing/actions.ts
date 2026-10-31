@@ -11,7 +11,7 @@ import {
   type InvoiceLineItemInput,
   type InvoiceCalculatedTotals,
 } from './calculations';
-import { getCompanyBillingProfile, getCurrentFinancialYear } from './company-config';
+import { getCompanyBillingProfile, getCurrentFinancialYear, getPaymentInstructions } from './company-config';
 import type { InvoiceType, InvoiceStatus, PaymentMethod } from '@/types/database';
 
 export interface ActionResponse<T = Record<string, unknown>> {
@@ -117,7 +117,7 @@ export async function createInvoiceAction(
         company_legal_name: companyProfile.legalName,
         company_trade_name: companyProfile.tradeName,
         company_gstin: companyProfile.gstin,
-        company_pan: companyProfile.pan,
+        company_pan: companyProfile.pan || (companyProfile.gstin ? companyProfile.gstin.slice(2, 12) : ''),
         company_state_code: companyProfile.stateCode,
         company_state_name: companyProfile.stateName,
         company_registered_address: companyProfile.registeredAddress,
@@ -143,9 +143,7 @@ export async function createInvoiceAction(
         paid_amount: 0.0,
         balance_amount: totals.grand_total_amount,
         terms_conditions: termsConditions,
-        payment_instructions:
-          paymentInstructions ||
-          `Bank: ${companyProfile.bankDetails.bankName}\nA/C: ${companyProfile.bankDetails.accountNumber}\nIFSC: ${companyProfile.bankDetails.ifscCode}\nUPI: ${companyProfile.bankDetails.upiId}`,
+        payment_instructions: paymentInstructions || getPaymentInstructions(companyProfile),
         notes: notes,
         created_by_staff_id: user.id,
       })
@@ -196,6 +194,196 @@ export async function createInvoiceAction(
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected server error';
+    return { error: message };
+  }
+}
+
+/**
+ * Server Action: Update an existing draft invoice
+ * Strictly guards: Only draft invoices (unissued) can be edited. Issued invoices are legally immutable.
+ */
+export async function updateDraftInvoiceAction(
+  _prevState: ActionResponse | null,
+  formData: FormData
+): Promise<ActionResponse<{ invoiceId: string }>> {
+  try {
+    const { user, profile } = await requireStaffSession();
+
+    if (!AUTHORIZED_BILLING_ROLES.includes(profile.role)) {
+      return { error: 'Access denied: You do not have permission to edit invoices.' };
+    }
+
+    const invoiceId = (formData.get('invoiceId') as string)?.trim();
+    if (!invoiceId) return { error: 'Invoice ID is required.' };
+
+    const customerId = (formData.get('customerId') as string)?.trim();
+    const invoiceType = ((formData.get('invoiceType') as string)?.trim() || 'tax_invoice') as InvoiceType;
+    const invoiceDate = (formData.get('invoiceDate') as string)?.trim() || new Date().toISOString().split('T')[0];
+    const dueDate = (formData.get('dueDate') as string)?.trim() || invoiceDate;
+    const placeOfSupplyStateCode = (formData.get('placeOfSupplyStateCode') as string)?.trim();
+    const deliveryLocation = (formData.get('deliveryLocation') as string)?.trim() || null;
+    const clientPoReference = (formData.get('clientPoReference') as string)?.trim() || null;
+    const termsConditions = (formData.get('termsConditions') as string)?.trim() || null;
+    const paymentInstructions = (formData.get('paymentInstructions') as string)?.trim() || null;
+    const notes = (formData.get('notes') as string)?.trim() || null;
+    const itemsRaw = formData.get('itemsJson') as string;
+
+    if (!customerId) return { error: 'Customer selection is required.' };
+
+    let items: InvoiceLineItemInput[] = [];
+    try {
+      items = JSON.parse(itemsRaw || '[]');
+    } catch {
+      return { error: 'Invalid line items payload.' };
+    }
+
+    if (!items || items.length === 0) {
+      return { error: 'At least one line item is required to update an invoice.' };
+    }
+
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      if (!item.item_name || item.item_name.trim().length < 2) {
+        return { error: `Line item #${idx + 1}: Name is required.` };
+      }
+      if (Number(item.quantity) <= 0) {
+        return { error: `Line item #${idx + 1}: Quantity must be greater than zero.` };
+      }
+      if (Number(item.unit_rate) < 0) {
+        return { error: `Line item #${idx + 1}: Unit rate cannot be negative.` };
+      }
+    }
+
+    const adminClient = createAdminClient();
+
+    // Verify invoice is draft
+    const { data: prevInvoice, error: invErr } = await adminClient
+      .from('invoices')
+      .select('id, invoice_number, status, financial_year')
+      .eq('id', invoiceId)
+      .single();
+
+    if (invErr || !prevInvoice) return { error: 'Invoice not found.' };
+
+    if (prevInvoice.status !== 'draft') {
+      return {
+        error: `Cannot edit ${prevInvoice.status} invoice. Issued invoices are legally immutable under CGST Rule 46. Use credit/debit notes or cancellation workflows for statutory adjustments.`,
+      };
+    }
+
+    // Customer Snapshot
+    const { data: customer, error: customerErr } = await adminClient
+      .from('customers')
+      .select('*')
+      .eq('id', customerId)
+      .single();
+
+    if (customerErr || !customer) return { error: 'Customer could not be found.' };
+
+    const companyProfile = getCompanyBillingProfile();
+    const fy = getCurrentFinancialYear(new Date(invoiceDate));
+
+    const effectiveSupplyCode = placeOfSupplyStateCode || customer.state_code || '';
+    const totals: InvoiceCalculatedTotals = calculateInvoiceTotals(
+      items,
+      invoiceType,
+      effectiveSupplyCode,
+      companyProfile.stateCode
+    );
+
+    const safeInstructions = paymentInstructions || getPaymentInstructions(companyProfile);
+
+    // Update invoice
+    const { error: updateInvErr } = await adminClient
+      .from('invoices')
+      .update({
+        invoice_type: invoiceType,
+        customer_id: customer.id,
+        invoice_date: invoiceDate,
+        due_date: dueDate,
+        financial_year: fy.code,
+        customer_billing_name: customer.company_name,
+        customer_billing_address: customer.billing_address || 'No registered billing address recorded.',
+        customer_gstin: customer.gstin || null,
+        customer_pan: customer.pan || null,
+        customer_state_name: customer.state || undefined,
+        customer_state_code: customer.state_code || undefined,
+        place_of_supply_state_code: placeOfSupplyStateCode || customer.state_code || totals.place_of_supply_state_code || undefined,
+        is_intra_state: totals.is_intra_state,
+        delivery_location: deliveryLocation,
+        client_po_reference: clientPoReference,
+        subtotal_amount: totals.subtotal_amount,
+        discount_amount: totals.discount_amount,
+        taxable_amount: totals.taxable_amount,
+        cgst_amount: totals.cgst_amount,
+        sgst_amount: totals.sgst_amount,
+        igst_amount: totals.igst_amount,
+        total_tax_amount: totals.total_tax_amount,
+        round_off_amount: totals.round_off_amount,
+        grand_total_amount: totals.grand_total_amount,
+        balance_amount: totals.grand_total_amount,
+        terms_conditions: termsConditions,
+        payment_instructions: safeInstructions,
+        notes: notes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', invoiceId);
+
+    if (updateInvErr) {
+      return { error: `Failed to update invoice: ${updateInvErr.message}` };
+    }
+
+    // Replace items
+    await adminClient.from('invoice_items').delete().eq('invoice_id', invoiceId);
+
+    const itemRows = totals.items.map((it, idx) => ({
+      invoice_id: invoiceId,
+      product_service_id: it.product_service_id || null,
+      sort_order: idx + 1,
+      item_name: it.item_name,
+      description: it.description || null,
+      hsn_sac_code: it.hsn_sac_code || null,
+      unit: it.unit || 'unit',
+      quantity: it.quantity,
+      unit_rate: it.unit_rate,
+      discount_amount: it.discount_amount || 0,
+      taxable_amount: it.taxable_amount,
+      gst_rate: it.gst_rate,
+      cgst_rate: it.cgst_rate,
+      sgst_rate: it.sgst_rate,
+      igst_rate: it.igst_rate,
+      cgst_amount: it.cgst_amount,
+      sgst_amount: it.sgst_amount,
+      igst_amount: it.igst_amount,
+      tax_amount: it.tax_amount,
+      line_total: it.line_total,
+    }));
+
+    const { error: insertItemsErr } = await adminClient.from('invoice_items').insert(itemRows);
+    if (insertItemsErr) {
+      return { error: `Failed to save updated invoice items: ${insertItemsErr.message}` };
+    }
+
+    // Audit log
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'invoices',
+      entity_id: invoiceId,
+      action: 'invoice_draft_updated',
+      actor_type: 'staff',
+      actor_id: user.id,
+      new_state: {
+        grand_total: totals.grand_total_amount,
+        customer: customer.company_name,
+        items_count: items.length,
+      },
+    });
+
+    revalidatePath('/staff/billing');
+    revalidatePath(`/staff/billing/${invoiceId}`);
+
+    return { success: true, data: { invoiceId } };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unexpected error editing invoice draft.';
     return { error: message };
   }
 }
@@ -330,7 +518,7 @@ export async function convertQuotationToInvoiceAction(
         company_legal_name: companyProfile.legalName,
         company_trade_name: companyProfile.tradeName,
         company_gstin: companyProfile.gstin,
-        company_pan: companyProfile.pan,
+        company_pan: companyProfile.pan || (companyProfile.gstin ? companyProfile.gstin.slice(2, 12) : ''),
         company_state_code: companyProfile.stateCode,
         company_state_name: companyProfile.stateName,
         company_registered_address: companyProfile.registeredAddress,
@@ -356,7 +544,7 @@ export async function convertQuotationToInvoiceAction(
         paid_amount: 0.0,
         balance_amount: totals.grand_total_amount,
         terms_conditions: version.terms_conditions || version.payment_terms,
-        payment_instructions: `Bank: ${companyProfile.bankDetails.bankName}\nA/C: ${companyProfile.bankDetails.accountNumber}\nIFSC: ${companyProfile.bankDetails.ifscCode}\nUPI: ${companyProfile.bankDetails.upiId}`,
+        payment_instructions: getPaymentInstructions(companyProfile),
         notes: `Converted from Quotation ${quote.quotation_number} (Rev ${version.version_number})`,
         created_by_staff_id: user.id,
       })
@@ -785,6 +973,7 @@ export async function recordInvoiceDeliveryAction(
         igst_amount,
         grand_total_amount,
         balance_amount,
+        is_intra_state,
         customer_state_code,
         customer_billing_name,
         customer_gstin
@@ -805,7 +994,7 @@ export async function recordInvoiceDeliveryAction(
     }
 
     const customerName = invoice.customer_billing_name || 'Valued Customer';
-    const isIntraState = invoice.customer_state_code === '07';
+    const isIntraState = invoice.is_intra_state ?? (invoice.customer_state_code === '10');
 
     // If channel is email, validate recipient and enqueue outbox job
     if (deliveryChannel === 'email') {

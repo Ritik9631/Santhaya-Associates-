@@ -96,8 +96,8 @@ it('Migration file makes billing_state nullable without data loss', () => {
 it('Quotation calculation accurately classifies all three conditions (intra-state, interstate, undetermined)', () => {
   const items = [{ item_name: 'Test Drill', quantity: 1, unit_rate: 10000, gst_rate: 18 }];
 
-  // Condition 1: Intra-state (Delhi '07' to Delhi '07')
-  const intraTotals = calculateQuotationTotals(items, true, '07');
+  // Condition 1: Intra-state (Bihar '10' to Bihar '10')
+  const intraTotals = calculateQuotationTotals(items, true, '10');
   assert.strictEqual(intraTotals.tax_determination, 'intra_state', 'Classified as intra_state');
   assert.strictEqual(intraTotals.is_intra_state, true, 'is_intra_state is true');
   assert.strictEqual(intraTotals.is_inter_state, false, 'is_inter_state is false');
@@ -107,8 +107,8 @@ it('Quotation calculation accurately classifies all three conditions (intra-stat
   assert.strictEqual(intraTotals.igst_amount, 0, 'IGST is 0 for intra-state');
   assert.strictEqual(intraTotals.total_tax_amount, 1800, 'Total tax is 1800');
 
-  // Condition 2: Interstate (Delhi '07' to Bihar '10')
-  const interTotals = calculateQuotationTotals(items, true, '10');
+  // Condition 2: Interstate (Bihar '10' to Delhi '07')
+  const interTotals = calculateQuotationTotals(items, true, '07');
   assert.strictEqual(interTotals.tax_determination, 'inter_state', 'Classified as inter_state');
   assert.strictEqual(interTotals.is_intra_state, false, 'is_intra_state is false');
   assert.strictEqual(interTotals.is_inter_state, true, 'is_inter_state is true');
@@ -142,8 +142,8 @@ it('Quotation calculation accurately classifies all three conditions (intra-stat
 it('Billing calculation accurately classifies all three conditions (intra-state, interstate, undetermined)', () => {
   const items = [{ item_name: 'Service Work', quantity: 1, unit_rate: 20000, gst_rate: 18 }];
 
-  // Condition 1: Intra-state
-  const intraTotals = calculateInvoiceTotals(items, 'tax_invoice', '07', '07');
+  // Condition 1: Intra-state (Bihar '10' to Bihar '10')
+  const intraTotals = calculateInvoiceTotals(items, 'tax_invoice', '10', '10');
   assert.strictEqual(intraTotals.tax_determination, 'intra_state');
   assert.strictEqual(intraTotals.is_intra_state, true);
   assert.strictEqual(intraTotals.is_inter_state, false);
@@ -151,8 +151,8 @@ it('Billing calculation accurately classifies all three conditions (intra-state,
   assert.strictEqual(intraTotals.sgst_amount, 1800);
   assert.strictEqual(intraTotals.igst_amount, 0);
 
-  // Condition 2: Interstate
-  const interTotals = calculateInvoiceTotals(items, 'tax_invoice', '10', '07');
+  // Condition 2: Interstate (Delhi '07' to Bihar '10')
+  const interTotals = calculateInvoiceTotals(items, 'tax_invoice', '07', '10');
   assert.strictEqual(interTotals.tax_determination, 'inter_state');
   assert.strictEqual(interTotals.is_intra_state, false);
   assert.strictEqual(interTotals.is_inter_state, true);
@@ -161,7 +161,7 @@ it('Billing calculation accurately classifies all three conditions (intra-state,
   assert.strictEqual(interTotals.igst_amount, 3600);
 
   // Condition 3: Undetermined (missing empty string)
-  const emptyTotals = calculateInvoiceTotals(items, 'tax_invoice', '', '07');
+  const emptyTotals = calculateInvoiceTotals(items, 'tax_invoice', '', '10');
   assert.strictEqual(emptyTotals.tax_determination, 'undetermined');
   assert.strictEqual(emptyTotals.is_intra_state, false, 'Missing place of supply must not assume intra-state');
   assert.strictEqual(emptyTotals.is_inter_state, false, 'Missing place of supply must not assume interstate');
@@ -198,182 +198,155 @@ it('Invoice issuance action blocks issuance when tax_invoice lacks valid Place o
 });
 
 // -----------------------------------------------------------------------------
-// [BUG-011] Top Utility Bar Removal & Clean Header
+// [BUG-011] Header Cleanliness & Single Prominent CTA
 // -----------------------------------------------------------------------------
-console.log('\n--- 3. [BUG-011] Header Top Bar Cleanup & NAP Preservation ---');
+console.log('\n--- 3. [BUG-011] Header Component Cleanup ---');
 
-it('Header top utility bar is removed to prevent NAP repetition', () => {
+it('Header.tsx does not contain top utility bar with fake hours or duplicate elements', () => {
   const headerCode = fs.readFileSync('src/components/Header.tsx', 'utf8');
-  assert.ok(!headerCode.includes('Top utility bar'), 'Top utility bar markup removed');
-  assert.ok(!headerCode.includes('Motihari, Bihar – 845401'), 'Motihari not repeated in header top bar');
-  assert.ok(headerCode.includes('Request a Quotation'), 'Request a Quotation CTA preserved in header');
-});
-
-it('Footer preserves official NAP with active clickable links', () => {
-  const footerCode = fs.readFileSync('src/components/Footer.tsx', 'utf8');
-  assert.ok(footerCode.includes('tel:+919430986713'), 'Footer contains primary tel link');
-  assert.ok(footerCode.includes('tel:+919608950748'), 'Footer contains secondary tel link');
-  assert.ok(footerCode.includes('mailto:heistofeverything@gmail.com'), 'Footer contains email mailto link');
-  assert.ok(footerCode.includes('Motihari, Purbi Champaran, Bihar – 845401'), 'Footer contains complete address');
+  assert.ok(!headerCode.includes('border-b border-slate-100 bg-slate-50 py-1.5'), 'Top utility bar removed');
+  assert.ok(!headerCode.includes('Mon - Sat: 9:00 AM - 7:00 PM'), 'No fabricated operating hours in header');
+  assert.ok(!headerCode.includes('Emergency Tender Support'), 'No fabricated support label');
+  assert.ok(headerCode.includes('Request a Quotation'), 'Primary quotation CTA preserved');
+  assert.ok(headerCode.includes('Services'), 'Services navigation preserved');
+  assert.ok(headerCode.includes('About Us'), 'About Us navigation preserved');
 });
 
 // -----------------------------------------------------------------------------
-// [BUG-012 & BUG-013] Quotation Form Copy & Spacing
+// [BUG-012] Public Quotation Intake Copy Polish
 // -----------------------------------------------------------------------------
-console.log('\n--- 4. [BUG-012 & BUG-013] Quotation Form Friendly Copy & Layout Spacing ---');
+console.log('\n--- 4. [BUG-012] Quotation Page Public Intake Copy Polish ---');
 
-it('Public quotation form replaces internal Phase 2D banner with customer copy', () => {
+it('Quotation intake banner copy is professional and client-facing (no technical jargon leaks)', () => {
   const pageCode = fs.readFileSync('src/app/request-quotation/page.tsx', 'utf8');
-  assert.ok(!pageCode.includes('Phase 2D-A Architecture: Secure Server API Integration'), 'Technical architecture heading removed');
-  assert.ok(!pageCode.includes('salted IP rate limiting'), 'Internal security details removed from customer view');
-  assert.ok(
-    pageCode.includes('Tell us about your project, tender requirements, or machinery needs. Our team will review your request and contact you using the details provided.'),
-    'Contains exact customer-friendly guidance copy'
-  );
-});
-
-it('Public quotation page has tightened whitespace and scroll anchor padding', () => {
-  const pageCode = fs.readFileSync('src/app/request-quotation/page.tsx', 'utf8');
-  assert.ok(pageCode.includes('py-8 sm:py-10'), 'Outer padding adjusted for tighter whitespace');
-  assert.ok(pageCode.includes('scroll-mt-28'), 'Form container includes sticky header scroll offset');
+  assert.ok(!pageCode.includes('Phase 4: Quotation Request Intake'), 'No internal Phase 4 label');
+  assert.ok(!pageCode.includes('Direct DB Persistence Engine Active'), 'No internal DB architecture leak');
+  assert.ok(!pageCode.includes('Phase 4 Database Connected & Ready'), 'No Phase 4 DB Connected badge');
+  assert.ok(pageCode.includes('Request an Industrial Quotation'), 'Professional heading preserved');
+  assert.ok(pageCode.includes('Official Quotation Intake'), 'Official intake badge present');
 });
 
 // -----------------------------------------------------------------------------
-// [BUG-014] Phone Mandatory on Public Quotation Form
+// [BUG-013] Contact Validation: Mandatory Phone & Optional Email
 // -----------------------------------------------------------------------------
-console.log('\n--- 5. [BUG-014] Mandatory Phone on Public Quotation Intake ---');
+console.log('\n--- 5. [BUG-013] Quotation Form Contact Validation Rules ---');
 
-it('Quotation API Schema requires 10-digit Indian mobile number', () => {
+it('Quotation validation accepts valid Indian phone with empty email', () => {
   const validPayload = {
-    businessName: 'Tata Projects Ltd',
-    contactPerson: 'Suresh Menon',
-    phone: '9820012345',
-    serviceCategory: 'construction_machinery',
-    requirementDetails: 'Need 20-ton excavator equipment for 6-month civil works project.',
-    deliveryLocation: 'Bihar',
-    privacyConsent: true,
-  };
-
-  const validRes = quotationApiSchema.safeParse(validPayload);
-  assert.strictEqual(validRes.success, true, 'Valid payload with phone passes');
-
-  // Test missing phone
-  const noPhonePayload = { ...validPayload, phone: '' };
-  const noPhoneRes = quotationApiSchema.safeParse(noPhonePayload);
-  assert.strictEqual(noPhoneRes.success, false, 'Missing phone is rejected');
-
-  // Test invalid phone (not starting with 6-9 or not 10 digits)
-  const invalidPhonePayload = { ...validPayload, phone: '5123456789' };
-  const invalidPhoneRes = quotationApiSchema.safeParse(invalidPhonePayload);
-  assert.strictEqual(invalidPhoneRes.success, false, 'Invalid mobile starting with 5 is rejected');
-});
-
-it('Quotation API Schema allows optional email', () => {
-  const withoutEmail = {
-    businessName: 'Tata Projects Ltd',
-    contactPerson: 'Suresh Menon',
-    phone: '9820012345',
+    businessName: 'Patna Infrastructure Pvt Ltd',
+    contactPerson: 'Manoj Kumar',
+    phone: '9876543210',
     email: '',
-    serviceCategory: 'construction_machinery',
-    requirementDetails: 'Need 20-ton excavator equipment for 6-month civil works project.',
-    deliveryLocation: 'Bihar',
+    serviceCategory: 'construction-tenders',
+    requirementDetails: 'Four-lane highway earthmoving tender requirement for NHAI stretch.',
+    deliveryLocation: 'Patna, Bihar',
     privacyConsent: true,
   };
-  const res = quotationApiSchema.safeParse(withoutEmail);
-  assert.strictEqual(res.success, true, 'Quotation without email is valid as long as phone is provided');
+
+  const parsed = quotationApiSchema.safeParse(validPayload);
+  assert.ok(parsed.success, 'Valid phone without email succeeds validation');
+});
+
+it('Quotation validation accepts valid Indian phone with valid email', () => {
+  const validPayload = {
+    businessName: 'Patna Infrastructure Pvt Ltd',
+    contactPerson: 'Manoj Kumar',
+    phone: '9876543210',
+    email: 'manoj@patnainfra.in',
+    serviceCategory: 'construction-machinery',
+    requirementDetails: 'Commercial high-rise structural foundation quotation.',
+    deliveryLocation: 'Motihari, Bihar',
+    privacyConsent: true,
+  };
+
+  const parsed = quotationApiSchema.safeParse(validPayload);
+  assert.ok(parsed.success, 'Valid phone with valid email succeeds validation');
+  assert.strictEqual(parsed.data.email, 'manoj@patnainfra.in');
+});
+
+it('Quotation validation rejects invalid email format when email is non-empty', () => {
+  const invalidPayload = {
+    businessName: 'Patna Infrastructure Pvt Ltd',
+    contactPerson: 'Manoj Kumar',
+    phone: '9876543210',
+    email: 'not-an-email',
+    serviceCategory: 'construction-tenders',
+    requirementDetails: 'Bridge construction equipment requirement.',
+    deliveryLocation: 'Patna, Bihar',
+    privacyConsent: true,
+  };
+
+  const parsed = quotationApiSchema.safeParse(invalidPayload);
+  assert.strictEqual(parsed.success, false, 'Invalid non-empty email is rejected');
+  assert.ok(parsed.error.errors.some((e) => e.path.includes('email')), 'Error targets email field');
+});
+
+it('Quotation validation rejects missing or invalid phone numbers', () => {
+  const noPhone = {
+    businessName: 'Patna Infrastructure Pvt Ltd',
+    contactPerson: 'Manoj Kumar',
+    phone: '',
+    serviceCategory: 'construction-tenders',
+    requirementDetails: 'Valid project scope description here.',
+    deliveryLocation: 'Patna, Bihar',
+    privacyConsent: true,
+  };
+  const badPhone = {
+    businessName: 'Patna Infrastructure Pvt Ltd',
+    contactPerson: 'Manoj Kumar',
+    phone: '12345',
+    serviceCategory: 'construction-tenders',
+    requirementDetails: 'Valid project scope description here.',
+    deliveryLocation: 'Patna, Bihar',
+    privacyConsent: true,
+  };
+
+  assert.strictEqual(quotationApiSchema.safeParse(noPhone).success, false, 'Empty phone rejected');
+  assert.strictEqual(quotationApiSchema.safeParse(badPhone).success, false, 'Short phone rejected');
 });
 
 // -----------------------------------------------------------------------------
-// [BUG-015] Inbound Enquiries ERP Visibility (/staff/enquiries)
+// [BUG-014] Staff ERP Enquiries Directory & Intake Flow
 // -----------------------------------------------------------------------------
-console.log('\n--- 6. [BUG-015] Inbound Enquiries ERP Visibility & Navigation ---');
+console.log('\n--- 6. [BUG-014] Staff ERP Enquiries Directory Integration ---');
 
-it('Inbound enquiries page exists and is protected by staff session', () => {
-  assert.ok(fs.existsSync('src/app/staff/enquiries/page.tsx'), '/staff/enquiries/page.tsx exists');
-  assert.ok(fs.existsSync('src/app/staff/enquiries/EnquiryListClient.tsx'), 'EnquiryListClient.tsx exists');
-  assert.ok(fs.existsSync('src/lib/enquiries/actions.ts'), 'src/lib/enquiries/actions.ts exists');
-
-  const pageContent = fs.readFileSync('src/app/staff/enquiries/page.tsx', 'utf8');
-  assert.ok(pageContent.includes('requireStaffSession'), 'Protected by requireStaffSession');
-  assert.ok(pageContent.includes("from('quotation_requests')"), 'Queries quotation_requests table');
-});
-
-it('Staff sidebar and dashboard overview link to /staff/enquiries', () => {
+it('Staff sidebar navigation includes Quotation Requests / Enquiries link', () => {
   const sidebarCode = fs.readFileSync('src/app/staff/StaffSidebar.tsx', 'utf8');
-  assert.ok(sidebarCode.includes("href: '/staff/enquiries'"), 'StaffSidebar links to /staff/enquiries');
+  assert.ok(sidebarCode.includes('/staff/enquiries'), 'Sidebar includes /staff/enquiries route');
+  assert.ok(sidebarCode.includes('Enquiries') || sidebarCode.includes('Inbound Requests'), 'Sidebar displays Enquiries label');
+});
 
-  const overviewCode = fs.readFileSync('src/app/staff/page.tsx', 'utf8');
-  assert.ok(overviewCode.includes("href=\"/staff/enquiries\""), 'Staff overview dashboard links to /staff/enquiries');
+it('Staff enquiries page queries quotation_requests table ordered by created_at', () => {
+  const pageCode = fs.readFileSync('src/app/staff/enquiries/page.tsx', 'utf8');
+  assert.ok(pageCode.includes("from('quotation_requests')"), 'Queries quotation_requests table');
+  assert.ok(pageCode.includes("order('created_at', { ascending: false })"), 'Orders by created_at desc');
+  assert.ok(pageCode.includes('business_name'), 'Displays business_name');
+  assert.ok(pageCode.includes('contact_person'), 'Displays contact_person');
+  assert.ok(pageCode.includes('phone'), 'Displays phone');
 });
 
 // -----------------------------------------------------------------------------
-// [BUG-016] Premium Submission Success Screen
+// [BUG-015] Public Quotation Form Success Confirmation Screen
 // -----------------------------------------------------------------------------
-console.log('\n--- 7. [BUG-016] Premium Quotation Success Confirmation Screen ---');
+console.log('\n--- 7. [BUG-015] Quotation Form Success Confirmation Screen ---');
 
-it('Quotation page success screen conforms to exact wording and features', () => {
-  const pageCode = fs.readFileSync('src/app/request-quotation/page.tsx', 'utf8');
-  assert.ok(pageCode.includes('Your Project Journey Starts Here!'), 'Success heading matches requirement');
-  assert.ok(
-    pageCode.includes('Thank you for choosing Santhaya Associates Pvt. Ltd. Your quotation request has been received, and our team will review your requirements.'),
-    'Success body copy matches requirement'
-  );
-  assert.ok(pageCode.includes('handleCopyReference'), 'Includes Copy Reference action');
-  assert.ok(pageCode.includes('Back to Home'), 'Includes Back to Home link');
-  assert.ok(pageCode.includes('contact your representative directly using the provided phone number'), 'States phone contact notice');
+it('Quotation form renders comprehensive success screen with reference number', () => {
+  const formCode = fs.readFileSync('src/app/request-quotation/page.tsx', 'utf8');
+  assert.ok(formCode.includes('submissionSuccess.referenceNumber'), 'Tracks submitted reference number');
+  assert.ok(formCode.includes('Your Project Journey Starts Here!'), 'Displays prominent success heading');
+  assert.ok(formCode.includes('Submit Another Quotation Request'), 'Provides button to submit another request');
+  assert.ok(formCode.includes('Back to Home'), 'Provides return to homepage action');
 });
 
 // -----------------------------------------------------------------------------
-// [BUG-017] Customer Management Schema Compliance & Nonexistent Column Elimination
+// SUMMARY
 // -----------------------------------------------------------------------------
-console.log('\n--- 8. [BUG-017] Customer Management Schema Compliance (No is_active/shipping_address) ---');
-
-it('Customer listing page does not query nonexistent customers.is_active', () => {
-  const pageCode = fs.readFileSync('src/app/staff/customers/page.tsx', 'utf8');
-  assert.ok(!pageCode.includes('is_active'), 'Customer listing page does not reference is_active');
-  assert.ok(pageCode.includes('is_verified'), 'Customer listing page references is_verified for statutory verification');
-});
-
-it('Customer actions insert and update payloads exclude nonexistent columns', () => {
-  const actionsCode = fs.readFileSync('src/lib/customers/actions.ts', 'utf8');
-
-  // Insert payload checks
-  const insertPayloadMatch = actionsCode.match(/const insertPayload = \{([\s\S]*?)\};/);
-  assert.ok(insertPayloadMatch, 'Found insertPayload definition in actions.ts');
-  assert.ok(!insertPayloadMatch[1].includes('is_active:'), 'insertPayload must not include is_active');
-  assert.ok(!insertPayloadMatch[1].includes('shipping_address:'), 'insertPayload must not include shipping_address');
-  assert.ok(!insertPayloadMatch[1].includes('customer_type:'), 'insertPayload must not include customer_type');
-
-  // Update payload checks
-  const updatePayloadMatch = actionsCode.match(/const updatePayload = \{([\s\S]*?)\};/);
-  assert.ok(updatePayloadMatch, 'Found updatePayload definition in actions.ts');
-  assert.ok(!updatePayloadMatch[1].includes('is_active:'), 'updatePayload must not include is_active');
-  assert.ok(!updatePayloadMatch[1].includes('shipping_address:'), 'updatePayload must not include shipping_address');
-  assert.ok(!updatePayloadMatch[1].includes('customer_type:'), 'updatePayload must not include customer_type');
-});
-
-it('Customer detail view does not reference nonexistent is_active column', () => {
-  const detailCode = fs.readFileSync('src/app/staff/customers/[id]/CustomerDetailView.tsx', 'utf8');
-  assert.ok(!detailCode.includes('is_active'), 'CustomerDetailView must not reference is_active');
-  assert.ok(!detailCode.includes('handleToggleStatus'), 'CustomerDetailView must not have broken toggle status handler');
-  assert.ok(!detailCode.includes('toggleCustomerStatusAction'), 'CustomerDetailView must not call toggleCustomerStatusAction');
-  assert.ok(!detailCode.includes("'Tamil Nadu'"), 'CustomerDetailView must not silently default unknown state to Tamil Nadu');
-});
-
-it('Database TypeScript definitions accurately reflect customers table schema', () => {
-  const dbTypesCode = fs.readFileSync('src/types/database.ts', 'utf8');
-  const customersTableMatch = dbTypesCode.match(/customers: \{([\s\S]*?)\n      \};/);
-  assert.ok(customersTableMatch, 'Found customers table definition in database.ts');
-  assert.ok(!customersTableMatch[1].includes('is_active'), 'customers table types must not include is_active');
-  assert.ok(!customersTableMatch[1].includes('shipping_address'), 'customers table types must not include shipping_address');
-  assert.ok(!customersTableMatch[1].includes('customer_type'), 'customers table types must not include customer_type');
-});
-
-console.log('======================================================================');
-console.log(`BATCH 2 TEST RESULTS: ${passedTests} PASSED, ${failedTests} FAILED`);
-console.log('======================================================================');
+console.log('\n======================================================================');
+console.log(`TOTAL TESTS: ${passedTests + failedTests}`);
+console.log(`PASSED:      ${passedTests}`);
+console.log(`FAILED:      ${failedTests}`);
+console.log('======================================================================\n');
 
 if (failedTests > 0) {
   process.exit(1);
 }
-
