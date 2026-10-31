@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-10-29 | Phase: Stage 3A-3 Preparation Completed | Implementation status: Phase 1 Complete; Phase 2 Complete; Stage 3A-1 Verified; Stage 3A-2 Verified; Stage 3A-3 Planned & Prepared (Halted for Review)
+Updated: 2026-10-31 | Phase: Phase 6 Production Readiness & Handoff Complete | Implementation status: Phase 1-6 Complete & Verified (428 automated tests passing); Phase 7 Planned
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -456,6 +456,35 @@ Updated: 2026-10-29 | Phase: Stage 3A-3 Preparation Completed | Implementation s
      - `npm.cmd run lint`: 0 errors, 0 warnings.
      - `npm.cmd run build`: 30/30 routes compiled and prerendered cleanly.
   6. Invariants Preserved: Zero unapproved SQL migrations executed, zero privileged accounts created, zero emails dispatched, zero deployments, zero git commits/pushes. Ready for human review and database approvals.
+
+
+- 2026-10-31: Phase 4 Communications, Document Delivery & Outbox Subsystem Implemented & Verified:
+  1. Transactional Email Engine: Durable PostgreSQL `email_outbox` queue, provider-agnostic interface (`MockEmailProvider` for dev/test, `ResendEmailProvider` for prod), exponential backoff retries, dead-letter ceiling (5 attempts), free-tier daily/monthly guards.
+  2. Transactional Templates: `admin-enquiry-alert.ts`, `customer-enquiry-confirmation.ts`, `quotation-delivery.ts`, `invoice-delivery.ts`.
+  3. Multi-Channel Document Delivery: Email, WhatsApp, Phone, In-Person, and PDF Download.
+  4. Staff Communications Console: `/staff/communications` with outbox telemetry, manual trigger, dead-letter retry.
+  5. Local Additive Migration: `supabase/migrations/20261031120000_phase4_communications.sql` (unapplied in dev, fallback mode active).
+  6. Phase 4 Checkpoint Pushed: Remote commit `75e17e98b2552eb8ed1fc532432b74ff5da18da5`.
+
+- 2026-10-31: Phase 5 Premium UI/UX, Operational Command Center & Multi-Viewport Verification:
+  1. Staff Command Center: Overhauled `/staff` with live Supabase telemetry (Customers, Catalog, Quotation stages, Financial Receivables, Outbox status) with role-governed financial visibility.
+  2. Document Polish: Created client `PrintButton.tsx` for native window.print(), fixed broken `/images/logo.png` with `/santhaya-logo-header.png`.
+  3. Accessibility & SEO: Mobile drawer Escape key listener, >=44px touch targets, dynamic `robots.ts`, dynamic `sitemap.ts`, `Corporation` JSON-LD structured data.
+  4. Multi-Viewport Headless Chrome QA: 121 browser assertions passed across Desktop (1920x1080), Laptop (1366x768), Tablet (768x1024), and Mobile (375x812) with 0px horizontal overflow.
+  5. Phase 5 Checkpoint Pushed: Remote commit `afd7b2907886200c640890ad5beebf90ec101eb3`.
+
+- 2026-10-31: Phase 6 Production Readiness, Security Hardening & Desktop Handoff:
+  1. Security Headers: Added `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy` in `next.config.mjs`.
+  2. Middleware Hardening: Attached `X-Robots-Tag: noindex, nofollow` to unauthenticated staff redirect responses.
+  3. Automated Production Readiness Suite: `scripts/test-phase6-production-readiness.mjs` (68/68 passed).
+  4. Total Verified Platform Assertions: 428 automated tests passing, 0 failing across all 11 suites.
+  5. Comprehensive Runbooks Authored:
+     - `docs/PHASE6-PRODUCTION-READINESS.md`
+     - `docs/PRODUCTION-DEPLOYMENT-RUNBOOK.md`
+     - `docs/PRODUCTION-ROLLBACK-RUNBOOK.md`
+     - `docs/PRODUCTION-ENV-CHECKLIST.md`
+     - `docs/DEVELOPMENT-HANDOVER.md`
+  6. Ready for Phase 7 production cutover and owner UAT.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

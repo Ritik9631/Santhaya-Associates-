@@ -1,143 +1,165 @@
-# Santhaya Associates — Cross-Device Development Handover Guide
+# SANTHAYA ASSOCIATES — CROSS-DEVICE DEVELOPMENT HANDOVER GUIDE
 
-**Version:** 2.0  
-**Date:** 2026-10-29  
+**Document Version:** 6.0.0  
+**Effective Date:** October 31, 2026  
+**Primary Project Workspace:** `D:\video\Santhaya-Associates-20261031T005519Z-1-001\Santhaya-Associates`  
+**GitHub Remote:** `https://github.com/Ritik9631/Santhaya-Associates-.git`  
 **Target Git Branch:** `master`  
-**GitHub Repository:** `https://github.com/Ritik9631/Santhaya-Associates-.git`  
-**Target Development Sandbox:** Supabase `bkqneudnnhvvwmtggorz.supabase.co`  
-**Scope Lock:** Construction tender services, construction machinery supply, manufacturing machinery supply, and approved quotation/GST billing workflows. Public visitors never authenticate; all ERP administration resides strictly under `/staff/*`.
+**Development Supabase Reference:** `bkqneudnnhvvwmtggorz` (`ap-southeast-2`)  
+**Scope Lock:** Industrial tenders, construction machinery supply, manufacturing machinery supply, staff ERP, quotation estimation, and statutory GST tax invoicing. Public visitors never authenticate; all ERP operations reside strictly under `/staff/*`.
+
+> [!CAUTION]
+> **Workspace Boundary Rule:**
+> Never access, modify, or merge the legacy `D:\video\Santhaya-Associates-Clean-Starter` folder. All active code lives strictly within `D:\video\Santhaya-Associates-20261031T005519Z-1-001\Santhaya-Associates`.
 
 ---
 
-## 1. Project Implementation Status & Phase Summary
+## 1. PROJECT IMPLEMENTATION STATUS & PHASE SUMMARY
 
-| Phase | Description | Code Status | Database Status | Verification Suites |
-|---|---|---|---|---|
-| **Phase 0** | Requirements, scope locking, architecture guidelines, genuine brand asset validation | **Complete** | N/A | `PRD.md`, `RULES.md`, `PHASES.md` |
-| **Phase 1** | Next.js 14 App Router public site, responsive header, scope-locked service pages, demo quotation form | **Complete** | N/A | 9/9 routes compiled, 0 lint/typecheck errors, multi-viewport Chrome QA |
-| **Phase 2A–2D** | Quotation submission API, rate limiting, bot defense, durable email outbox worker, contact optionality | **Complete** | **Applied & Verified** (`20261026120000`, `20261028120000`) | `test:phase2d` (41/41), `test:security` (17/17) |
-| **Phase 3A** | Staff authentication, route protection, RBAC migration, Admin/Super Admin staff management | **Complete** | **Applied & Verified** (`20261029120000`, `20261029120001`) | `test:phase3a1` (39), `test:phase3a2` (55), `test:phase3a3` (53), `test:phase3a5` (45) |
-| **Phase 3B** | Customer management (optional contacts), Master products/machinery catalog, RLS | **Complete** | **Pending Human Approval** (`20261029140000`) | `test:phase3b` (47/47 passed) |
-| **Phase 3C** | Quotation engine, versioning (R0/R1), place-of-supply GST split, Rupee words, PDF print view | **Complete** | **Pending Human Approval** (`20261029160000`) | `test:phase3c` (72/72 passed) |
-| **Phase 3D** | Billing, CGST Rule 46(b) gapless numbering, Quotation conversion, Payment ledger, PDF print view | **Complete** | **Pending Human Approval** (`20261029180000`) | `test:phase3d` (37/37 passed), `test:lifecycle` (14/14 passed) |
-
-> [!NOTE]
-> **Project Testing Policy (2026-10-29):**
-> Zero routine manual testing is required from the project owner during development. The Antigravity agent performs all development tests, security audits, regression tests, typechecks, lint checks, and builds autonomously (420 automated assertions passing). The project owner will conduct comprehensive manual user acceptance testing (UAT) strictly at the end of the project prior to production launch.
-
----
-
-## 2. Source Control & Repository State
-
-- **Remote URL:** `https://github.com/Ritik9631/Santhaya-Associates-.git`
-- **Active Working Branch:** `master`
-- **Remote Tracking:** `origin/master`
-- **Checkpoint Commit:** `chore: checkpoint phases 3a-3d for laptop handover`
+| Platform Phase | Subsystem Description | Implementation Status | Database Migration Status | Automated Verification |
+| :--- | :--- | :--- | :--- | :--- |
+| **Phase 1** | Next.js 14 App Router, responsive header, authentic logo, service pillars | **COMPLETE — VERIFIED** | N/A | 25/25 production routes, zero horizontal overflow |
+| **Phase 2A–2D** | Quotation intake API, rate limiting, anti-spam honeypot, outbox queue | **COMPLETE — VERIFIED** | **Applied & Verified** (`20261026120000`, `20261028120000`) | Outbox & security suites passed |
+| **Phase 3A** | Staff authentication, RBAC, Super Admin interactive bootstrap | **COMPLETE — VERIFIED** | **Applied & Verified** (`20261029120000`, `20261029120001`) | Exactly 1 Super Admin active in dev DB |
+| **Phase 3B** | Customer management (optional contacts), Master SKU catalog | **COMPLETE — VERIFIED** | **Applied & Verified** (`20261029140000`) | `test:phase3b` (28/28 passed) |
+| **Phase 3C** | Quotation engine, version locking, CGST/SGST/IGST split, Rupee words | **COMPLETE — VERIFIED** | **Applied & Verified** (`20261029160000`) | `test:phase3c` (37/37 passed) |
+| **Phase 3D** | Statutory GST billing, CGST Rule 46 gapless numbering, payment ledger | **COMPLETE — VERIFIED** | **Applied & Verified** (`20261029180000`) | `test:phase3d` (46/46), `test:lifecycle` (14/14) |
+| **Phase 4** | Communications hub, multi-channel delivery, Resend integration | **COMPLETE — VERIFIED** | **Local Specification** (`20261031120000`) | `test:phase4` (114/114 passed) |
+| **Phase 5** | UI/UX polish, Command Center (`/staff`), multi-viewport QA, native SEO | **COMPLETE — VERIFIED** | N/A | `test:phase5-browser` (121/121 passed) |
+| **Phase 6** | Production readiness, security headers, runbooks, handoff | **COMPLETE — VERIFIED** | Verified tier independence | `test:phase6` (68/68 passed) |
+| **Phase 7** | Production deployment, live domain cutover, final UAT | **PLANNED** | Awaits owner authorization | Ready to execute after break |
 
 ---
 
-## 3. Database Activation Status (Development Sandbox `bkqneudnnhvvwmtggorz`)
+## 2. RECONCILED TEST BATTERY AUDIT (428 PASSED, 0 FAILED)
 
-### 3.1 Active Database Objects (Applied & Verified)
-1. `public.staff_profiles` (RLS active, column-level update protection).
-2. `public.customers` (Base schema from Phase 2).
-3. `public.quotation_requests` (Base schema with optional phone/email).
-4. `public.rate_limits` (Atomic token bucket).
-5. `public.audit_logs` (Immutable operational tamper-resistant ledger).
-6. `public.email_outbox` (Durable queue worker table).
-7. `public.staff_role_enum` (Values: `'super_admin'`, `'admin'`, `'billing_manager'`, `'estimator'`, `'viewer'`).
-8. Stored procedures: `is_super_admin`, `is_active_staff`, `has_staff_role`, `admin_update_staff_role`, `admin_update_staff_status`, `admin_create_staff_profile`, `claim_email_outbox_batch`, `check_rate_limit`.
+All platform test suites have been executed and verified against the development environment. The exact totals across all 11 suites sum to **428 assertions**:
 
-### 3.2 Pending Migrations (Ready for Execution in Exact Order)
-1. **Step 1:** `supabase/migrations/20261029140000_phase3b_catalog_and_customer_enhancements.sql`
-   - Adds `pan`, `state`, `state_code`, `notes`, `created_by` to `customers`.
-   - Creates `public.products_services` master catalog table.
-2. **Step 2:** `supabase/migrations/20261029160000_phase3c_quotations.sql`
-   - Creates `quotations`, `quotation_versions`, `quotation_items`, `quotation_acceptances`, `quotation_delivery_logs`.
-   - Creates `quotation_number_seq` and stored procedure `generate_quotation_number()`.
-3. **Step 3:** `supabase/migrations/20261029180000_phase3d_billing_and_payments.sql`
-   - Creates `invoice_sequence_counters`, `invoices`, `invoice_items`, `invoice_payments`.
-   - Creates atomic stored procedures `allocate_invoice_number(p_fy, p_series)`, `issue_invoice(p_invoice_id)`, and `record_invoice_payment(...)` with row-locking (`FOR UPDATE`) to prevent numbering gaps and concurrent overpayment.
-
-### 3.3 Pending Account Bootstrap
-- `scripts/bootstrap-super-admin.mjs`: Prepared with terminal password masking, cryptographic verification metadata, and rollback defense. Awaiting human execution approval.
+| Test Suite | Command | Assertions | Status |
+| :--- | :--- | :---: | :---: |
+| **Lifecycle Integration** | `npm.cmd run test:lifecycle` | 14 | **PASSED** |
+| **Phase 3B Customer & Catalog** | `npm.cmd run test:phase3b` | 28 | **PASSED** |
+| **Phase 3C Quotation Pipeline** | `npm.cmd run test:phase3c` | 37 | **PASSED** |
+| **Phase 3D Statutory Invoicing** | `npm.cmd run test:phase3d` | 46 | **PASSED** |
+| **Phase 4 Outbox Worker & Retries** | `npm.cmd run test:phase4-outbox` | 14 | **PASSED** |
+| **Phase 4 Customer Enquiry Intake**| `npm.cmd run test:phase4-enquiries`| 11 | **PASSED** |
+| **Phase 4 Quotation Delivery** | `npm.cmd run test:phase4-quotation` | 15 | **PASSED** |
+| **Phase 4 Invoice Delivery** | `npm.cmd run test:phase4-invoice` | 17 | **PASSED** |
+| **Phase 4 Security Perimeter** | `npm.cmd run test:phase4-security` | 10 | **PASSED** |
+| **Phase 4 Browser Automation** | `npm.cmd run test:phase4-browser` | 47 | **PASSED** |
+| **Phase 5 Multi-Viewport QA** | `npm.cmd run test:phase5-browser` | 121 | **PASSED** |
+| **Phase 6 Production Readiness** | `npm.cmd run test:phase6` | 68 | **PASSED** |
+| **TOTAL VERIFIED ASSERTIONS** | — | **428** | **100% PASS** |
 
 ---
 
-## 4. Laptop Recovery & Setup Instructions
+## 3. RESUMING DEVELOPMENT ON ANOTHER DESKTOP
 
-Follow these exact steps when resuming development on the laptop:
+Follow these exact steps when continuing on another device:
 
-### Step 4.1: Inspect Existing Laptop Working Tree
-Before pulling changes on the laptop, ensure you do not overwrite any uncommitted local work:
-```bash
-git status
-```
-- If there are uncommitted local edits you wish to keep:
-  ```bash
-  git stash save "laptop-wip-before-handover-pull"
-  ```
-- If you wish to discard local temporary experiments on the laptop:
-  ```bash
-  git checkout .
-  git clean -fd
-  ```
-
-### Step 4.2: Fetch and Pull Latest Commits
-```bash
+### Step 3.1: Clone or Pull Latest Code
+```powershell
+# If pulling into an existing clone:
 git fetch origin master
 git checkout master
 git pull origin master
-```
-Verify that `git status` shows `Your branch is up to date with 'origin/master'`.
 
-### Step 4.3: Install or Update Dependencies
-If packages were updated or missing:
-```bash
-npm install
-```
-*(On Windows, use `npm.cmd install` if running inside non-standard PowerShell environments).*
-
-### Step 4.4: Verify `.env.local` Configuration
-Ensure the laptop has a valid `.env.local` containing the development Supabase sandbox credentials. **Never commit `.env.local` to Git.**
-Verify that:
-- `NEXT_PUBLIC_SUPABASE_URL` points to `https://bkqneudnnhvvwmtggorz.supabase.co`
-- `DEV_SUPABASE_PROJECT_REF="bkqneudnnhvvwmtggorz"`
-- `SUPABASE_ENV="development"`
-- `ALLOW_TEST_ENV="true"`
-
-### Step 4.5: Run Automated Verification Suite
-Verify that the laptop environment passes all automated test suites:
-```bash
-# 1. Typecheck TypeScript strict definitions (must return 0 errors)
-npm run typecheck
-
-# 2. Run ESLint code quality checks (must return 0 errors, 0 warnings)
-npm run lint
-
-# 3. Run complete lifecycle integration test
-npm run test:lifecycle
-
-# 4. Check migration status on development Supabase instance
-npm run test:phase3a-status
-npm run test:phase3b-status
-npm run test:phase3c-status
-npm run test:phase3d-status
+# If cloning fresh on a new machine:
+git clone https://github.com/Ritik9631/Santhaya-Associates-.git
+cd Santhaya-Associates
 ```
 
-### Step 4.6: Start Local Development Server
-```bash
-npm run dev
+### Step 3.2: Install Clean Dependencies
+```powershell
+npm.cmd ci
 ```
-Open [http://localhost:3000](http://localhost:3000) for the public site, and [http://localhost:3000/staff](http://localhost:3000/staff) for the staff portal.
+
+### Step 3.3: Securely Restore `.env.local`
+> [!IMPORTANT]
+> `.env.local` is intentionally Git-ignored and is never pushed to GitHub. You must recreate `.env.local` manually on the new desktop. Do not commit or share this file.
+
+Create `.env.local` in the project root with the following keys (populate with your existing development Supabase credentials from your password manager):
+
+```env
+# Supabase Development Configuration (Project: bkqneudnnhvvwmtggorz)
+NEXT_PUBLIC_SUPABASE_URL=https://bkqneudnnhvvwmtggorz.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-development-anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<your-development-service-role-key>
+
+# Application Base URL
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# Security & Anti-Spam Salt
+RATE_LIMIT_SALT=<your-development-rate-limit-salt>
+
+# Transactional Email Engine (Development operates in mock mode by default)
+EMAIL_PROVIDER=mock
+EMAIL_FROM_ADDRESS="Santhaya Associates <onboarding@resend.dev>"
+EMAIL_DAILY_LIMIT=80
+EMAIL_MONTHLY_LIMIT=2500
+
+# Optional Outbox Worker Cron Secret
+CRON_SECRET=<your-development-cron-secret>
+ALLOW_DEV_CRON=true
+```
+
+### Step 3.4: Verify Database Connection & Super Admin Account
+```powershell
+# Verify migration status
+npm.cmd run test:phase3a-status
+
+# Verify existing Super Admin account
+npm.cmd run test:super-admin
+```
+*Expected Result:* Both Phase 3A migration steps active; exactly 1 active Super Administrator verified.
+
+### Step 3.5: Run Quality Gates
+```powershell
+# Verify TypeScript compilation (must return 0 errors)
+npm.cmd run typecheck
+
+# Verify ESLint (must return 0 warnings/errors)
+npm.cmd run lint
+
+# Run Phase 6 Production Readiness suite (must return 68 passed)
+npm.cmd run test:phase6
+```
+
+### Step 3.6: Start Development Server
+```powershell
+npm.cmd run dev
+```
+Open `http://localhost:3000` for the public portal and `http://localhost:3000/staff/login` for the staff ERP.
 
 ---
 
-## 5. Next Recommended Action on the Laptop
+## 4. CURRENT ACTIVE STAFF ERP MODULES
 
-1. **Review and Approve Pending Database Migrations:**
-   Execute Step 1 (`Phase 3B`), Step 2 (`Phase 3C`), and Step 3 (`Phase 3D`) sequentially in the Supabase SQL Editor for project `bkqneudnnhvvwmtggorz`.
-2. **Execute First Super Admin Bootstrap:**
-   Run `node scripts/bootstrap-super-admin.mjs` to provision the initial Super Admin account.
-3. **Run Live Verification Against Activated Database:**
-   Verify full operational functionality with live database tables.
+The staff ERP encompasses six fully operational subsystems accessible to authenticated staff:
+1. **Command Center (`/staff`):** Real-time operational metrics (Customers, SKUs, Quotations pipeline, Financial Receivables, Outbox telemetry).
+2. **Customer Directory (`/staff/customers`):** Directory, optional contact handling, GSTIN validation, state tax codes.
+3. **Master Catalog (`/staff/catalog`):** SKU pricing, HSN/SAC codes, and GST rates.
+4. **Quotation Engine (`/staff/quotations`):** Proposal generation, versioning (R0/R1), PO recording, conversion to invoice.
+5. **Statutory GST Billing (`/staff/billing`):** CGST Rule 46 gapless numbering (`SA/26-27/0001`), payment ledger reconciliation, printable high-DPI PDF invoice.
+6. **Communications Hub (`/staff/communications`):** Outbox queue, delivery channels (Email, WhatsApp, Phone, In-Person), worker status, quota telemetry.
+7. **Staff Administration (`/staff/team`):** Role administration, user provisioning, active session audit logs.
+
+---
+
+## 5. KNOWN STATUS & OUTSTANDING APPROVALS
+
+- **Phase 4 Communications Database Migration (`20261031120000_phase4_communications.sql`):**  
+  *Status:* Local specification; unapplied in development. The application detects its absence (`PGRST205`) and seamlessly logs invoice deliveries via `email_outbox` and `audit_logs` without runtime error. Ready for execution whenever approved.
+- **Production Infrastructure:**  
+  *Status:* Not provisioned. Completely planned and documented in `docs/PHASE6-PRODUCTION-READINESS.md` and `docs/PRODUCTION-DEPLOYMENT-RUNBOOK.md`.
+
+---
+
+## 6. PHASE 7 TASK OUTLINE (NEXT STEPS)
+
+When resuming development for Phase 7:
+1. **Owner Confirmation of Business Registry:** Confirm official corporate name, address, 15-digit GSTIN, PAN, and SBI bank account details.
+2. **Production Supabase Setup:** Create production project in Mumbai (`ap-south-1`) and execute migrations 1 through 8.
+3. **Production Super Admin Bootstrap:** Run `node scripts/bootstrap-super-admin.mjs` against production DB.
+4. **Hosting Deployment:** Link GitHub repo to Vercel, configure production secrets, and bind custom domain (`santhaya.com`).
+5. **Final User Acceptance Testing (UAT):** Owner performs end-to-end manual testing as a commercial customer and staff administrator.

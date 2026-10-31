@@ -92,6 +92,7 @@ export async function middleware(request: NextRequest) {
     );
     redirectResponse.headers.set('Pragma', 'no-cache');
     redirectResponse.headers.set('Expires', '0');
+    redirectResponse.headers.set('X-Robots-Tag', 'noindex, nofollow');
     return redirectResponse;
   }
 

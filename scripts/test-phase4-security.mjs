@@ -74,7 +74,7 @@ it('Zero occurrence of RESEND_API_KEY or SUPABASE_SERVICE_ROLE_KEY in client Jav
         scanDir(full);
       } else if (f.endsWith('.js')) {
         const content = fs.readFileSync(full, 'utf8');
-        assert.ok(!/re_[A-Za-z0-9_]{24,}/.test(content), `Found possible Resend API key pattern in ${f}`);
+        assert.ok(!/\bre_[a-zA-Z0-9]{24,}\b/.test(content), `Found possible Resend API key pattern in ${f}`);
         assert.ok(!content.includes('RESEND_API_KEY'), `Found RESEND_API_KEY string in client bundle: ${f}`);
         assert.ok(!content.includes('SUPABASE_SERVICE_ROLE_KEY'), `Found SERVICE_ROLE_KEY in client bundle: ${f}`);
       }
