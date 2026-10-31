@@ -24,8 +24,7 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
   // 1. Fetch Invoice
   const { data: invoice, error: invoiceErr } = await adminClient
     .from('invoices')
-    .select('*')
-    .eq('id', params.id)
+    .select('*, customers (*)').eq('id', params.id)
     .single();
 
   if (invoiceErr || !invoice) {
@@ -63,6 +62,13 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
     linkedQuotation = quote;
   }
 
+  // 5. Fetch Delivery Logs
+  const { data: deliveryLogs } = await adminClient
+    .from('email_outbox')
+    .select('*')
+    .eq('related_entity_id', params.id)
+    .order('created_at', { ascending: false });
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <InvoiceDetailView
@@ -71,6 +77,7 @@ export default async function InvoiceDetailPage({ params }: PageProps) {
         payments={payments || []}
         linkedQuotation={linkedQuotation}
         currentUserRole={session.profile.role}
+        deliveryLogs={deliveryLogs || []}
       />
     </div>
   );

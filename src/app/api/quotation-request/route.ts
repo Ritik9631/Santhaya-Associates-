@@ -175,6 +175,28 @@ export async function POST(req: NextRequest) {
       const record = atomicResult[0];
       const isReplayed = record.result_status === 'replayed';
 
+      // Phase 4: Enqueue client confirmation email if email is provided and not a replayed submission
+      if (!isReplayed && data.email && data.email.trim() !== '') {
+        const customerEmail = data.email.trim().toLowerCase();
+        try {
+          await adminClient.from('email_outbox').insert({
+            recipient_email: customerEmail,
+            subject: `Quotation Request Received — Santhaya Associates [Ref: ${record.reference_number}]`,
+            email_type: 'enquiry_confirmation_customer',
+            related_entity_type: 'quotation_request',
+            payload: {
+              referenceNumber: record.reference_number,
+              businessName: data.businessName.trim(),
+              contactPerson: data.contactPerson.trim(),
+              serviceCategory: data.serviceCategory,
+              submittedAt: new Date(record.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+            },
+          });
+        } catch (enqueueErr) {
+          console.warn('[Quotation API] Non-fatal customer confirmation enqueue error:', enqueueErr);
+        }
+      }
+
       return NextResponse.json(
         {
           success: true,

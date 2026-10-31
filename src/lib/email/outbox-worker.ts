@@ -16,6 +16,9 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import type { IEmailProvider, OutboxJob, EmailMessage, AdminEnquiryPayload } from './types';
 import { getEmailProvider } from './factory';
 import { renderAdminEnquiryAlert } from './templates/admin-enquiry-alert';
+import { renderCustomerEnquiryConfirmation, type CustomerEnquiryConfirmationPayload } from './templates/customer-enquiry-confirmation';
+import { renderQuotationDeliveryEmail, type QuotationDeliveryPayload } from './templates/quotation-delivery';
+import { renderInvoiceDeliveryEmail, type InvoiceDeliveryPayload } from './templates/invoice-delivery';
 
 export interface ProcessBatchOptions {
   batchSize?: number;
@@ -82,6 +85,57 @@ export function compileEmailMessageFromJob(job: OutboxJob): EmailMessage {
         outbox_job_id: job.id,
         email_type: job.email_type,
         ref_number: payload.referenceNumber || '',
+      },
+    };
+  }
+
+  if (job.email_type === 'enquiry_confirmation_customer') {
+    const payload = job.payload as unknown as CustomerEnquiryConfirmationPayload;
+    const { subject, html, text } = renderCustomerEnquiryConfirmation(payload);
+    return {
+      to: job.recipient_email,
+      subject,
+      html,
+      text,
+      idempotencyKey: job.id,
+      tags: {
+        outbox_job_id: job.id,
+        email_type: job.email_type,
+        ref_number: payload.referenceNumber || '',
+      },
+    };
+  }
+
+  if (job.email_type === 'quotation_customer') {
+    const payload = job.payload as unknown as QuotationDeliveryPayload;
+    const { subject, html, text } = renderQuotationDeliveryEmail(payload);
+    return {
+      to: job.recipient_email,
+      subject,
+      html,
+      text,
+      idempotencyKey: job.id,
+      tags: {
+        outbox_job_id: job.id,
+        email_type: job.email_type,
+        quotation_number: payload.quotationNumber || '',
+      },
+    };
+  }
+
+  if (job.email_type === 'invoice_customer') {
+    const payload = job.payload as unknown as InvoiceDeliveryPayload;
+    const { subject, html, text } = renderInvoiceDeliveryEmail(payload);
+    return {
+      to: job.recipient_email,
+      subject,
+      html,
+      text,
+      idempotencyKey: job.id,
+      tags: {
+        outbox_job_id: job.id,
+        email_type: job.email_type,
+        invoice_number: payload.invoiceNumber || '',
       },
     };
   }

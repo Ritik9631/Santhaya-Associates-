@@ -7,6 +7,7 @@ import {
   issueInvoiceAction,
   recordPaymentAction,
   cancelInvoiceAction,
+  recordInvoiceDeliveryAction,
 } from '@/lib/billing/actions';
 import type { StaffRole, PaymentMethod } from '@/types/database';
 import {
@@ -31,6 +32,7 @@ interface InvoiceDetailViewProps {
   payments: any[];
   linkedQuotation: any | null;
   currentUserRole: StaffRole;
+  deliveryLogs?: any[];
 }
 
 export default function InvoiceDetailView({
@@ -39,6 +41,7 @@ export default function InvoiceDetailView({
   payments,
   linkedQuotation,
   currentUserRole,
+  deliveryLogs = [],
 }: InvoiceDetailViewProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -58,6 +61,34 @@ export default function InvoiceDetailView({
 
   // Cancel Form
   const [cancelReason, setCancelReason] = useState('');
+
+  // Delivery Modal State
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [deliveryChannel, setDeliveryChannel] = useState<'email' | 'whatsapp' | 'phone' | 'in_person' | 'download'>('email');
+  const [deliveryEmail, setDeliveryEmail] = useState(invoice.customers?.email || '');
+  const [deliveryPhone, setDeliveryPhone] = useState(invoice.customers?.phone || '');
+  const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [deliverySuccessMessage, setDeliverySuccessMessage] = useState<string | null>(null);
+
+  const handleDeliverySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setServerError(null);
+    setDeliverySuccessMessage(null);
+    startTransition(async () => {
+      const res = await recordInvoiceDeliveryAction(invoice.id, deliveryChannel, {
+        recipientEmail: deliveryEmail,
+        recipientPhone: deliveryPhone,
+        notes: deliveryNotes,
+      });
+      if (res.error) {
+        setServerError(res.error);
+      } else {
+        setDeliverySuccessMessage(`Invoice transmission recorded successfully via ${deliveryChannel.toUpperCase()}.`);
+        setShowDeliveryModal(false);
+        router.refresh();
+      }
+    });
+  };
 
   const canManage = ['super_admin', 'admin', 'billing_manager'].includes(currentUserRole);
 
@@ -196,6 +227,15 @@ export default function InvoiceDetailView({
             </button>
           )}
 
+          {invoice.status !== 'draft' && invoice.status !== 'cancelled' && canManage && (
+            <button
+              onClick={() => setShowDeliveryModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#10243B] hover:bg-slate-800 text-white rounded-lg text-sm font-semibold transition shadow-sm"
+            >
+              <Send className="w-4 h-4" />
+              Send / Deliver
+            </button>
+          )}
           <Link
             href={`/staff/billing/${invoice.id}/pdf`}
             target="_blank"
@@ -217,6 +257,12 @@ export default function InvoiceDetailView({
         </div>
       </div>
 
+      {deliverySuccessMessage && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="text-sm text-emerald-800 font-medium">{deliverySuccessMessage}</div>
+        </div>
+      )}
       {serverError && (
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
@@ -438,6 +484,70 @@ export default function InvoiceDetailView({
         )}
       </div>
 
+
+      {/* ----------------- DELIVERY & DISPATCH HISTORY ----------------- */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <Send className="w-4 h-4 text-gold-500" />
+            Statutory Delivery & Dispatch History
+          </h2>
+          <span className="text-xs text-slate-500 font-mono">
+            {deliveryLogs.length} logged transmissions
+          </span>
+        </div>
+
+        {deliveryLogs.length === 0 ? (
+          <div className="text-center py-6 text-xs text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+            No formal deliveries recorded for this invoice yet. Click &quot;Send / Deliver&quot; to queue email or record manual handover.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500 bg-slate-50">
+                  <th className="py-2.5 px-3 font-semibold">Channel</th>
+                  <th className="py-2.5 px-3 font-semibold">Recipient / Contact</th>
+                  <th className="py-2.5 px-3 font-semibold">Status</th>
+                  <th className="py-2.5 px-3 font-semibold">Logged At</th>
+                  <th className="py-2.5 px-3 font-semibold">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {deliveryLogs.map((log: any) => (
+                  <tr key={log.id} className="hover:bg-slate-50/50">
+                    <td className="py-2.5 px-3 font-semibold text-slate-800 uppercase tracking-wider text-[11px]">
+                      {log.email_type === 'invoice_customer' ? 'EMAIL TRANSMISSION' : (log.payload?.deliveryChannel || 'MANUAL HANDOVER').toUpperCase()}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-700 font-mono">
+                      {log.recipient_email}
+                      {log.payload?.recipientPhone && <div className="text-slate-400 text-[10px]">Phone: {log.payload.recipientPhone}</div>}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        log.status === 'sent'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : log.status === 'failed'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                          : 'bg-amber-100 text-amber-800 border border-amber-300'
+                      }`}>
+                        {log.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-500">
+                      {new Date(log.created_at).toLocaleString('en-IN')}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-500">
+                      {log.payload?.notes || log.error_message || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* ----------------- RECORD PAYMENT MODAL ----------------- */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -558,6 +668,107 @@ export default function InvoiceDetailView({
                   className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold shadow disabled:opacity-50"
                 >
                   {isPending ? 'Recording...' : 'Confirm Payment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* ----------------- INVOICE DELIVERY MODAL ----------------- */}
+      {showDeliveryModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Send className="w-5 h-5 text-gold-500" />
+                Dispatch / Log Invoice Delivery
+              </h3>
+              <button
+                onClick={() => setShowDeliveryModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleDeliverySubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 uppercase mb-1">
+                  Delivery Channel <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={deliveryChannel}
+                  onChange={(e) => setDeliveryChannel(e.target.value as any)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
+                >
+                  <option value="email">Email Transmission (Outbox Queue)</option>
+                  <option value="whatsapp">WhatsApp PDF Transmission</option>
+                  <option value="phone">Phone Discussion / Notification</option>
+                  <option value="in_person">In-Person Handover / Printed</option>
+                  <option value="download">Direct Staff PDF Download</option>
+                </select>
+              </div>
+
+              {deliveryChannel === 'email' && (
+                <div>
+                  <label className="block font-semibold text-slate-700 uppercase mb-1">
+                    Recipient Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={deliveryEmail}
+                    onChange={(e) => setDeliveryEmail(e.target.value)}
+                    placeholder="client@company.com"
+                    className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+              )}
+
+              {deliveryChannel === 'whatsapp' && (
+                <div>
+                  <label className="block font-semibold text-slate-700 uppercase mb-1">
+                    Recipient Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    value={deliveryPhone}
+                    onChange={(e) => setDeliveryPhone(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                    className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block font-semibold text-slate-700 uppercase mb-1">
+                  Delivery Notes / Remarks
+                </label>
+                <textarea
+                  rows={2}
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                  placeholder="e.g. Sent formal Tax Invoice to accounts department."
+                  className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowDeliveryModal(false)}
+                  className="px-4 py-2 border border-slate-300 rounded text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="px-4 py-2 bg-[#10243B] text-white rounded font-semibold hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {isPending ? 'Logging...' : 'Confirm Delivery'}
                 </button>
               </div>
             </form>

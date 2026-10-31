@@ -625,7 +625,7 @@ export async function recordQuotationDeliveryAction(
 
     const { data: quote } = await adminClient
       .from('quotations')
-      .select('id, quotation_number, current_version_number')
+      .select('id, quotation_number, current_version_number, customers ( company_name, primary_contact_person )')
       .eq('id', quotationId)
       .single();
 
@@ -633,26 +633,60 @@ export async function recordQuotationDeliveryAction(
 
     const { data: version } = await adminClient
       .from('quotation_versions')
-      .select('id')
+      .select('id, grand_total_amount, taxable_amount, total_tax_amount, expires_at, issued_at, delivery_location')
       .eq('quotation_id', quotationId)
       .eq('version_number', quote.current_version_number)
       .single();
 
     if (!version) return { error: 'Quotation version not found.' };
 
-    // Record delivery log
+    // If channel is email, validate recipient and enqueue outbox job
+    if (deliveryChannel === 'email') {
+      const email = details?.recipientEmail?.trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return { error: 'Valid recipient email address is required for email delivery.' };
+      }
+
+      const customerName = (quote.customers as any)?.company_name || 'Valued Client';
+      const contactPerson = (quote.customers as any)?.primary_contact_person || null;
+
+      await adminClient.from('email_outbox').insert({
+        recipient_email: email.toLowerCase(),
+        subject: `Commercial Quotation ${quote.quotation_number} — Santhaya Associates Pvt. Ltd.`,
+        email_type: 'quotation_customer',
+        related_entity_type: 'quotation',
+        related_entity_id: quotationId,
+        payload: {
+          quotationNumber: quote.quotation_number,
+          versionNumber: quote.current_version_number,
+          customerName,
+          contactPerson,
+          grandTotal: Number(version.grand_total_amount || 0),
+          taxableAmount: Number(version.taxable_amount || 0),
+          taxAmount: Number(version.total_tax_amount || 0),
+          validUntil: version.expires_at ? new Date(version.expires_at).toLocaleDateString('en-IN') : '30 days from issue',
+          issueDate: version.issued_at ? new Date(version.issued_at).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
+          itemCount: 1,
+          deliveryLocation: version.delivery_location || 'Site Location',
+          notes: details?.notes || null,
+        },
+      });
+    }
+
+    // Record delivery log in quotation_delivery_logs
     await adminClient.from('quotation_delivery_logs').insert({
       quotation_id: quotationId,
       quotation_version_id: version.id,
       delivery_channel: deliveryChannel,
-      recipient_email: details?.recipientEmail || null,
-      recipient_phone: details?.recipientPhone || null,
-      delivery_status: deliveryChannel === 'download' ? 'downloaded' : 'sent',
-      notes: details?.notes || null,
+      recipient_email: details?.recipientEmail?.trim() || null,
+      recipient_phone: details?.recipientPhone?.trim() || null,
+      delivery_status: deliveryChannel === 'email' ? 'enqueued' : deliveryChannel === 'download' ? 'downloaded' : 'logged',
+      notes: details?.notes?.trim() || null,
       recorded_by_staff_id: user.id,
     });
 
     revalidatePath(`/staff/quotations/${quotationId}`);
+    revalidatePath('/staff/communications');
     return { success: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error logging delivery.';

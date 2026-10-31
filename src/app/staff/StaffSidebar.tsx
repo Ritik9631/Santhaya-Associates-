@@ -10,6 +10,7 @@ import {
   Package,
   FileSpreadsheet,
   Receipt,
+  Mail,
   Menu,
   X,
   ShieldAlert,
@@ -80,6 +81,13 @@ export function StaffSidebar({ userRole }: StaffSidebarProps) {
       href: '/staff/billing',
       icon: Receipt,
       active: pathname.startsWith('/staff/billing'),
+      available: true,
+    },
+    {
+      name: 'Communications',
+      href: '/staff/communications',
+      icon: Mail,
+      active: pathname.startsWith('/staff/communications'),
       available: true,
     },
   ];

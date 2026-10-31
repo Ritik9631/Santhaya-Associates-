@@ -740,3 +740,132 @@ export async function cancelInvoiceAction(
   }
 }
 
+/**
+ * Server Action: Record and dispatch invoice delivery (Email outbox, WhatsApp, Phone, Download, In-Person)
+ */
+export async function recordInvoiceDeliveryAction(
+  invoiceId: string,
+  deliveryChannel: 'email' | 'whatsapp' | 'phone' | 'in_person' | 'download',
+  details?: { recipientEmail?: string; recipientPhone?: string; notes?: string }
+): Promise<ActionResponse> {
+  try {
+    const { user, profile } = await requireStaffSession();
+    if (!['super_admin', 'admin', 'billing_manager'].includes(profile.role)) {
+      return { error: 'UNAUTHORIZED: Insufficient permissions to dispatch invoices.' };
+    }
+
+    const adminClient = createAdminClient();
+
+    const { data: invoice, error: fetchErr } = await adminClient
+      .from('invoices')
+      .select(`
+        id,
+        invoice_number,
+        invoice_type,
+        status,
+        invoice_date,
+        due_date,
+        taxable_amount,
+        cgst_amount,
+        sgst_amount,
+        igst_amount,
+        grand_total_amount,
+        balance_amount,
+        customer_state_code,
+        customer_billing_name,
+        customer_gstin
+      `)
+      .eq('id', invoiceId)
+      .single();
+
+    if (fetchErr || !invoice) {
+      return { error: 'Invoice not found.' };
+    }
+
+    if (invoice.status === 'draft') {
+      return { error: 'Cannot deliver a draft invoice. Formally issue the invoice first.' };
+    }
+
+    if (invoice.status === 'cancelled') {
+      return { error: 'Cannot deliver a cancelled invoice.' };
+    }
+
+    const customerName = invoice.customer_billing_name || 'Valued Customer';
+    const isIntraState = invoice.customer_state_code === '07';
+
+    // If channel is email, validate recipient and enqueue outbox job
+    if (deliveryChannel === 'email') {
+      const email = details?.recipientEmail?.trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return { error: 'Valid recipient email address is required for email delivery.' };
+      }
+
+      // Check duplicate send cooldown (within last 3 minutes to same email)
+      const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+      const { data: recentJob } = await adminClient
+        .from('email_outbox')
+        .select('id')
+        .eq('related_entity_id', invoiceId)
+        .eq('recipient_email', email.toLowerCase())
+        .gte('created_at', threeMinutesAgo)
+        .limit(1);
+
+      if (recentJob && recentJob.length > 0) {
+        return { error: 'Invoice was already queued for transmission to this email within the last 3 minutes.' };
+      }
+
+      await adminClient.from('email_outbox').insert({
+        recipient_email: email.toLowerCase(),
+        subject: `Tax Invoice ${invoice.invoice_number} — Santhaya Associates Pvt. Ltd.`,
+        email_type: 'invoice_customer',
+        related_entity_type: 'invoice',
+        related_entity_id: invoiceId,
+        payload: {
+          invoiceNumber: invoice.invoice_number,
+          invoiceType: invoice.invoice_type,
+          customerName,
+          contactPerson: null,
+          customerGstin: invoice.customer_gstin || null,
+          totalAmount: Number(invoice.grand_total_amount || 0),
+          balanceAmount: Number(invoice.balance_amount || 0),
+          taxableAmount: Number(invoice.taxable_amount || 0),
+          cgstAmount: Number(invoice.cgst_amount || 0),
+          sgstAmount: Number(invoice.sgst_amount || 0),
+          igstAmount: Number(invoice.igst_amount || 0),
+          isIntraState,
+          issueDate: invoice.invoice_date,
+          dueDate: invoice.due_date,
+          notes: details?.notes || null,
+        },
+      });
+    } else {
+      // Record manual delivery event into email_outbox with status 'sent'
+      await adminClient.from('email_outbox').insert({
+        recipient_email: details?.recipientEmail || `${deliveryChannel}_manual_delivery@santhaya.local`,
+        subject: `Manual Delivery [${deliveryChannel.toUpperCase()}]: Invoice ${invoice.invoice_number}`,
+        email_type: 'invoice_manual_delivery',
+        related_entity_type: 'invoice',
+        related_entity_id: invoiceId,
+        status: 'sent',
+        attempts: 1,
+        processed_at: new Date().toISOString(),
+        payload: {
+          invoiceNumber: invoice.invoice_number,
+          customerName,
+          deliveryChannel,
+          recipientPhone: details?.recipientPhone || null,
+          notes: details?.notes || null,
+          recordedByStaffId: user.id,
+        },
+      });
+    }
+
+    revalidatePath(`/staff/billing/${invoiceId}`);
+    revalidatePath('/staff/communications');
+
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unexpected error logging invoice delivery.';
+    return { error: message };
+  }
+}
