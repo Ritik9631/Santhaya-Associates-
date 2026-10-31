@@ -32,3 +32,6 @@ next-env.d.ts
 
 # supabase cli temp
 supabase/.temp/
+
+# QA artifacts
+/docs/qa/
