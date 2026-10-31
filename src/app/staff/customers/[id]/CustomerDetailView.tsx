@@ -1,21 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { toggleCustomerStatusAction } from '@/lib/customers/actions';
 import {
   Building2,
   Edit2,
-  CheckCircle2,
-  XCircle,
+  ShieldCheck,
   FileSpreadsheet,
   Receipt,
   Mail,
   Phone,
   MapPin,
   History,
-  AlertTriangle,
-  Loader2,
 } from 'lucide-react';
 import type { CustomerType } from '@/types/database';
 
@@ -32,10 +28,11 @@ interface CustomerDetailViewProps {
     pan?: string | null;
     billing_address?: string | null;
     shipping_address?: string | null;
+    billing_state?: string | null;
     state?: string | null;
     state_code?: string | null;
     notes?: string | null;
-    is_active?: boolean;
+    is_verified?: boolean;
     created_at?: string;
     updated_at?: string;
   };
@@ -49,31 +46,6 @@ interface CustomerDetailViewProps {
 }
 
 export function CustomerDetailView({ customer, auditLogs, canEdit }: CustomerDetailViewProps) {
-  const [isActive, setIsActive] = useState(customer.is_active ?? true);
-  const [loading, setLoading] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-
-  const handleToggleStatus = async () => {
-    setShowConfirm(false);
-    setLoading(true);
-    setFeedback(null);
-
-    const formData = new FormData();
-    formData.append('customerId', customer.id);
-    formData.append('isActive', String(!isActive));
-
-    const res = await toggleCustomerStatusAction(null, formData);
-    setLoading(false);
-
-    if (res.error) {
-      setFeedback(res.error);
-    } else {
-      setIsActive(!isActive);
-      setFeedback(`Customer account ${!isActive ? 'activated' : 'deactivated'} successfully.`);
-    }
-  };
-
   const typeLabels: Record<string, string> = {
     private_corporate: 'Private Corporate / Commercial',
     government: 'Government / Public Sector',
@@ -109,14 +81,14 @@ export function CustomerDetailView({ customer, auditLogs, canEdit }: CustomerDet
             </div>
 
             <div className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs">
-              <span className="text-slate-500 block text-[10px] uppercase font-semibold">Status</span>
-              {isActive ? (
+              <span className="text-slate-500 block text-[10px] uppercase font-semibold">Statutory Verification</span>
+              {customer.is_verified ? (
                 <span className="text-emerald-400 font-semibold inline-flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Active
+                  <ShieldCheck className="w-3.5 h-3.5" /> Verified
                 </span>
               ) : (
-                <span className="text-rose-400 font-semibold inline-flex items-center gap-1">
-                  <XCircle className="w-3.5 h-3.5" /> Inactive
+                <span className="text-slate-400 font-semibold inline-flex items-center gap-1">
+                  Unverified
                 </span>
               )}
             </div>
@@ -130,29 +102,10 @@ export function CustomerDetailView({ customer, auditLogs, canEdit }: CustomerDet
                   <Edit2 className="w-3.5 h-3.5" />
                   <span>Edit Profile</span>
                 </Link>
-
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm(true)}
-                  disabled={loading}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
-                    isActive
-                      ? 'bg-rose-950/70 hover:bg-rose-900 text-rose-200 border border-rose-800/60'
-                      : 'bg-emerald-950/70 hover:bg-emerald-900 text-emerald-200 border border-emerald-800/60'
-                  }`}
-                >
-                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isActive ? 'Deactivate' : 'Activate'}
-                </button>
               </div>
             )}
           </div>
         </div>
-
-        {feedback && (
-          <div className="mt-4 p-3 rounded-lg bg-slate-950 border border-gold-500/30 text-gold-300 text-xs">
-            {feedback}
-          </div>
-        )}
 
         {/* Statutory & Contact Details Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-6 text-xs text-slate-400">
@@ -194,14 +147,18 @@ export function CustomerDetailView({ customer, auditLogs, canEdit }: CustomerDet
               <MapPin className="w-3 h-3" /> Registered Billing Address
             </span>
             <p className="text-slate-300 whitespace-pre-wrap">{customer.billing_address || 'No billing address recorded.'}</p>
-            <p className="text-slate-500 text-[11px]">State: {customer.state || 'Tamil Nadu'} (Code: {customer.state_code || '33'})</p>
+            <p className="text-slate-500 text-[11px]">
+              State: {customer.state ? `${customer.state}${customer.state_code ? ` (Code: ${customer.state_code})` : ''}` : 'Not Specified'}
+            </p>
           </div>
 
           <div className="space-y-1">
             <span className="text-slate-500 block text-[11px] uppercase font-semibold flex items-center gap-1">
               <MapPin className="w-3 h-3" /> Shipping / Worksite Address
             </span>
-            <p className="text-slate-300 whitespace-pre-wrap">{customer.shipping_address || 'Same as billing address.'}</p>
+            <p className="text-slate-300 whitespace-pre-wrap">
+              {customer.shipping_address || 'Same as billing address or designated per order / quotation.'}
+            </p>
           </div>
         </div>
 
@@ -281,41 +238,6 @@ export function CustomerDetailView({ customer, auditLogs, canEdit }: CustomerDet
           </div>
         )}
       </div>
-
-      {/* Confirmation Dialog */}
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="rounded-2xl border border-gold-500/30 bg-slate-900 p-6 max-w-md w-full space-y-4 shadow-2xl">
-            <div className="flex items-center gap-3 text-gold-400">
-              <AlertTriangle className="w-6 h-6 flex-shrink-0" />
-              <h3 className="text-sm font-bold text-white">
-                Confirm Customer {isActive ? 'Deactivation' : 'Activation'}
-              </h3>
-            </div>
-            <p className="text-xs text-slate-300">
-              Are you sure you want to {isActive ? 'deactivate' : 'activate'}{' '}
-              <strong>{customer.company_name}</strong>?
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowConfirm(false)}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleToggleStatus}
-                className="px-4 py-1.5 rounded-lg bg-gold-400 hover:bg-gold-300 text-slate-900 font-semibold text-xs transition-colors"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-

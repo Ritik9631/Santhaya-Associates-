@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-10-31 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediation | Implementation status: Batches 1 & 2 Bug Fixes Complete & Verified (570+ automated tests passing); Phase 7 Planned
+Updated: 2026-11-01 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediation | Implementation status: Batches 1, 2, and BUG-017 Complete & Verified (590+ automated tests passing); Phase 7 Planned
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -543,6 +543,20 @@ Updated: 2026-10-31 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediatio
   3. Issuance Enforcement: `issueQuotationAction` and `issueInvoiceAction` validate state codes against official 2-digit Indian GST codes (01-38, 97) via `isValidIndianStateCode`, strictly blocking issuance of taxable quotes and statutory tax invoices until Place of Supply is provided.
   4. Removed Assumed Defaults: Removed hardcoded '07' defaults from action handlers (`createQuotationAction`, `createInvoiceAction`) and client forms (`QuotationForm.tsx`, `InvoiceForm.tsx`).
   5. Regression Matrix: Extended `scripts/test-batch2-regressions.mjs` testing all three conditions: intra-state, interstate, and undetermined. Verified with typecheck (0 errors), lint (0 warnings), full test suite (570+ assertions passed), and Next.js production build (26/26 routes compiled).
+
+- 2026-11-01: BUG-017 Customer Management Schema Drift Remediation (Code-Only Fix):
+  1. Root Cause Identification: Diagnosed the Staff ERP Customer Management error (`column customers.is_active does not exist`). Application queries in `src/app/staff/customers/page.tsx` and mutation payloads in `src/lib/customers/actions.ts` referenced `is_active`, an obsolete field from earlier UI drafting that was never present in the `public.customers` database schema.
+  2. Additional Schema Mismatch Remediation: Identified that `src/lib/customers/actions.ts` was passing `shipping_address` into `insertPayload` and `updatePayload`, which would have caused immediate runtime failure on customer creation/update because the database only has `billing_address`. Resolved cleanly without data loss by capturing any user-submitted shipping destination inside customer `notes` (`Shipping/Site Address: ...`).
+  3. UI Alignment & Statutory Verification: Updated `src/app/staff/customers/page.tsx` to query and display statutory verification status (`is_verified`) rather than active/inactive status. Replaced broken active/inactive table badges and filters with statutory verification badges (`Verified` / `Unverified`).
+  4. Detail View Modernization: Updated `src/app/staff/customers/[id]/CustomerDetailView.tsx` to remove broken activation/deactivation button and confirmation dialog. Displayed `is_verified` cleanly as Statutory Verification. Fixed state fallback so an empty customer state displays `Not Specified` rather than silently defaulting to Tamil Nadu.
+  5. TypeScript Database Types Synchronized: Updated `src/types/database.ts` customer Row/Insert/Update definitions to accurately reflect the live development Supabase schema: removed nonexistent `is_active`, `shipping_address`, and `customer_type`, and updated `billing_state` to nullable.
+  6. Automated Verification Gates Passed (100%):
+     - `test:batch2` regression battery: 21/21 assertions passed (including 4 new BUG-017 regression checks).
+     - `test:phase3b`: 47/47 assertions passed.
+     - `npm.cmd run typecheck`: Passed with 0 errors.
+     - `npm.cmd run lint`: Passed with 0 warnings or errors.
+     - `npm.cmd run build`: 26/26 routes compiled and optimized cleanly.
+     - Zero unapproved migrations executed; zero persistent test customer records created.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

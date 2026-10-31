@@ -97,6 +97,13 @@ export async function createCustomerAction(
     const normalizedGstin = gstin && gstin.trim() !== '' ? gstin.trim().toUpperCase() : null;
     const normalizedPan = pan && pan.trim() !== '' ? pan.trim().toUpperCase() : null;
 
+    const trimmedNotes = notes && notes.trim() !== '' ? notes.trim() : null;
+    const trimmedShipping = shippingAddress && shippingAddress.trim() !== '' ? shippingAddress.trim() : null;
+    const combinedNotes = [
+      trimmedNotes,
+      trimmedShipping ? `Shipping/Site Address: ${trimmedShipping}` : null,
+    ].filter(Boolean).join('\n\n') || null;
+
     const insertPayload = {
       company_name: finalCompanyName,
       primary_contact_person: contactPerson,
@@ -106,12 +113,10 @@ export async function createCustomerAction(
       gstin: normalizedGstin,
       pan: normalizedPan,
       billing_address: billingAddress && billingAddress.trim() !== '' ? billingAddress.trim() : null,
-      shipping_address: shippingAddress && shippingAddress.trim() !== '' ? shippingAddress.trim() : null,
       billing_state: normalizedState,
       state: normalizedState,
       state_code: normalizedStateCode,
-      notes: notes && notes.trim() !== '' ? notes.trim() : null,
-      is_active: true,
+      notes: combinedNotes,
       created_by: profile.id,
     };
 
@@ -216,6 +221,13 @@ export async function updateCustomerAction(
     const normalizedGstin = gstin && gstin.trim() !== '' ? gstin.trim().toUpperCase() : null;
     const normalizedPan = pan && pan.trim() !== '' ? pan.trim().toUpperCase() : null;
 
+    const trimmedNotes = notes && notes.trim() !== '' ? notes.trim() : null;
+    const trimmedShipping = shippingAddress && shippingAddress.trim() !== '' ? shippingAddress.trim() : null;
+    const combinedNotes = [
+      trimmedNotes,
+      trimmedShipping ? `Shipping/Site Address: ${trimmedShipping}` : null,
+    ].filter(Boolean).join('\n\n') || null;
+
     const updatePayload = {
       company_name: companyName || contactPerson,
       primary_contact_person: contactPerson,
@@ -225,11 +237,10 @@ export async function updateCustomerAction(
       gstin: normalizedGstin,
       pan: normalizedPan,
       billing_address: billingAddress && billingAddress.trim() !== '' ? billingAddress.trim() : null,
-      shipping_address: shippingAddress && shippingAddress.trim() !== '' ? shippingAddress.trim() : null,
       billing_state: normalizedState,
       state: normalizedState,
       state_code: normalizedStateCode,
-      notes: notes && notes.trim() !== '' ? notes.trim() : null,
+      notes: combinedNotes,
       updated_at: new Date().toISOString(),
     };
 
@@ -264,51 +275,13 @@ export async function updateCustomerAction(
 }
 
 /**
- * Server Action: Activate or Deactivate Customer Record
+ * Server Action: Customer status alterations (Safe stub)
+ * Note: Customers table uses statutory verification (is_verified) rather than account suspension.
  */
 export async function toggleCustomerStatusAction(
   _prevState: ActionResponse | null,
-  formData: FormData
+  _formData: FormData
 ): Promise<ActionResponse> {
-  try {
-    const { user, profile } = await requireStaffSession();
-
-    if (!AUTHORIZED_ROLES.includes(profile.role)) {
-      return { error: 'Access denied: You do not have permission to alter customer status.' };
-    }
-
-    const customerId = (formData.get('customerId') as string)?.trim();
-    const isActiveStr = formData.get('isActive') as string;
-    const isActive = isActiveStr === 'true';
-
-    if (!customerId) return { error: 'Customer ID is required.' };
-
-    const admin = createAdminClient();
-    const { error: updateError } = await admin
-      .from('customers')
-      .update({ is_active: isActive, updated_at: new Date().toISOString() } as any)
-      .eq('id', customerId);
-
-    if (updateError) {
-      return { error: updateError.message };
-    }
-
-    await admin.from('audit_logs').insert({
-      entity_type: 'customers',
-      entity_id: customerId,
-      action: isActive ? 'customer_activated' : 'customer_deactivated',
-      actor_type: 'staff',
-      actor_id: user.id,
-      new_state: { is_active: isActive },
-    });
-
-    revalidatePath('/staff/customers');
-    revalidatePath(`/staff/customers/${customerId}`);
-
-    return { success: true };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to alter customer status.';
-    return { error: message };
-  }
+  return { error: 'Customer activation/deactivation status is not supported on customer accounts.' };
 }
 

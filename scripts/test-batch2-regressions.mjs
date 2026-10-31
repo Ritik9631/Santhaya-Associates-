@@ -323,6 +323,52 @@ it('Quotation page success screen conforms to exact wording and features', () =>
   assert.ok(pageCode.includes('contact your representative directly using the provided phone number'), 'States phone contact notice');
 });
 
+// -----------------------------------------------------------------------------
+// [BUG-017] Customer Management Schema Compliance & Nonexistent Column Elimination
+// -----------------------------------------------------------------------------
+console.log('\n--- 8. [BUG-017] Customer Management Schema Compliance (No is_active/shipping_address) ---');
+
+it('Customer listing page does not query nonexistent customers.is_active', () => {
+  const pageCode = fs.readFileSync('src/app/staff/customers/page.tsx', 'utf8');
+  assert.ok(!pageCode.includes('is_active'), 'Customer listing page does not reference is_active');
+  assert.ok(pageCode.includes('is_verified'), 'Customer listing page references is_verified for statutory verification');
+});
+
+it('Customer actions insert and update payloads exclude nonexistent columns', () => {
+  const actionsCode = fs.readFileSync('src/lib/customers/actions.ts', 'utf8');
+
+  // Insert payload checks
+  const insertPayloadMatch = actionsCode.match(/const insertPayload = \{([\s\S]*?)\};/);
+  assert.ok(insertPayloadMatch, 'Found insertPayload definition in actions.ts');
+  assert.ok(!insertPayloadMatch[1].includes('is_active:'), 'insertPayload must not include is_active');
+  assert.ok(!insertPayloadMatch[1].includes('shipping_address:'), 'insertPayload must not include shipping_address');
+  assert.ok(!insertPayloadMatch[1].includes('customer_type:'), 'insertPayload must not include customer_type');
+
+  // Update payload checks
+  const updatePayloadMatch = actionsCode.match(/const updatePayload = \{([\s\S]*?)\};/);
+  assert.ok(updatePayloadMatch, 'Found updatePayload definition in actions.ts');
+  assert.ok(!updatePayloadMatch[1].includes('is_active:'), 'updatePayload must not include is_active');
+  assert.ok(!updatePayloadMatch[1].includes('shipping_address:'), 'updatePayload must not include shipping_address');
+  assert.ok(!updatePayloadMatch[1].includes('customer_type:'), 'updatePayload must not include customer_type');
+});
+
+it('Customer detail view does not reference nonexistent is_active column', () => {
+  const detailCode = fs.readFileSync('src/app/staff/customers/[id]/CustomerDetailView.tsx', 'utf8');
+  assert.ok(!detailCode.includes('is_active'), 'CustomerDetailView must not reference is_active');
+  assert.ok(!detailCode.includes('handleToggleStatus'), 'CustomerDetailView must not have broken toggle status handler');
+  assert.ok(!detailCode.includes('toggleCustomerStatusAction'), 'CustomerDetailView must not call toggleCustomerStatusAction');
+  assert.ok(!detailCode.includes("'Tamil Nadu'"), 'CustomerDetailView must not silently default unknown state to Tamil Nadu');
+});
+
+it('Database TypeScript definitions accurately reflect customers table schema', () => {
+  const dbTypesCode = fs.readFileSync('src/types/database.ts', 'utf8');
+  const customersTableMatch = dbTypesCode.match(/customers: \{([\s\S]*?)\n      \};/);
+  assert.ok(customersTableMatch, 'Found customers table definition in database.ts');
+  assert.ok(!customersTableMatch[1].includes('is_active'), 'customers table types must not include is_active');
+  assert.ok(!customersTableMatch[1].includes('shipping_address'), 'customers table types must not include shipping_address');
+  assert.ok(!customersTableMatch[1].includes('customer_type'), 'customers table types must not include customer_type');
+});
+
 console.log('======================================================================');
 console.log(`BATCH 2 TEST RESULTS: ${passedTests} PASSED, ${failedTests} FAILED`);
 console.log('======================================================================');

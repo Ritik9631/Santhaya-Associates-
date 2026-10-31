@@ -37,16 +37,16 @@ export default async function CustomersPage({ searchParams }: PageProps) {
   const admin = createAdminClient();
   let dbQuery = admin
     .from('customers')
-    .select('id, company_name, primary_contact_person, email, phone, gstin, client_type, is_active, created_at')
+    .select('id, company_name, primary_contact_person, email, phone, gstin, client_type, is_verified, created_at')
     .order('created_at', { ascending: false });
 
   if (typeFilter !== 'all') {
     dbQuery = dbQuery.eq('client_type', typeFilter as CustomerType);
   }
-  if (statusFilter === 'active') {
-    dbQuery = dbQuery.eq('is_active', true);
-  } else if (statusFilter === 'inactive') {
-    dbQuery = dbQuery.eq('is_active', false);
+  if (statusFilter === 'verified') {
+    dbQuery = dbQuery.eq('is_verified', true);
+  } else if (statusFilter === 'unverified') {
+    dbQuery = dbQuery.eq('is_verified', false);
   }
 
   const { data: customerList, error } = await dbQuery;
@@ -145,7 +145,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
                 <th scope="col" className="px-5 py-3.5 font-semibold">Contact Person</th>
                 <th scope="col" className="px-5 py-3.5 font-semibold">Statutory GSTIN</th>
                 <th scope="col" className="px-5 py-3.5 font-semibold">Client Type</th>
-                <th scope="col" className="px-5 py-3.5 font-semibold">Status</th>
+                <th scope="col" className="px-5 py-3.5 font-semibold">Statutory Verification</th>
                 <th scope="col" className="px-5 py-3.5 font-semibold text-right">Actions</th>
               </tr>
             </thead>
@@ -179,13 +179,13 @@ export default async function CustomersPage({ searchParams }: PageProps) {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      {cust.is_active ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Active
+                      {cust.is_verified ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                          <ShieldCheck className="w-3.5 h-3.5" /> Verified
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-rose-400">
-                          <XCircle className="w-3.5 h-3.5" /> Inactive
+                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                          Unverified
                         </span>
                       )}
                     </td>
