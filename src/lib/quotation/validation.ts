@@ -30,11 +30,10 @@ export const quotationApiBaseSchema = z.object({
     .nullable()
     .or(z.literal('')),
   phone: z
-    .string()
+    .string({ required_error: 'Valid Indian mobile phone number is required' })
     .trim()
-    .optional()
-    .nullable()
-    .or(z.literal('')),
+    .min(1, 'Valid Indian mobile phone number is required')
+    .regex(/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number (e.g. 9876543210)'),
   gstin: z
     .string()
     .trim()
@@ -79,21 +78,7 @@ export const quotationApiSchema = quotationApiBaseSchema.superRefine((data, ctx)
   const hasEmail = Boolean(data.email && data.email.trim() !== '');
   const hasPhone = Boolean(data.phone && data.phone.trim() !== '');
 
-  // 1. Conditional validation: At least one contact method must be provided
-  if (!hasEmail && !hasPhone) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'At least one contact method (valid phone number or official email) is required.',
-      path: ['email'],
-    });
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'At least one contact method (valid phone number or official email) is required.',
-      path: ['phone'],
-    });
-  }
-
-  // 2. Format validation for email if supplied
+  // Email format check when supplied
   if (hasEmail) {
     const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
     if (!emailRegex.test(data.email!.trim())) {
@@ -101,18 +86,6 @@ export const quotationApiSchema = quotationApiBaseSchema.superRefine((data, ctx)
         code: z.ZodIssueCode.custom,
         message: 'Invalid business email format (e.g. name@company.com)',
         path: ['email'],
-      });
-    }
-  }
-
-  // 3. Format validation for phone if supplied
-  if (hasPhone) {
-    const phoneRegex = /^[6-9]\d{9}$/;
-    if (!phoneRegex.test(data.phone!.trim())) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Phone must be a valid 10-digit Indian mobile number (e.g. 9876543210)',
-        path: ['phone'],
       });
     }
   }

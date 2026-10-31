@@ -20,6 +20,7 @@ import {
   Clock,
   AlertCircle,
   FileText,
+  Inbox,
 } from 'lucide-react';
 import { ProfileNameEditor } from './ProfileNameEditor';
 
@@ -55,6 +56,7 @@ export default async function StaffOverviewPage() {
   // 1. Fetch live operational KPI counts
   const [
     { count: customerCount },
+    { data: enquiryRows },
     { count: catalogCount },
     { data: quoteRows },
     { data: invoiceRows },
@@ -63,6 +65,7 @@ export default async function StaffOverviewPage() {
     { data: recentInvoices },
   ] = await Promise.all([
     adminClient.from('customers').select('*', { count: 'exact', head: true }),
+    adminClient.from('quotation_requests').select('id, status'),
     adminClient.from('products_services').select('*', { count: 'exact', head: true }),
     adminClient.from('quotations').select('id, status'),
     canViewFinancials
@@ -82,6 +85,10 @@ export default async function StaffOverviewPage() {
           .limit(4)
       : Promise.resolve({ data: [] }),
   ]);
+
+  // Aggregate Inbound Enquiries
+  const totalEnquiries = enquiryRows?.length || 0;
+  const newEnquiries = (enquiryRows || []).filter((e: any) => e.status === 'new').length;
 
   // Aggregate Quotations
   const totalQuotes = quoteRows?.length || 0;
@@ -145,7 +152,29 @@ export default async function StaffOverviewPage() {
       </div>
 
       {/* Live Operational KPI Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Inbound Enquiries KPI */}
+        <Link
+          href="/staff/enquiries"
+          className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-xl p-4 space-y-1.5 transition group"
+        >
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Inbound Enquiries</span>
+            <Inbox className="w-4 h-4 text-gold-400 group-hover:scale-110 transition-transform" />
+          </div>
+          <div className="text-2xl font-bold text-white flex items-center gap-2">
+            <span>{totalEnquiries}</span>
+            {newEnquiries > 0 && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-500/30">
+                {newEnquiries} new
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-slate-400 flex items-center gap-1">
+            <span>Public intake requests</span>
+            <ArrowRight className="w-3 h-3 text-gold-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+        </Link>
         {/* Customers KPI */}
         <Link
           href="/staff/customers"

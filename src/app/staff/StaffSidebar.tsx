@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
+  Inbox,
   Users,
   Building2,
   Package,
@@ -67,6 +68,13 @@ export function StaffSidebar({ userRole }: StaffSidebarProps) {
       href: '/staff/catalog',
       icon: Package,
       active: pathname.startsWith('/staff/catalog'),
+      available: true,
+    },
+    {
+      name: 'Inbound Enquiries',
+      href: '/staff/enquiries',
+      icon: Inbox,
+      active: pathname.startsWith('/staff/enquiries'),
       available: true,
     },
     {

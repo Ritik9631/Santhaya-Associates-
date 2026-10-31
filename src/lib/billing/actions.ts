@@ -448,6 +448,17 @@ export async function issueInvoiceAction(
       return { error: `Invoice is already issued or cannot be issued. Current status: ${invoice.status}` };
     }
 
+    // Financial safeguard (BUG-010): Place of Supply is mandatory for statutory tax invoices
+    if (
+      invoice.invoice_type === 'tax_invoice' &&
+      (!invoice.place_of_supply_state_code || invoice.place_of_supply_state_code.trim() === '')
+    ) {
+      return {
+        error:
+          'Cannot issue statutory tax invoice: Place of Supply state code is required to determine CGST/SGST vs IGST. Please specify Place of Supply before issuing.',
+      };
+    }
+
     // 2. Try Atomic Database RPC first (guarantees zero number burn on failure)
     const { data: rpcIssueNum, error: rpcIssueErr } = await adminClient.rpc('issue_invoice', {
       p_invoice_id: invoiceId,

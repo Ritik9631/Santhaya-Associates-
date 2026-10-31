@@ -43,7 +43,7 @@ const enquirySchema = z.object({
   businessName: z.string().min(2).max(200),
   contactPerson: z.string().min(2).max(100),
   email: z.string().email().max(255).optional().or(z.literal('')),
-  phone: z.string().regex(/^[6-9]\d{9}$/, 'Must be valid 10-digit Indian mobile').optional().or(z.literal('')),
+  phone: z.string({ required_error: 'Must be valid 10-digit Indian mobile' }).regex(/^[6-9]\d{9}$/, 'Must be valid 10-digit Indian mobile'),
   gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, 'Invalid GSTIN').optional().or(z.literal('')),
   serviceCategory: z.enum(['construction_tenders', 'construction_machinery', 'manufacturing_machinery']),
   requirementDetails: z.string().min(10).max(5000),
@@ -81,7 +81,7 @@ it('Accepts valid inquiry with phone only (no email provided)', () => {
   assert.strictEqual(res.success, true);
 });
 
-it('Accepts valid inquiry with email only (no phone provided)', () => {
+it('Rejects inquiry missing mandatory phone number (BUG-014)', () => {
   const res = enquirySchema.safeParse({
     businessName: 'Global Infra Partners',
     contactPerson: 'David Chen',
@@ -91,7 +91,7 @@ it('Accepts valid inquiry with email only (no phone provided)', () => {
     requirementDetails: 'Supplying CNC heavy industrial milling units.',
     deliveryLocation: 'Uttar Pradesh',
   });
-  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.success, false);
 });
 
 it('Rejects inquiry missing both email and phone', () => {
@@ -105,7 +105,7 @@ it('Rejects inquiry missing both email and phone', () => {
     deliveryLocation: 'Delhi',
   });
   assert.strictEqual(res.success, false);
-  assert.ok(res.error?.issues.some((i) => i.message.includes('At least one contact method')));
+  assert.ok(res.error?.issues.some((i) => i.message.includes('Must be valid 10-digit Indian mobile')));
 });
 
 it('Rejects malformed Indian mobile number (e.g. 12345)', () => {

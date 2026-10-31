@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Menu, X, ArrowRight, MapPin, PhoneCall, Mail } from 'lucide-react';
+import { Menu, X, ArrowRight } from 'lucide-react';
 
 export default function Header() {
   const pathname = usePathname();
@@ -30,42 +30,6 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm transition-all">
-      {/* Top utility bar */}
-      <div className="bg-navy-950 text-slate-300 text-xs py-1.5 px-4 sm:px-6 lg:px-8 border-b border-navy-800">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-1 sm:gap-4">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-gold-500 animate-pulse" />
-            <span className="font-medium tracking-wide">
-              Official Portal — Construction Tenders & Machinery Supply
-            </span>
-          </div>
-          <div className="flex items-center gap-4 text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-gold-500" />
-              <span>Motihari, Bihar – 845401</span>
-            </span>
-            <span className="hidden md:inline text-navy-700">|</span>
-            <a
-              href="tel:+919430986713"
-              className="hidden md:flex items-center gap-1.5 hover:text-gold-400 transition-colors"
-              title="Call Santhaya Associates Primary Helpline"
-            >
-              <PhoneCall className="w-3 h-3 text-gold-500" />
-              <span>+91 9430986713</span>
-            </a>
-            <span className="hidden xl:inline text-navy-700">|</span>
-            <a
-              href="mailto:heistofeverything@gmail.com"
-              className="hidden xl:flex items-center gap-1.5 hover:text-gold-400 transition-colors"
-              title="Email Santhaya Associates"
-            >
-              <Mail className="w-3 h-3 text-gold-500" />
-              <span>heistofeverything@gmail.com</span>
-            </a>
-          </div>
-        </div>
-      </div>
-
       {/* Main navigation container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20 md:h-24">

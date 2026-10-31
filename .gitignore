@@ -35,3 +35,4 @@ supabase/.temp/
 
 # QA artifacts
 /docs/qa/
+/.qa_screenshots/

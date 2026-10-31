@@ -86,7 +86,7 @@ const emailOnlyResult = quotationApiSchema.safeParse({
   ...baseValidEnquiry,
   phone: '', // No phone
 });
-assert(emailOnlyResult.success, 'Accepts public enquiry with email only (phone omitted/empty)');
+assert(!emailOnlyResult.success, 'Rejects public enquiry with email only (phone is mandatory per BUG-014)');
 
 // -----------------------------------------------------------------------------
 // TEST 2: Phone-only public enquiry

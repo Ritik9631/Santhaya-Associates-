@@ -104,8 +104,8 @@ export function calculateLineItem(
 
   // Determine state supply nature
   // Normalized 2-digit state code comparison
-  const normalizedSupplyCode = (placeOfSupplyStateCode || COMPANY_STATE_CODE).trim().padStart(2, '0');
-  const isIntraState = isGstApplicable && normalizedSupplyCode === COMPANY_STATE_CODE;
+  const normalizedSupplyCode = placeOfSupplyStateCode ? placeOfSupplyStateCode.trim().padStart(2, '0') : '';
+  const isIntraState = Boolean(isGstApplicable && normalizedSupplyCode && normalizedSupplyCode === COMPANY_STATE_CODE);
 
   let cgstRate = 0;
   let sgstRate = 0;
@@ -159,10 +159,10 @@ export function calculateLineItem(
 export function calculateQuotationTotals(
   items: LineItemInput[],
   isGstApplicable = true,
-  placeOfSupplyStateCode = COMPANY_STATE_CODE
+  placeOfSupplyStateCode?: string
 ): QuotationTotals {
-  const normalizedSupplyCode = (placeOfSupplyStateCode || COMPANY_STATE_CODE).trim().padStart(2, '0');
-  const isIntraState = isGstApplicable && normalizedSupplyCode === COMPANY_STATE_CODE;
+  const normalizedSupplyCode = placeOfSupplyStateCode ? placeOfSupplyStateCode.trim().padStart(2, '0') : '';
+  const isIntraState = Boolean(isGstApplicable && normalizedSupplyCode && normalizedSupplyCode === COMPANY_STATE_CODE);
 
   const calculatedItems = items.map((item) =>
     calculateLineItem(item, isGstApplicable, normalizedSupplyCode)

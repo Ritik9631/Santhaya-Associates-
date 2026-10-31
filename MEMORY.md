@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-10-31 | Phase: Phase 6 Production Readiness & Handoff Complete | Implementation status: Phase 1-6 Complete & Verified (428 automated tests passing); Phase 7 Planned
+Updated: 2026-10-31 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediation | Implementation status: Batches 1 & 2 Bug Fixes Complete & Verified (570+ automated tests passing); Phase 7 Planned
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -507,6 +507,29 @@ Updated: 2026-10-31 | Phase: Phase 6 Production Readiness & Handoff Complete | I
      - `npm.cmd run lint`: 0 errors, 0 warnings.
      - `npm.cmd run build`: 25/25 static routes compiled cleanly.
      - `npm.cmd run test`: Full test battery (all 11 suites, over 550 assertions) passed with 0 failures.
+
+- 2026-10-31: Batch 2 Defect Remediation, Staff Triage ERP & Place of Supply Safeguards (BUG-009 through BUG-016):
+  1. BUG-009 (Customer Creation Column Mismatch): Removed non-existent `customer_type` column from customer insert and update payloads in `src/lib/customers/actions.ts`, preserving the schema-defined `client_type` column.
+  2. BUG-010 (Optional Customer State & Financial Safeguard):
+     - Removed hardcoded 'Tamil Nadu' and state code '33' defaults from `CustomerForm.tsx` and `src/lib/customers/actions.ts`. State and state code are optional for customer record creation.
+     - Hardened Place of Supply logic: `calculateQuotationTotals` and `calculateInvoiceTotals` no longer fall back silently to company state code when Place of Supply is missing.
+     - Added strict financial enforcement in `issueQuotationAction` and `issueInvoiceAction`: Issuance of taxable quotations or statutory tax invoices is blocked if `place_of_supply_state_code` is missing, preventing illegal or erroneous tax determination.
+     - Prepared minimal, versioned migration `supabase/migrations/20261031230000_make_customer_billing_state_nullable.sql` to drop `NOT NULL` from `public.customers.billing_state` (pending explicit user approval and execution).
+  3. BUG-011 (Remove Repetitive NAP from Top Utility Bar): Removed top contact utility bar from `Header.tsx` to streamline the desktop and tablet header while preserving complete clickable phone, email, and location details in `Footer.tsx` and Contact section.
+  4. BUG-012 (Quotation Form Copy Polish): Replaced technical architecture note on `/request-quotation` with client-centric welcoming copy explaining review and follow-up procedures.
+  5. BUG-013 (Quotation Intake Layout & Spacing): Optimized outer and section padding, enhanced responsive field grid, and added `scroll-mt-28` to form sections to prevent header occlusion during in-page navigation.
+  6. BUG-014 (Mandatory Phone on Public Quotation Requests): Made 10-digit Indian mobile number mandatory (regex `/^[6-9]\d{9}$/`) on both client and server validation schemas (`src/lib/quotation/validation.ts` and `request-quotation/page.tsx`), keeping email optional.
+  7. BUG-015 (Staff Enquiries Portal):
+     - Discovered public enquiry `INQ-2026-00032` was successfully persisted in `public.quotation_requests` but lacked staff triage UI.
+     - Built comprehensive `/staff/enquiries` portal with status filtering (All, New, Reviewing, Quoted, Closed), live search, expandable detail drawer, contact action triggers, and secure `updateEnquiryStatusAction` server action.
+     - Added Inbound Enquiries nav item to `StaffSidebar.tsx` and live KPI card to `/staff` dashboard.
+  8. BUG-016 (Premium Quotation Confirmation Screen): Replaced basic confirmation card with a dedicated success screen displaying reference number, copy-to-clipboard action with visual feedback, timeline guidance, and back-to-home navigation.
+  9. Automated Verification Gates Passed (100%):
+     - `npm.cmd run typecheck`: 0 errors.
+     - `npm.cmd run lint`: 0 errors, 0 warnings.
+     - `npm.cmd run build`: 26/26 routes compiled cleanly (including new `/staff/enquiries`).
+     - `npm.cmd run test:batch2`: 16/16 regression assertions passed.
+     - `npm.cmd run test`: Full test battery (over 570 assertions across 12 suites) passed with 0 failures.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

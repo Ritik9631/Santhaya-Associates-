@@ -244,31 +244,31 @@ export function CustomerForm({ initialData, isEdit }: CustomerFormProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="space-y-1.5">
           <label htmlFor="state" className="block text-xs font-semibold text-slate-300">
-            State (Place of Supply)
+            State (Place of Supply) <span className="text-slate-500 text-[11px]">(Optional)</span>
           </label>
           <input
             id="state"
             name="state"
             type="text"
-            defaultValue={initialData?.state || 'Tamil Nadu'}
+            defaultValue={initialData?.state || ''}
             disabled={loading}
-            placeholder="e.g. Tamil Nadu"
+            placeholder="e.g. Bihar / Maharashtra"
             className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gold-500 disabled:opacity-50"
           />
         </div>
 
         <div className="space-y-1.5">
           <label htmlFor="stateCode" className="block text-xs font-semibold text-slate-300">
-            State Code <span className="text-slate-500 text-[11px]">(2 Digits)</span>
+            State Code <span className="text-slate-500 text-[11px]">(Optional — 2 Digits)</span>
           </label>
           <input
             id="stateCode"
             name="stateCode"
             type="text"
             maxLength={2}
-            defaultValue={initialData?.state_code || '33'}
+            defaultValue={initialData?.state_code || ''}
             disabled={loading}
-            placeholder="33"
+            placeholder="e.g. 10"
             className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 font-mono text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gold-500 disabled:opacity-50"
           />
         </div>

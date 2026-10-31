@@ -220,10 +220,9 @@ export function calculateInvoiceLineItem(
 ): CalculatedInvoiceLineItem {
   const profile = getCompanyBillingProfile();
   const baseCompanyCode = (companyStateCode || profile.stateCode).trim().padStart(2, '0');
-  const normalizedSupplyCode = (placeOfSupplyStateCode || baseCompanyCode).trim().padStart(2, '0');
-
+  const normalizedSupplyCode = placeOfSupplyStateCode ? placeOfSupplyStateCode.trim().padStart(2, '0') : '';
   const isTaxInvoice = invoiceType === 'tax_invoice';
-  const isIntraState = isTaxInvoice && normalizedSupplyCode === baseCompanyCode;
+  const isIntraState = Boolean(isTaxInvoice && normalizedSupplyCode && normalizedSupplyCode === baseCompanyCode);
 
   const quantity = parseDecimalSafe(item.quantity, 1);
   const unitRate = parseDecimalSafe(item.unit_rate, 0);
@@ -286,8 +285,8 @@ export function calculateInvoiceTotals(
 ): InvoiceCalculatedTotals {
   const profile = getCompanyBillingProfile();
   const baseCompanyCode = (companyStateCode || profile.stateCode).trim().padStart(2, '0');
-  const normalizedSupplyCode = (placeOfSupplyStateCode || baseCompanyCode).trim().padStart(2, '0');
-  const isIntraState = invoiceType === 'tax_invoice' && normalizedSupplyCode === baseCompanyCode;
+  const normalizedSupplyCode = placeOfSupplyStateCode ? placeOfSupplyStateCode.trim().padStart(2, '0') : '';
+  const isIntraState = Boolean(invoiceType === 'tax_invoice' && normalizedSupplyCode && normalizedSupplyCode === baseCompanyCode);
 
   const calculatedItems = items.map((item) =>
     calculateInvoiceLineItem(item, invoiceType, normalizedSupplyCode, baseCompanyCode)

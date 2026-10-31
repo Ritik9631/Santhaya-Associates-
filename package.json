@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:connection && npm run test:super-admin && npm run test:phase2d && npm run test:phase3a1 && npm run test:phase3a2 && npm run test:phase3a3 && npm run test:phase3b && npm run test:phase3c && npm run test:phase3d && npm run test:phase4 && npm run test:phase6",
+    "test": "npm run test:connection && npm run test:super-admin && npm run test:phase2d && npm run test:phase3a1 && npm run test:phase3a2 && npm run test:phase3a3 && npm run test:phase3b && npm run test:phase3c && npm run test:phase3d && npm run test:phase4 && npm run test:phase6 && npm run test:batch2",
     "test:connection": "node scripts/verify-supabase-connection.mjs",
     "test:migration-status": "node scripts/verify-phase2-migration.mjs",
     "test:phase2d": "node --experimental-strip-types scripts/test-phase2d-preparation.mjs",
@@ -36,7 +36,8 @@
     "test:phase4": "npm run test:phase4-outbox && npm run test:phase4-enquiries && npm run test:phase4-quotation && npm run test:phase4-invoice && npm run test:phase4-security && npm run test:phase4-browser",
     "test:phase5-browser": "node scripts/test-phase5-browser-e2e.mjs",
     "test:phase5": "npm run test:phase5-browser",
-    "test:phase6": "node scripts/test-phase6-production-readiness.mjs"
+    "test:phase6": "node scripts/test-phase6-production-readiness.mjs",
+    "test:batch2": "node --experimental-strip-types scripts/test-batch2-regressions.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

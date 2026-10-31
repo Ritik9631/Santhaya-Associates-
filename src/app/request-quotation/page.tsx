@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { z } from 'zod';
 import {
   AlertTriangle,
@@ -11,8 +12,10 @@ import {
   RotateCcw,
   Send,
   Loader2,
-  ShieldCheck,
   Clock,
+  Copy,
+  Check,
+  Phone,
 } from 'lucide-react';
 
 const quotationBaseSchema = z.object({
@@ -33,10 +36,10 @@ const quotationBaseSchema = z.object({
     .optional()
     .or(z.literal('')),
   phone: z
-    .string()
+    .string({ required_error: 'Indian mobile phone number is required' })
     .trim()
-    .optional()
-    .or(z.literal('')),
+    .min(1, 'Indian mobile phone number is required')
+    .regex(/^[6-9]\d{9}$/, 'Please enter a valid 10-digit Indian mobile number (e.g. 9876543210)'),
   gstin: z
     .string()
     .trim()
@@ -74,20 +77,6 @@ const quotationBaseSchema = z.object({
 
 const quotationSchema = quotationBaseSchema.superRefine((data, ctx) => {
   const hasEmail = Boolean(data.email && data.email.trim() !== '');
-  const hasPhone = Boolean(data.phone && data.phone.trim() !== '');
-
-  if (!hasEmail && !hasPhone) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Please provide at least one contact method (email or phone).',
-      path: ['email'],
-    });
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Please provide at least one contact method (email or phone).',
-      path: ['phone'],
-    });
-  }
 
   if (hasEmail) {
     const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
@@ -96,17 +85,6 @@ const quotationSchema = quotationBaseSchema.superRefine((data, ctx) => {
         code: z.ZodIssueCode.custom,
         message: 'Please enter a valid business email address (e.g. name@company.com)',
         path: ['email'],
-      });
-    }
-  }
-
-  if (hasPhone) {
-    const phoneRegex = /^[6-9]\d{9}$/;
-    if (!phoneRegex.test(data.phone!.trim())) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Please enter a valid 10-digit Indian mobile number (e.g. 9876543210)',
-        path: ['phone'],
       });
     }
   }
@@ -130,6 +108,7 @@ export default function RequestQuotationPage() {
   const [submissionSuccess, setSubmissionSuccess] = useState<SubmissionResponse | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [rateLimitWait, setRateLimitWait] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Anti-Spam Hidden Honeypot & Timing
   const [honeypot, setHoneypot] = useState('');
@@ -143,6 +122,19 @@ export default function RequestQuotationPage() {
       setIdempotencyKey(crypto.randomUUID());
     }
   }, []);
+
+  const handleCopyReference = async () => {
+    if (!submissionSuccess?.referenceNumber) return;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(submissionSuccess.referenceNumber);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      }
+    } catch {
+      // Fallback if clipboard API is restricted
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,6 +225,7 @@ export default function RequestQuotationPage() {
     setSubmissionSuccess(null);
     setServerError(null);
     setRateLimitWait(null);
+    setCopied(false);
     setHoneypot('');
     setFormRenderTs(Date.now());
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -241,10 +234,10 @@ export default function RequestQuotationPage() {
   };
 
   return (
-    <div className="py-12 bg-slate-50 min-h-screen">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <div className="py-8 sm:py-10 bg-slate-50 min-h-screen">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
         {/* Page Heading */}
-        <div className="space-y-2 border-b border-slate-200 pb-6">
+        <div className="space-y-2 border-b border-slate-200 pb-5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy-100 text-navy-900 text-xs font-semibold">
             <FileText className="w-3.5 h-3.5 text-gold-600" />
             Official Quotation Intake
@@ -257,19 +250,11 @@ export default function RequestQuotationPage() {
           </p>
         </div>
 
-        {/* Phase 2D-A Preparation Notice */}
-        <div className="rounded-xl bg-blue-50 border-2 border-blue-200 p-5 shadow-sm space-y-2">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <h2 className="text-sm font-bold text-blue-950 uppercase tracking-wide">
-                Phase 2D-A Architecture: Secure Server API Integration
-              </h2>
-              <p className="text-xs text-blue-900 leading-relaxed mt-1">
-                This intake form is prepared with server-side Zod validation, honeypot anti-spam defense, salted IP rate limiting, and atomic idempotency keys. Live remote database persistence and background transactional email notifications will be activated upon human authorization of Phase 2D-B.
-              </p>
-            </div>
-          </div>
+        {/* Customer Guidance Callout (BUG-012) */}
+        <div className="rounded-xl bg-blue-50/80 border border-blue-200/80 p-4 sm:p-5 shadow-sm">
+          <p className="text-xs sm:text-sm text-navy-900 leading-relaxed font-medium">
+            Tell us about your project, tender requirements, or machinery needs. Our team will review your request and contact you using the details provided.
+          </p>
         </div>
 
         {/* Rate Limit Alert */}
@@ -296,48 +281,75 @@ export default function RequestQuotationPage() {
           </div>
         )}
 
-        {/* Verified Submission Success State */}
+        {/* Verified Submission Success State (BUG-016) */}
         {submissionSuccess && (
-          <div className="rounded-xl bg-emerald-50 border-2 border-emerald-300 p-6 shadow-sm space-y-4 animate-in fade-in duration-200">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-emerald-950">
-                  Quotation Request Successfully Registered
-                </h3>
-                <p className="text-xs text-emerald-800 leading-relaxed">
-                  Your industrial requirement has been received and registered under official reference number:
+          <div className="rounded-2xl bg-white border border-emerald-200 p-6 sm:p-8 shadow-md space-y-6 animate-in fade-in duration-200">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+              </div>
+              <div className="space-y-1.5">
+                <h2 className="text-xl sm:text-2xl font-black text-navy-950 tracking-tight">
+                  Your Project Journey Starts Here!
+                </h2>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Thank you for choosing Santhaya Associates Pvt. Ltd. Your quotation request has been received, and our team will review your requirements.
                 </p>
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">
-                  Official Inbound Reference
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Persisted Inbound Reference Number
                 </span>
-                <span className="text-2xl font-black text-navy-950 font-mono tracking-tight">
+                <span className="text-2xl sm:text-3xl font-black text-navy-950 font-mono tracking-tight">
                   {submissionSuccess.referenceNumber}
                 </span>
               </div>
-              <div className="text-left sm:text-right text-xs text-slate-500">
-                <p>Status: <span className="font-semibold text-emerald-700 capitalize">{submissionSuccess.status}</span></p>
-                <p>Timestamp: {new Date(submissionSuccess.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyReference}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-navy-900 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-gold-500"
+                  title="Copy reference number to clipboard"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-700">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Copy Reference</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
-            <div className="text-xs text-emerald-900 bg-emerald-100/60 p-3 rounded-lg leading-relaxed">
-              Our engineering estimating desk will inspect your specifications and prepare Quotation Draft v1. You may quote reference <strong className="font-mono">{submissionSuccess.referenceNumber}</strong> in any direct communications.
+            <div className="text-xs sm:text-sm text-slate-700 bg-emerald-50/70 border border-emerald-200/70 p-4 rounded-xl leading-relaxed flex items-start gap-3">
+              <Phone className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <span>
+                Our engineering estimating desk is reviewing your requirements and will contact your representative directly using the provided phone number. You may cite reference number <strong className="font-mono text-navy-950">{submissionSuccess.referenceNumber}</strong> in any follow-up communications.
+              </span>
             </div>
 
-            <div className="pt-2">
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              <Link
+                href="/"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold text-white bg-navy-950 hover:bg-navy-900 transition-colors shadow-sm"
+              >
+                <span>Back to Home</span>
+              </Link>
               <button
                 type="button"
                 onClick={handleReset}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-emerald-900 bg-emerald-200 hover:bg-emerald-300 transition-colors"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                Submit Another Quotation Request
+                <span>Submit Another Quotation Request</span>
               </button>
             </div>
           </div>
@@ -345,7 +357,7 @@ export default function RequestQuotationPage() {
 
         {/* The Form */}
         {!submissionSuccess && (
-          <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 space-y-8">
+          <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-8 space-y-7 scroll-mt-28">
             {/* Anti-Spam Hidden Honeypot Field (Hidden from humans via CSS) */}
             <div style={{ display: 'none' }} aria-hidden="true">
               <label htmlFor="_company_fax">Leave this field blank</label>
@@ -405,26 +417,8 @@ export default function RequestQuotationPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="email" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Official Email Address <span className="text-slate-400 font-normal">(Email or Phone required)</span>
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={formData.email || ''}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="name@company.com"
-                    disabled={isSubmitting}
-                    className={`w-full px-3.5 py-2.5 rounded-lg border text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-gold-500 transition-all ${
-                      errors.email ? 'border-red-400 bg-red-50/30' : 'border-slate-300 bg-white'
-                    }`}
-                  />
-                  {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
-                </div>
-
-                <div>
                   <label htmlFor="phone" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Indian Mobile / Phone (10 Digits) <span className="text-slate-400 font-normal">(Email or Phone required)</span>
+                    Indian Mobile / Phone (10 Digits) <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-xs text-slate-500 font-semibold">
@@ -446,9 +440,27 @@ export default function RequestQuotationPage() {
                   {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
                 </div>
 
+                <div>
+                  <label htmlFor="email" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Official Email Address <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={formData.email || ''}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="name@company.com"
+                    disabled={isSubmitting}
+                    className={`w-full px-3.5 py-2.5 rounded-lg border text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-gold-500 transition-all ${
+                      errors.email ? 'border-red-400 bg-red-50/30' : 'border-slate-300 bg-white'
+                    }`}
+                  />
+                  {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
+                </div>
+
                 <div className="sm:col-span-2">
                   <label htmlFor="gstin" className="block text-xs font-semibold text-slate-700 mb-1">
-                    GSTIN (Optional — 15 Characters)
+                    GSTIN <span className="text-slate-400 font-normal">(Optional — 15 Characters)</span>
                   </label>
                   <input
                     type="text"
@@ -518,7 +530,7 @@ export default function RequestQuotationPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="quantity" className="block text-xs font-semibold text-slate-700 mb-1">
-                      Estimated Quantity / Units (Optional)
+                      Estimated Quantity / Units <span className="text-slate-400 font-normal">(Optional)</span>
                     </label>
                     <input
                       type="text"
@@ -554,7 +566,7 @@ export default function RequestQuotationPage() {
 
                 <div>
                   <label htmlFor="technicalSpecs" className="block text-xs font-semibold text-slate-700 mb-1">
-                    Technical Specifications / Capacity Requirements (Optional)
+                    Technical Specifications / Capacity Requirements <span className="text-slate-400 font-normal">(Optional)</span>
                   </label>
                   <textarea
                     id="technicalSpecs"

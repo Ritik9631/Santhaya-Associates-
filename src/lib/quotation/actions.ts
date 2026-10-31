@@ -237,7 +237,7 @@ export async function issueQuotationAction(quotationId: string): Promise<ActionR
 
     const { data: quote, error: quoteErr } = await adminClient
       .from('quotations')
-      .select('id, quotation_number, status, current_version_number')
+      .select('id, quotation_number, status, current_version_number, is_gst_applicable, place_of_supply_state_code')
       .eq('id', quotationId)
       .single();
 
@@ -247,6 +247,13 @@ export async function issueQuotationAction(quotationId: string): Promise<ActionR
 
     if (!isAllowedStatusTransition(quote.status as QuotationStatus, 'issued')) {
       return { error: `Cannot issue quotation: Transition from '${quote.status}' to 'issued' is not permitted.` };
+    }
+
+    // Financial safeguard (BUG-010): Place of Supply is mandatory for taxable quotations
+    if (quote.is_gst_applicable && (!quote.place_of_supply_state_code || quote.place_of_supply_state_code.trim() === '')) {
+      return {
+        error: 'Cannot issue taxable quotation: Place of Supply state code is required to determine CGST/SGST vs IGST. Please update the quotation with a valid Place of Supply before issuing.',
+      };
     }
 
     // Lock current version and set issued timestamp

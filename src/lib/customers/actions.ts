@@ -90,21 +90,27 @@ export async function createCustomerAction(
 
     // Try inserting via authenticated client (RLS) or adminClient
     let customerId: string | null = null;
+    const normalizedState = state && state.trim() !== '' ? state.trim() : null;
+    const normalizedStateCode = stateCode && stateCode.trim() !== '' ? stateCode.trim() : null;
+    const normalizedEmail = email && email.trim() !== '' ? email.trim().toLowerCase() : null;
+    const normalizedPhone = phone && phone.trim() !== '' ? phone.trim() : null;
+    const normalizedGstin = gstin && gstin.trim() !== '' ? gstin.trim().toUpperCase() : null;
+    const normalizedPan = pan && pan.trim() !== '' ? pan.trim().toUpperCase() : null;
+
     const insertPayload = {
       company_name: finalCompanyName,
       primary_contact_person: contactPerson,
       client_type: customerType,
-      customer_type: customerType,
-      email,
-      phone,
-      gstin,
-      pan,
-      billing_address: billingAddress,
-      shipping_address: shippingAddress,
-      billing_state: state || 'Tamil Nadu',
-      state,
-      state_code: stateCode,
-      notes,
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      gstin: normalizedGstin,
+      pan: normalizedPan,
+      billing_address: billingAddress && billingAddress.trim() !== '' ? billingAddress.trim() : null,
+      shipping_address: shippingAddress && shippingAddress.trim() !== '' ? shippingAddress.trim() : null,
+      billing_state: normalizedState,
+      state: normalizedState,
+      state_code: normalizedStateCode,
+      notes: notes && notes.trim() !== '' ? notes.trim() : null,
       is_active: true,
       created_by: profile.id,
     };
@@ -203,20 +209,27 @@ export async function updateCustomerAction(
 
     if (!prevCustomer) return { error: 'Customer record not found.' };
 
+    const normalizedState = state && state.trim() !== '' ? state.trim() : null;
+    const normalizedStateCode = stateCode && stateCode.trim() !== '' ? stateCode.trim() : null;
+    const normalizedEmail = email && email.trim() !== '' ? email.trim().toLowerCase() : null;
+    const normalizedPhone = phone && phone.trim() !== '' ? phone.trim() : null;
+    const normalizedGstin = gstin && gstin.trim() !== '' ? gstin.trim().toUpperCase() : null;
+    const normalizedPan = pan && pan.trim() !== '' ? pan.trim().toUpperCase() : null;
+
     const updatePayload = {
       company_name: companyName || contactPerson,
       primary_contact_person: contactPerson,
       client_type: customerType,
-      customer_type: customerType,
-      email,
-      phone,
-      gstin,
-      pan,
-      billing_address: billingAddress,
-      shipping_address: shippingAddress,
-      state,
-      state_code: stateCode,
-      notes,
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      gstin: normalizedGstin,
+      pan: normalizedPan,
+      billing_address: billingAddress && billingAddress.trim() !== '' ? billingAddress.trim() : null,
+      shipping_address: shippingAddress && shippingAddress.trim() !== '' ? shippingAddress.trim() : null,
+      billing_state: normalizedState,
+      state: normalizedState,
+      state_code: normalizedStateCode,
+      notes: notes && notes.trim() !== '' ? notes.trim() : null,
       updated_at: new Date().toISOString(),
     };
 

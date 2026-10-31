@@ -165,7 +165,7 @@ async function runPhase4BrowserQA() {
     if (submitBtn) {
       await submitBtn.click();
       await page.waitForFunction(
-        () => document.body.innerText.includes('Quotation Request Successfully Registered') ||
+        () => document.body.innerText.includes('Your Project Journey Starts Here!') || document.body.innerText.includes('Quotation Request Successfully Registered') ||
               document.body.innerText.includes('INQ-') ||
               document.body.innerText.includes('Thank You'),
         { timeout: 10000 }
@@ -177,7 +177,7 @@ async function runPhase4BrowserQA() {
 
     // Verify submission outcome on page
     const pageBody = await page.content();
-    const formSubmitted = pageBody.includes('Quotation Request Successfully Registered') ||
+    const formSubmitted = pageBody.includes('Your Project Journey Starts Here!') || pageBody.includes('Quotation Request Successfully Registered') ||
                           pageBody.includes('INQ-') ||
                           pageBody.includes('Thank You');
     assert(formSubmitted, 'Quotation request registered successfully with reference number');
