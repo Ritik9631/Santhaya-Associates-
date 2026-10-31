@@ -32,7 +32,9 @@
     "test:phase4-invoice": "node scripts/test-phase4-invoice-delivery.mjs",
     "test:phase4-security": "node scripts/test-phase4-security.mjs",
     "test:phase4-browser": "node scripts/test-phase4-browser-e2e.mjs",
-    "test:phase4": "npm run test:phase4-outbox && npm run test:phase4-enquiries && npm run test:phase4-quotation && npm run test:phase4-invoice && npm run test:phase4-security && npm run test:phase4-browser"
+    "test:phase4": "npm run test:phase4-outbox && npm run test:phase4-enquiries && npm run test:phase4-quotation && npm run test:phase4-invoice && npm run test:phase4-security && npm run test:phase4-browser",
+    "test:phase5-browser": "node scripts/test-phase5-browser-e2e.mjs",
+    "test:phase5": "npm run test:phase5-browser"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

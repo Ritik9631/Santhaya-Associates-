@@ -3,7 +3,8 @@ import { requireStaffSession } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Printer, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import PrintButton from '@/components/PrintButton';
 import { convertNumberToIndianWords } from '@/lib/quotation/calculations';
 
 interface PageProps {
@@ -110,15 +111,7 @@ export default async function QuotationPdfPage({ params }: PageProps) {
           Back to Quotation View
         </Link>
 
-        <button
-          onClick={() => {
-            if (typeof window !== 'undefined') window.print();
-          }}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#10243B] text-white rounded-lg text-sm font-semibold hover:bg-slate-800 shadow transition"
-        >
-          <Printer className="w-4 h-4" />
-          Print / Save as PDF
-        </button>
+        <PrintButton className="inline-flex items-center gap-2 px-4 py-2 bg-[#10243B] text-white rounded-lg text-xs font-semibold hover:bg-slate-800 shadow transition focus:ring-2 focus:ring-gold-500" />
       </div>
 
       {/* Official Quotation Document Container (A4 Printable) */}

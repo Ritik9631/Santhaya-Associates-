@@ -10,6 +10,16 @@ export default function Header() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileMenuOpen]);
+
   if (pathname?.startsWith('/staff')) {
     return null;
   }
@@ -33,7 +43,7 @@ export default function Header() {
             <span className="hidden md:inline">|</span>
             <span className="hidden md:flex items-center gap-1">
               <PhoneCall className="w-3 h-3 text-gold-500" />
-              Inquiries: info@santhaya.com (Pending Confirmation)
+              Inquiries: info@santhaya.com
             </span>
           </div>
         </div>
@@ -111,7 +121,7 @@ export default function Header() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-navy-900 hover:text-gold-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500"
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center p-2 rounded-lg text-navy-900 hover:text-gold-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500"
               aria-expanded={mobileMenuOpen}
               aria-label="Toggle navigation menu"
             >

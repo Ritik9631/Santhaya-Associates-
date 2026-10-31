@@ -52,8 +52,8 @@ export function StaffSidebar({ userRole }: StaffSidebarProps) {
       href: '/staff/team',
       icon: Users,
       active: pathname.startsWith('/staff/team'),
-      available: canManageTeam,
-      badge: canManageTeam ? undefined : 'Admin Only',
+      available: true,
+      badge: canManageTeam ? undefined : 'Directory',
     },
     {
       name: 'Customers',
@@ -134,6 +134,7 @@ export function StaffSidebar({ userRole }: StaffSidebarProps) {
                   key={item.name}
                   href={item.href}
                   onClick={() => setIsOpen(false)}
+                  aria-current={item.active ? 'page' : undefined}
                   className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${
                     item.active
                       ? 'bg-gold-500/10 text-gold-400 border border-gold-500/30'

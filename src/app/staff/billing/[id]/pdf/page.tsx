@@ -3,7 +3,8 @@ import { requireStaffSession } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Printer, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import PrintButton from '@/components/PrintButton';
 import { convertNumberToIndianWords } from '@/lib/quotation/calculations';
 import type { Metadata } from 'next';
 
@@ -74,14 +75,7 @@ export default async function InvoicePdfPage({ params }: PageProps) {
           Back to Billing View
         </Link>
 
-        <button
-          onClick={() => {}}
-          // Note: In client, window.print() can be triggered
-          className="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg shadow-sm transition"
-        >
-          <Printer className="w-4 h-4" />
-          Print / Save as PDF
-        </button>
+        <PrintButton className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-navy-900 hover:bg-navy-950 rounded-lg shadow-sm transition focus:ring-2 focus:ring-gold-500" />
       </div>
 
       {/* Main A4 Printable Sheet */}
@@ -92,7 +86,7 @@ export default async function InvoicePdfPage({ params }: PageProps) {
             <div className="space-y-1 max-w-[60%]">
               <div className="flex items-center gap-2 mb-2">
                 <Image
-                  src="/images/logo.png"
+                  src="/santhaya-logo-header.png"
                   alt="Santhaya Associates"
                   width={140}
                   height={45}

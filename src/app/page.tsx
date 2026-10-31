@@ -15,9 +15,34 @@ import {
   HelpCircle,
 } from 'lucide-react';
 
+const jsonLdData = {
+  '@context': 'https://schema.org',
+  '@type': 'Corporation',
+  name: 'Santhaya Associates Pvt. Ltd.',
+  alternateName: 'Santhaya Associates',
+  slogan: 'Building Today • Powering Tomorrow',
+  description:
+    'Santhaya Associates Pvt. Ltd. — Specialized industrial enterprise partner for Government & Private Construction Tenders, Construction Machinery Supply, and Manufacturing Machinery Supply.',
+  address: {
+    '@type': 'PostalAddress',
+    addressCountry: 'IN',
+    addressRegion: 'Delhi',
+  },
+  knowsAbout: [
+    'Government Construction Tenders',
+    'Private Infrastructure Bidding',
+    'Construction Machinery Fleet Supply',
+    'Manufacturing Industrial Equipment',
+  ],
+};
+
 export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdData) }}
+      />
       {/* Hero Section */}
       <section className="relative bg-gradient-to-b from-navy-950 via-navy-900 to-navy-950 text-white overflow-hidden py-16 md:py-24 border-b border-navy-800">
         {/* Subtle background grid pattern */}
