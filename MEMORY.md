@@ -531,6 +531,13 @@ Updated: 2026-10-31 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediatio
      - `npm.cmd run test:batch2`: 16/16 regression assertions passed.
      - `npm.cmd run test`: Full test battery (over 570 assertions across 12 suites) passed with 0 failures.
 
+- 2026-11-01: Financial Calculation Hardening (Code-Only Place of Supply Safeguards):
+  1. Undetermined Place of Supply: Missing, null, or invalid Place of Supply state codes are strictly classified as `tax_determination: 'undetermined'` across `src/lib/quotation/calculations.ts` and `src/lib/billing/calculations.ts`. Never defaulted to intra-state (CGST/SGST) or interstate (IGST).
+  2. Non-Silent Presentation: Quotation and Invoice UI forms display an amber warning banner (`Tax Determination Pending`) when Place of Supply is undetermined, and amount in words appends `(Excluding GST — Place of Supply Undetermined)`. Zero GST is never presented as final tax for taxable transactions.
+  3. Issuance Enforcement: `issueQuotationAction` and `issueInvoiceAction` validate state codes against official 2-digit Indian GST codes (01-38, 97) via `isValidIndianStateCode`, strictly blocking issuance of taxable quotes and statutory tax invoices until Place of Supply is provided.
+  4. Removed Assumed Defaults: Removed hardcoded '07' defaults from action handlers (`createQuotationAction`, `createInvoiceAction`) and client forms (`QuotationForm.tsx`, `InvoiceForm.tsx`).
+  5. Regression Matrix: Extended `scripts/test-batch2-regressions.mjs` testing all three conditions: intra-state, interstate, and undetermined. Verified with typecheck (0 errors), lint (0 warnings), full test suite (570+ assertions passed), and Next.js production build (26/26 routes compiled).
+
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
 

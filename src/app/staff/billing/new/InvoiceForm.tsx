@@ -9,6 +9,7 @@ import {
 } from '@/lib/billing/actions';
 import {
   calculateInvoiceTotals,
+  isValidIndianStateCode,
   type InvoiceLineItemInput,
 } from '@/lib/billing/calculations';
 import type { CompanyBillingProfile } from '@/lib/billing/company-config';
@@ -85,7 +86,7 @@ export default function InvoiceForm({
   );
 
   const [placeOfSupplyStateCode, setPlaceOfSupplyStateCode] = useState(
-    selectedCustomer?.state_code || companyProfile.stateCode
+    selectedCustomer?.state_code || ''
   );
 
   // Line items state
@@ -113,9 +114,7 @@ export default function InvoiceForm({
   const handleCustomerChange = (newCustId: string) => {
     setCustomerId(newCustId);
     const cust = customers.find((c) => c.id === newCustId);
-    if (cust?.state_code) {
-      setPlaceOfSupplyStateCode(cust.state_code);
-    }
+    setPlaceOfSupplyStateCode(cust?.state_code || '');
   };
 
   // Add line item
@@ -343,7 +342,11 @@ export default function InvoiceForm({
                     required
                   />
                   <div className="text-xs text-slate-500 flex items-center">
-                    {placeOfSupplyStateCode === companyProfile.stateCode ? (
+                    {!placeOfSupplyStateCode || !isValidIndianStateCode(placeOfSupplyStateCode) ? (
+                      <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-1 rounded">
+                        Undetermined (State Code Required)
+                      </span>
+                    ) : placeOfSupplyStateCode === companyProfile.stateCode ? (
                       <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-1 rounded">
                         Intra-State (CGST + SGST)
                       </span>
@@ -646,7 +649,14 @@ export default function InvoiceForm({
                   <span>₹{totals.taxable_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
 
-                {totals.is_intra_state ? (
+                {totals.tax_determination === 'undetermined' ? (
+                  <div className="bg-amber-950/60 border border-amber-600/60 text-amber-300 p-2.5 rounded text-xs space-y-1 my-1">
+                    <p className="font-semibold text-amber-200">⚠️ Tax Determination Pending (Undetermined)</p>
+                    <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                      Place of Supply state code is missing or invalid. GST cannot be determined or issued until a valid 2-digit State Code is provided.
+                    </p>
+                  </div>
+                ) : totals.is_intra_state ? (
                   <>
                     <div className="flex justify-between text-xs text-slate-300">
                       <span>CGST (Central Tax):</span>
@@ -657,12 +667,12 @@ export default function InvoiceForm({
                       <span>₹{totals.sgst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
                   </>
-                ) : (
+                ) : totals.tax_determination === 'inter_state' ? (
                   <div className="flex justify-between text-xs text-slate-300">
                     <span>IGST (Integrated Tax):</span>
                     <span>₹{totals.igst_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
-                )}
+                ) : null}
 
                 {totals.round_off_amount !== 0 && (
                   <div className="flex justify-between text-xs text-slate-400">
@@ -673,7 +683,15 @@ export default function InvoiceForm({
 
                 <div className="flex justify-between text-lg font-bold text-white border-t border-slate-700 pt-2">
                   <span>Grand Total:</span>
-                  <span>₹{totals.grand_total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span>
+                    {totals.tax_determination === 'undetermined' && invoiceType === 'tax_invoice' ? (
+                      <span className="text-amber-300 text-sm font-medium">
+                        ₹{totals.taxable_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} + GST (Pending)
+                      </span>
+                    ) : (
+                      `₹${totals.grand_total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                    )}
+                  </span>
                 </div>
 
                 <p className="text-[11px] text-slate-400 italic font-serif">

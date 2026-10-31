@@ -16,6 +16,38 @@
 export const COMPANY_STATE_CODE = '07'; // Delhi
 export const COMPANY_STATE_NAME = 'Delhi';
 
+export type TaxDeterminationStatus = 'intra_state' | 'inter_state' | 'undetermined' | 'not_applicable';
+
+/**
+ * Validates whether a state code is a recognized Indian GST 2-digit state code.
+ * Standard GST state codes range from 01 (Jammu & Kashmir) to 38 (Ladakh), plus 97 (Other Territory).
+ */
+export function isValidIndianStateCode(code: string | null | undefined): boolean {
+  if (!code) return false;
+  const trimmed = code.trim().padStart(2, '0');
+  if (!/^\d{2}$/.test(trimmed)) return false;
+  const num = parseInt(trimmed, 10);
+  return (num >= 1 && num <= 38) || num === 97;
+}
+
+/**
+ * Determines statutory Indian GST classification without defaulting unknown states.
+ * Missing or invalid Place of Supply is strictly 'undetermined'.
+ */
+export function determineTaxStatus(
+  isTaxable: boolean,
+  placeOfSupplyStateCode?: string | null,
+  companyStateCode = COMPANY_STATE_CODE
+): TaxDeterminationStatus {
+  if (!isTaxable) return 'not_applicable';
+  if (!placeOfSupplyStateCode || !isValidIndianStateCode(placeOfSupplyStateCode)) {
+    return 'undetermined';
+  }
+  const normSupply = placeOfSupplyStateCode.trim().padStart(2, '0');
+  const normCompany = companyStateCode.trim().padStart(2, '0');
+  return normSupply === normCompany ? 'intra_state' : 'inter_state';
+}
+
 export interface LineItemInput {
   product_service_id?: string | null;
   item_name: string;
@@ -53,6 +85,10 @@ export interface QuotationTotals {
   is_gst_applicable: boolean;
   place_of_supply_state_code: string;
   is_intra_state: boolean;
+  is_inter_state: boolean;
+  tax_determination: TaxDeterminationStatus;
+  is_tax_determined: boolean;
+  tax_determination_message?: string;
   subtotal_amount: number;
   discount_amount: number;
   taxable_amount: number;
@@ -102,10 +138,8 @@ export function calculateLineItem(
   // Taxable amount cannot be negative
   const taxableAmount = Math.max(0, roundToTwoDecimals(grossAmount - discountAmount));
 
-  // Determine state supply nature
-  // Normalized 2-digit state code comparison
-  const normalizedSupplyCode = placeOfSupplyStateCode ? placeOfSupplyStateCode.trim().padStart(2, '0') : '';
-  const isIntraState = Boolean(isGstApplicable && normalizedSupplyCode && normalizedSupplyCode === COMPANY_STATE_CODE);
+  // Determine state supply nature strictly
+  const taxDetermination = determineTaxStatus(isGstApplicable, placeOfSupplyStateCode, COMPANY_STATE_CODE);
 
   let cgstRate = 0;
   let sgstRate = 0;
@@ -114,18 +148,19 @@ export function calculateLineItem(
   let sgstAmount = 0;
   let igstAmount = 0;
 
-  if (isGstApplicable && gstRate > 0 && taxableAmount > 0) {
-    if (isIntraState) {
-      // Split 50/50 between CGST and SGST
-      cgstRate = roundToTwoDecimals(gstRate / 2);
-      sgstRate = roundToTwoDecimals(gstRate / 2);
-      cgstAmount = roundToTwoDecimals((taxableAmount * cgstRate) / 100);
-      sgstAmount = roundToTwoDecimals((taxableAmount * sgstRate) / 100);
-    } else {
-      // Full rate applied to IGST
-      igstRate = gstRate;
-      igstAmount = roundToTwoDecimals((taxableAmount * igstRate) / 100);
-    }
+  if (taxDetermination === 'intra_state' && gstRate > 0 && taxableAmount > 0) {
+    // Split 50/50 between CGST and SGST
+    cgstRate = roundToTwoDecimals(gstRate / 2);
+    sgstRate = roundToTwoDecimals(gstRate / 2);
+    cgstAmount = roundToTwoDecimals((taxableAmount * cgstRate) / 100);
+    sgstAmount = roundToTwoDecimals((taxableAmount * sgstRate) / 100);
+  } else if (taxDetermination === 'inter_state' && gstRate > 0 && taxableAmount > 0) {
+    // Full rate applied to IGST
+    igstRate = gstRate;
+    igstAmount = roundToTwoDecimals((taxableAmount * igstRate) / 100);
+  } else {
+    // taxDetermination is 'undetermined' or 'not_applicable':
+    // Zero tax assigned. Never assume intra or inter state.
   }
 
   const taxAmount = roundToTwoDecimals(cgstAmount + sgstAmount + igstAmount);
@@ -162,7 +197,10 @@ export function calculateQuotationTotals(
   placeOfSupplyStateCode?: string
 ): QuotationTotals {
   const normalizedSupplyCode = placeOfSupplyStateCode ? placeOfSupplyStateCode.trim().padStart(2, '0') : '';
-  const isIntraState = Boolean(isGstApplicable && normalizedSupplyCode && normalizedSupplyCode === COMPANY_STATE_CODE);
+  const taxDetermination = determineTaxStatus(isGstApplicable, normalizedSupplyCode, COMPANY_STATE_CODE);
+  const isIntraState = taxDetermination === 'intra_state';
+  const isInterState = taxDetermination === 'inter_state';
+  const isTaxDetermined = taxDetermination !== 'undetermined';
 
   const calculatedItems = items.map((item) =>
     calculateLineItem(item, isGstApplicable, normalizedSupplyCode)
@@ -192,10 +230,23 @@ export function calculateQuotationTotals(
   const grandTotalRounded = Math.round(unroundedGrandTotal);
   const roundOffAmount = roundToTwoDecimals(grandTotalRounded - unroundedGrandTotal);
 
+  let amountInWords = convertNumberToIndianWords(grandTotalRounded);
+  let taxDeterminationMessage: string | undefined = undefined;
+
+  if (taxDetermination === 'undetermined') {
+    amountInWords += ' (Excluding GST — Place of Supply Undetermined)';
+    taxDeterminationMessage =
+      'Place of Supply is undetermined. GST rates and amounts cannot be calculated until a valid 2-digit Indian State Code is provided.';
+  }
+
   return {
     is_gst_applicable: isGstApplicable,
     place_of_supply_state_code: normalizedSupplyCode,
     is_intra_state: isIntraState,
+    is_inter_state: isInterState,
+    tax_determination: taxDetermination,
+    is_tax_determined: isTaxDetermined,
+    tax_determination_message: taxDeterminationMessage,
     subtotal_amount: subtotalAmount,
     discount_amount: discountAmount,
     taxable_amount: taxableAmount,
@@ -206,7 +257,7 @@ export function calculateQuotationTotals(
     round_off_amount: roundOffAmount,
     grand_total_amount: grandTotalRounded,
     items: calculatedItems,
-    amount_in_words: convertNumberToIndianWords(grandTotalRounded),
+    amount_in_words: amountInWords,
   };
 }
 

@@ -49,9 +49,10 @@ export default function QuotationForm({
   const [error, setError] = useState<string | null>(null);
 
   // Form State
+  const defaultCust = customers.find((c) => c.id === defaultCustomerId) || customers[0];
   const [customerId, setCustomerId] = useState(defaultCustomerId || (customers[0]?.id || ''));
   const [enquiryId, setEnquiryId] = useState(defaultEnquiryId || '');
-  const [placeOfSupplyStateCode, setPlaceOfSupplyStateCode] = useState('07'); // Default Delhi
+  const [placeOfSupplyStateCode, setPlaceOfSupplyStateCode] = useState(defaultCust?.state_code || '');
   const [isGstApplicable, setIsGstApplicable] = useState(true);
   const [validityDays, setValidityDays] = useState(30);
   const [deliveryLocation, setDeliveryLocation] = useState('');
@@ -79,9 +80,7 @@ export default function QuotationForm({
   const handleCustomerChange = (id: string) => {
     setCustomerId(id);
     const selected = customers.find((c) => c.id === id);
-    if (selected?.state_code) {
-      setPlaceOfSupplyStateCode(selected.state_code);
-    }
+    setPlaceOfSupplyStateCode(selected?.state_code || '');
   };
 
   // Add line item
@@ -235,6 +234,7 @@ export default function QuotationForm({
               onChange={(e) => setPlaceOfSupplyStateCode(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#10243B]"
             >
+              <option value="">-- Place of Supply Pending (Required for Taxable Quote) --</option>
               <option value="07">07 — Delhi (Intra-State: CGST + SGST)</option>
               <option value="09">09 — Uttar Pradesh (Inter-State: IGST)</option>
               <option value="06">06 — Haryana (Inter-State: IGST)</option>
@@ -491,7 +491,16 @@ export default function QuotationForm({
               </p>
             </div>
             <div className="text-xs text-slate-400 space-y-1">
-              <p>• Supply Nature: {totals.is_intra_state ? 'Intra-State (Delhi to Delhi)' : 'Inter-State (IGST)'}</p>
+              <p>
+                • Supply Nature:{' '}
+                {!isGstApplicable
+                  ? 'Non-GST Commercial Quotation'
+                  : totals.tax_determination === 'intra_state'
+                  ? 'Intra-State (Delhi to Delhi: CGST + SGST)'
+                  : totals.tax_determination === 'inter_state'
+                  ? 'Inter-State (IGST)'
+                  : 'Undetermined (Place of Supply Pending)'}
+              </p>
               <p>• Rounding: Standard statutory round-off applied.</p>
             </div>
           </div>
@@ -514,7 +523,14 @@ export default function QuotationForm({
 
             {isGstApplicable && (
               <>
-                {totals.is_intra_state ? (
+                {totals.tax_determination === 'undetermined' ? (
+                  <div className="bg-amber-950/60 border border-amber-600/60 text-amber-300 p-2.5 rounded text-xs space-y-1 my-1">
+                    <p className="font-semibold text-amber-200">⚠️ Tax Determination Pending (Undetermined)</p>
+                    <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                      Place of Supply is not specified or invalid. GST cannot be determined or issued until a valid 2-digit State Code is provided.
+                    </p>
+                  </div>
+                ) : totals.is_intra_state ? (
                   <>
                     <div className="flex justify-between text-slate-400">
                       <span>Central GST (CGST):</span>
@@ -536,7 +552,15 @@ export default function QuotationForm({
 
             <div className="flex justify-between items-center text-sm font-bold text-[#F4B323] pt-3 border-t-2 border-slate-700">
               <span className="text-white">Grand Total (INR):</span>
-              <span className="text-lg">₹{totals.grand_total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              <span className="text-lg">
+                {totals.tax_determination === 'undetermined' && isGstApplicable ? (
+                  <span className="text-amber-300 text-sm font-medium">
+                    ₹{totals.taxable_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} + GST (Pending)
+                  </span>
+                ) : (
+                  `₹${totals.grand_total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                )}
+              </span>
             </div>
           </div>
         </div>

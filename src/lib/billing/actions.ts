@@ -7,6 +7,7 @@ import {
   calculateInvoiceTotals,
   reconcileInvoiceBalance,
   formatStatutoryInvoiceNumber,
+  isValidIndianStateCode,
   type InvoiceLineItemInput,
   type InvoiceCalculatedTotals,
 } from './calculations';
@@ -41,7 +42,8 @@ export async function createInvoiceAction(
     const dueDate = (formData.get('dueDate') as string)?.trim() || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
     const clientPoReference = (formData.get('clientPoReference') as string)?.trim() || null;
     const deliveryLocation = (formData.get('deliveryLocation') as string)?.trim() || null;
-    const placeOfSupplyStateCode = (formData.get('placeOfSupplyStateCode') as string)?.trim() || '07';
+    const rawSupplyCode = (formData.get('placeOfSupplyStateCode') as string)?.trim();
+    const placeOfSupplyStateCode = rawSupplyCode ? rawSupplyCode.padStart(2, '0') : '';
     const termsConditions = (formData.get('termsConditions') as string)?.trim() || null;
     const paymentInstructions = (formData.get('paymentInstructions') as string)?.trim() || null;
     const notes = (formData.get('notes') as string)?.trim() || null;
@@ -93,10 +95,11 @@ export async function createInvoiceAction(
     const fy = getCurrentFinancialYear(new Date(invoiceDate));
 
     // 3. Exact Calculations
+    const effectiveSupplyCode = placeOfSupplyStateCode || customer.state_code || '';
     const totals: InvoiceCalculatedTotals = calculateInvoiceTotals(
       items,
       invoiceType,
-      placeOfSupplyStateCode || customer.state_code || '07',
+      effectiveSupplyCode,
       companyProfile.stateCode
     );
 
@@ -122,7 +125,7 @@ export async function createInvoiceAction(
         customer_gstin: customer.gstin || null,
         customer_pan: customer.pan || null,
         customer_state_code: customer.state_code || totals.place_of_supply_state_code,
-        customer_state_name: customer.state || 'Delhi',
+        customer_state_name: customer.state || undefined,
         customer_billing_address: customer.billing_address || 'Address on file',
         delivery_location: deliveryLocation,
         client_po_reference: clientPoReference,
@@ -335,7 +338,7 @@ export async function convertQuotationToInvoiceAction(
         customer_gstin: customer.gstin || null,
         customer_pan: customer.pan || null,
         customer_state_code: customer.state_code || totals.place_of_supply_state_code,
-        customer_state_name: customer.state || 'Delhi',
+        customer_state_name: customer.state || undefined,
         customer_billing_address: customer.billing_address || 'Address on file',
         delivery_location: version.delivery_location,
         client_po_reference: quote.notes || null,
@@ -448,14 +451,14 @@ export async function issueInvoiceAction(
       return { error: `Invoice is already issued or cannot be issued. Current status: ${invoice.status}` };
     }
 
-    // Financial safeguard (BUG-010): Place of Supply is mandatory for statutory tax invoices
+    // Financial safeguard: Place of Supply is mandatory and must be valid for statutory tax invoices
     if (
       invoice.invoice_type === 'tax_invoice' &&
-      (!invoice.place_of_supply_state_code || invoice.place_of_supply_state_code.trim() === '')
+      (!invoice.place_of_supply_state_code || !isValidIndianStateCode(invoice.place_of_supply_state_code))
     ) {
       return {
         error:
-          'Cannot issue statutory tax invoice: Place of Supply state code is required to determine CGST/SGST vs IGST. Please specify Place of Supply before issuing.',
+          'Cannot issue statutory tax invoice: Place of Supply state code is required and must be a valid 2-digit Indian State Code (01-38, 97) to determine CGST/SGST vs IGST. Please specify a valid Place of Supply before issuing.',
       };
     }
 

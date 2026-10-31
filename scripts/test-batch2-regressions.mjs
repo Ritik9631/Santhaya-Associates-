@@ -87,28 +87,91 @@ it('Customer actions normalize empty state, state_code, phone, and email to null
   assert.ok(actionsCode.includes('normalizedEmail = email && email.trim() !== \'\' ? email.trim().toLowerCase() : null'), 'Email normalized to null when empty');
 });
 
-it('Quotation calculation does not assume intra-state if Place of Supply is missing', () => {
+it('Quotation calculation accurately classifies all three conditions (intra-state, interstate, undetermined)', () => {
   const items = [{ item_name: 'Test Drill', quantity: 1, unit_rate: 10000, gst_rate: 18 }];
-  // When placeOfSupplyStateCode is empty string
-  const totals = calculateQuotationTotals(items, true, '');
-  assert.strictEqual(totals.is_intra_state, false, 'Missing place of supply must not assume intra-state');
-  assert.strictEqual(totals.cgst_amount, 0, 'No CGST calculated when place of supply is undetermined');
-  assert.strictEqual(totals.sgst_amount, 0, 'No SGST calculated when place of supply is undetermined');
+
+  // Condition 1: Intra-state (Delhi '07' to Delhi '07')
+  const intraTotals = calculateQuotationTotals(items, true, '07');
+  assert.strictEqual(intraTotals.tax_determination, 'intra_state', 'Classified as intra_state');
+  assert.strictEqual(intraTotals.is_intra_state, true, 'is_intra_state is true');
+  assert.strictEqual(intraTotals.is_inter_state, false, 'is_inter_state is false');
+  assert.strictEqual(intraTotals.is_tax_determined, true, 'is_tax_determined is true');
+  assert.strictEqual(intraTotals.cgst_amount, 900, 'CGST is 9%');
+  assert.strictEqual(intraTotals.sgst_amount, 900, 'SGST is 9%');
+  assert.strictEqual(intraTotals.igst_amount, 0, 'IGST is 0 for intra-state');
+  assert.strictEqual(intraTotals.total_tax_amount, 1800, 'Total tax is 1800');
+
+  // Condition 2: Interstate (Delhi '07' to Bihar '10')
+  const interTotals = calculateQuotationTotals(items, true, '10');
+  assert.strictEqual(interTotals.tax_determination, 'inter_state', 'Classified as inter_state');
+  assert.strictEqual(interTotals.is_intra_state, false, 'is_intra_state is false');
+  assert.strictEqual(interTotals.is_inter_state, true, 'is_inter_state is true');
+  assert.strictEqual(interTotals.is_tax_determined, true, 'is_tax_determined is true');
+  assert.strictEqual(interTotals.cgst_amount, 0, 'CGST is 0 for interstate');
+  assert.strictEqual(interTotals.sgst_amount, 0, 'SGST is 0 for interstate');
+  assert.strictEqual(interTotals.igst_amount, 1800, 'IGST is 18%');
+  assert.strictEqual(interTotals.total_tax_amount, 1800, 'Total tax is 1800');
+
+  // Condition 3: Undetermined (missing empty string)
+  const emptyTotals = calculateQuotationTotals(items, true, '');
+  assert.strictEqual(emptyTotals.tax_determination, 'undetermined', 'Missing state classified as undetermined');
+  assert.strictEqual(emptyTotals.is_intra_state, false, 'Missing place of supply must not assume intra-state');
+  assert.strictEqual(emptyTotals.is_inter_state, false, 'Missing place of supply must not assume interstate');
+  assert.strictEqual(emptyTotals.is_tax_determined, false, 'is_tax_determined is false');
+  assert.strictEqual(emptyTotals.cgst_amount, 0, 'No CGST calculated when undetermined');
+  assert.strictEqual(emptyTotals.sgst_amount, 0, 'No SGST calculated when undetermined');
+  assert.strictEqual(emptyTotals.igst_amount, 0, 'No IGST calculated when undetermined');
+  assert.strictEqual(emptyTotals.total_tax_amount, 0, 'total_tax_amount is 0 when undetermined');
+  assert.ok(emptyTotals.tax_determination_message?.includes('Place of Supply is undetermined'), 'Provides warning message');
+  assert.ok(emptyTotals.amount_in_words.includes('Place of Supply Undetermined'), 'Amount in words marks tax pending');
+
+  // Condition 3b: Undetermined (invalid state code '99' or 'XYZ')
+  const invalidTotals = calculateQuotationTotals(items, true, '99');
+  assert.strictEqual(invalidTotals.tax_determination, 'undetermined', 'Invalid state code 99 is undetermined');
+  assert.strictEqual(invalidTotals.is_intra_state, false);
+  assert.strictEqual(invalidTotals.is_inter_state, false);
+  assert.strictEqual(invalidTotals.igst_amount, 0);
 });
 
-it('Billing calculation does not assume intra-state if Place of Supply is missing', () => {
+it('Billing calculation accurately classifies all three conditions (intra-state, interstate, undetermined)', () => {
   const items = [{ item_name: 'Service Work', quantity: 1, unit_rate: 20000, gst_rate: 18 }];
-  const totals = calculateInvoiceTotals(items, 'tax_invoice', '', '07');
-  assert.strictEqual(totals.is_intra_state, false, 'Missing place of supply in invoice calculation must not assume intra-state');
-  assert.strictEqual(totals.cgst_amount, 0, 'No CGST when place of supply is empty');
-  assert.strictEqual(totals.sgst_amount, 0, 'No SGST when place of supply is empty');
+
+  // Condition 1: Intra-state
+  const intraTotals = calculateInvoiceTotals(items, 'tax_invoice', '07', '07');
+  assert.strictEqual(intraTotals.tax_determination, 'intra_state');
+  assert.strictEqual(intraTotals.is_intra_state, true);
+  assert.strictEqual(intraTotals.is_inter_state, false);
+  assert.strictEqual(intraTotals.cgst_amount, 1800);
+  assert.strictEqual(intraTotals.sgst_amount, 1800);
+  assert.strictEqual(intraTotals.igst_amount, 0);
+
+  // Condition 2: Interstate
+  const interTotals = calculateInvoiceTotals(items, 'tax_invoice', '10', '07');
+  assert.strictEqual(interTotals.tax_determination, 'inter_state');
+  assert.strictEqual(interTotals.is_intra_state, false);
+  assert.strictEqual(interTotals.is_inter_state, true);
+  assert.strictEqual(interTotals.cgst_amount, 0);
+  assert.strictEqual(interTotals.sgst_amount, 0);
+  assert.strictEqual(interTotals.igst_amount, 3600);
+
+  // Condition 3: Undetermined (missing empty string)
+  const emptyTotals = calculateInvoiceTotals(items, 'tax_invoice', '', '07');
+  assert.strictEqual(emptyTotals.tax_determination, 'undetermined');
+  assert.strictEqual(emptyTotals.is_intra_state, false, 'Missing place of supply must not assume intra-state');
+  assert.strictEqual(emptyTotals.is_inter_state, false, 'Missing place of supply must not assume interstate');
+  assert.strictEqual(emptyTotals.is_tax_determined, false);
+  assert.strictEqual(emptyTotals.cgst_amount, 0);
+  assert.strictEqual(emptyTotals.sgst_amount, 0);
+  assert.strictEqual(emptyTotals.igst_amount, 0, 'No IGST attributed when place of supply is missing');
+  assert.ok(emptyTotals.tax_determination_message?.includes('Place of Supply is undetermined'));
+  assert.ok(emptyTotals.amount_in_words.includes('Place of Supply Undetermined'));
 });
 
-it('Quotation issuance action blocks issuance when taxable quotation lacks Place of Supply', () => {
+it('Quotation issuance action blocks issuance when taxable quotation lacks valid Place of Supply', () => {
   const code = fs.readFileSync('src/lib/quotation/actions.ts', 'utf8');
   assert.ok(
-    code.includes('quote.is_gst_applicable && (!quote.place_of_supply_state_code || quote.place_of_supply_state_code.trim() === \'\')'),
-    'issueQuotationAction checks for mandatory place_of_supply_state_code'
+    code.includes('quote.is_gst_applicable && (!quote.place_of_supply_state_code || !isValidIndianStateCode(quote.place_of_supply_state_code))'),
+    'issueQuotationAction checks for valid place_of_supply_state_code'
   );
   assert.ok(
     code.includes('Cannot issue taxable quotation: Place of Supply state code is required'),
@@ -116,11 +179,11 @@ it('Quotation issuance action blocks issuance when taxable quotation lacks Place
   );
 });
 
-it('Invoice issuance action blocks issuance when tax_invoice lacks Place of Supply', () => {
+it('Invoice issuance action blocks issuance when tax_invoice lacks valid Place of Supply', () => {
   const code = fs.readFileSync('src/lib/billing/actions.ts', 'utf8');
   assert.ok(
-    code.includes("invoice.invoice_type === 'tax_invoice' &&\n      (!invoice.place_of_supply_state_code || invoice.place_of_supply_state_code.trim() === '')"),
-    'issueInvoiceAction checks for mandatory place_of_supply_state_code'
+    code.includes("invoice.invoice_type === 'tax_invoice' &&\n      (!invoice.place_of_supply_state_code || !isValidIndianStateCode(invoice.place_of_supply_state_code))"),
+    'issueInvoiceAction checks for valid place_of_supply_state_code'
   );
   assert.ok(
     code.includes('Cannot issue statutory tax invoice: Place of Supply state code is required'),

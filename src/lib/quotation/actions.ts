@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import {
   calculateQuotationTotals,
   isAllowedStatusTransition,
+  isValidIndianStateCode,
   type LineItemInput,
   type QuotationStatus,
   type QuotationTotals,
@@ -38,7 +39,8 @@ export async function createQuotationAction(
 
     const customerId = (formData.get('customerId') as string)?.trim();
     const enquiryId = (formData.get('enquiryId') as string)?.trim() || null;
-    const placeOfSupplyStateCode = (formData.get('placeOfSupplyStateCode') as string)?.trim() || '07';
+    const rawSupplyCode = (formData.get('placeOfSupplyStateCode') as string)?.trim();
+    const placeOfSupplyStateCode = rawSupplyCode ? rawSupplyCode.padStart(2, '0') : '';
     const isGstApplicable = formData.get('isGstApplicable') !== 'false';
     const validityDays = parseInt((formData.get('validityDays') as string) || '30', 10);
     const deliveryLocation = (formData.get('deliveryLocation') as string)?.trim();
@@ -249,10 +251,11 @@ export async function issueQuotationAction(quotationId: string): Promise<ActionR
       return { error: `Cannot issue quotation: Transition from '${quote.status}' to 'issued' is not permitted.` };
     }
 
-    // Financial safeguard (BUG-010): Place of Supply is mandatory for taxable quotations
-    if (quote.is_gst_applicable && (!quote.place_of_supply_state_code || quote.place_of_supply_state_code.trim() === '')) {
+    // Financial safeguard: Place of Supply is mandatory and must be valid for taxable quotations
+    if (quote.is_gst_applicable && (!quote.place_of_supply_state_code || !isValidIndianStateCode(quote.place_of_supply_state_code))) {
       return {
-        error: 'Cannot issue taxable quotation: Place of Supply state code is required to determine CGST/SGST vs IGST. Please update the quotation with a valid Place of Supply before issuing.',
+        error:
+          'Cannot issue taxable quotation: Place of Supply state code is required and must be a valid 2-digit Indian State Code (01-38, 97) to determine CGST/SGST vs IGST. Please update the quotation with a valid Place of Supply before issuing.',
       };
     }
 

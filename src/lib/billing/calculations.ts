@@ -194,11 +194,48 @@ export interface CalculatedInvoiceLineItem {
   line_total: number;
 }
 
+export type TaxDeterminationStatus = 'intra_state' | 'inter_state' | 'undetermined' | 'not_applicable';
+
+/**
+ * Validates whether a state code is a recognized Indian GST 2-digit state code.
+ * Standard GST state codes range from 01 (Jammu & Kashmir) to 38 (Ladakh), plus 97 (Other Territory).
+ */
+export function isValidIndianStateCode(code: string | null | undefined): boolean {
+  if (!code) return false;
+  const trimmed = code.trim().padStart(2, '0');
+  if (!/^\d{2}$/.test(trimmed)) return false;
+  const num = parseInt(trimmed, 10);
+  return (num >= 1 && num <= 38) || num === 97;
+}
+
+/**
+ * Determines statutory Indian GST classification for an invoice without defaulting unknown states.
+ * Missing or invalid Place of Supply is strictly 'undetermined'.
+ */
+export function determineBillingTaxStatus(
+  invoiceType: InvoiceType,
+  placeOfSupplyStateCode?: string | null,
+  companyStateCode?: string
+): TaxDeterminationStatus {
+  if (invoiceType !== 'tax_invoice') return 'not_applicable';
+  if (!placeOfSupplyStateCode || !isValidIndianStateCode(placeOfSupplyStateCode)) {
+    return 'undetermined';
+  }
+  const profile = getCompanyBillingProfile();
+  const baseCompanyCode = (companyStateCode || profile.stateCode).trim().padStart(2, '0');
+  const normSupply = placeOfSupplyStateCode.trim().padStart(2, '0');
+  return normSupply === baseCompanyCode ? 'intra_state' : 'inter_state';
+}
+
 export interface InvoiceCalculatedTotals {
   invoice_type: InvoiceType;
   place_of_supply_state_code: string;
   company_state_code: string;
   is_intra_state: boolean;
+  is_inter_state: boolean;
+  tax_determination: TaxDeterminationStatus;
+  is_tax_determined: boolean;
+  tax_determination_message?: string;
   subtotal_amount: number;
   discount_amount: number;
   taxable_amount: number;
@@ -222,7 +259,7 @@ export function calculateInvoiceLineItem(
   const baseCompanyCode = (companyStateCode || profile.stateCode).trim().padStart(2, '0');
   const normalizedSupplyCode = placeOfSupplyStateCode ? placeOfSupplyStateCode.trim().padStart(2, '0') : '';
   const isTaxInvoice = invoiceType === 'tax_invoice';
-  const isIntraState = Boolean(isTaxInvoice && normalizedSupplyCode && normalizedSupplyCode === baseCompanyCode);
+  const taxDetermination = determineBillingTaxStatus(invoiceType, normalizedSupplyCode, baseCompanyCode);
 
   const quantity = parseDecimalSafe(item.quantity, 1);
   const unitRate = parseDecimalSafe(item.unit_rate, 0);
@@ -240,16 +277,17 @@ export function calculateInvoiceLineItem(
   let sgstAmount = 0;
   let igstAmount = 0;
 
-  if (isTaxInvoice && gstRate > 0 && taxableAmount > 0) {
-    if (isIntraState) {
-      cgstRate = roundToTwoDecimals(gstRate / 2);
-      sgstRate = roundToTwoDecimals(gstRate / 2);
-      cgstAmount = roundToTwoDecimals((taxableAmount * cgstRate) / 100);
-      sgstAmount = roundToTwoDecimals((taxableAmount * sgstRate) / 100);
-    } else {
-      igstRate = gstRate;
-      igstAmount = roundToTwoDecimals((taxableAmount * igstRate) / 100);
-    }
+  if (taxDetermination === 'intra_state' && gstRate > 0 && taxableAmount > 0) {
+    cgstRate = roundToTwoDecimals(gstRate / 2);
+    sgstRate = roundToTwoDecimals(gstRate / 2);
+    cgstAmount = roundToTwoDecimals((taxableAmount * cgstRate) / 100);
+    sgstAmount = roundToTwoDecimals((taxableAmount * sgstRate) / 100);
+  } else if (taxDetermination === 'inter_state' && gstRate > 0 && taxableAmount > 0) {
+    igstRate = gstRate;
+    igstAmount = roundToTwoDecimals((taxableAmount * igstRate) / 100);
+  } else {
+    // taxDetermination is 'undetermined' or 'not_applicable':
+    // Zero tax assigned. Never assume intra or inter state.
   }
 
   const taxAmount = roundToTwoDecimals(cgstAmount + sgstAmount + igstAmount);
@@ -286,7 +324,10 @@ export function calculateInvoiceTotals(
   const profile = getCompanyBillingProfile();
   const baseCompanyCode = (companyStateCode || profile.stateCode).trim().padStart(2, '0');
   const normalizedSupplyCode = placeOfSupplyStateCode ? placeOfSupplyStateCode.trim().padStart(2, '0') : '';
-  const isIntraState = Boolean(invoiceType === 'tax_invoice' && normalizedSupplyCode && normalizedSupplyCode === baseCompanyCode);
+  const taxDetermination = determineBillingTaxStatus(invoiceType, normalizedSupplyCode, baseCompanyCode);
+  const isIntraState = taxDetermination === 'intra_state';
+  const isInterState = taxDetermination === 'inter_state';
+  const isTaxDetermined = taxDetermination !== 'undetermined';
 
   const calculatedItems = items.map((item) =>
     calculateInvoiceLineItem(item, invoiceType, normalizedSupplyCode, baseCompanyCode)
@@ -315,11 +356,24 @@ export function calculateInvoiceTotals(
   const grandTotalRounded = Math.round(unroundedGrandTotal);
   const roundOffAmount = roundToTwoDecimals(grandTotalRounded - unroundedGrandTotal);
 
+  let amountInWords = convertNumberToIndianWords(grandTotalRounded);
+  let taxDeterminationMessage: string | undefined = undefined;
+
+  if (taxDetermination === 'undetermined') {
+    amountInWords += ' (Excluding GST — Place of Supply Undetermined)';
+    taxDeterminationMessage =
+      'Place of Supply is undetermined. Statutory tax invoice cannot be issued until a valid 2-digit Indian State Code is provided.';
+  }
+
   return {
     invoice_type: invoiceType,
     place_of_supply_state_code: normalizedSupplyCode,
     company_state_code: baseCompanyCode,
     is_intra_state: isIntraState,
+    is_inter_state: isInterState,
+    tax_determination: taxDetermination,
+    is_tax_determined: isTaxDetermined,
+    tax_determination_message: taxDeterminationMessage,
     subtotal_amount: subtotalAmount,
     discount_amount: discountAmount,
     taxable_amount: taxableAmount,
@@ -330,7 +384,7 @@ export function calculateInvoiceTotals(
     round_off_amount: roundOffAmount,
     grand_total_amount: grandTotalRounded,
     items: calculatedItems,
-    amount_in_words: convertNumberToIndianWords(grandTotalRounded),
+    amount_in_words: amountInWords,
   };
 }
 
