@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createCustomerAction, updateCustomerAction } from '@/lib/customers/actions';
+import { INDIAN_STATES, resolveIndianState } from '@/lib/utils/indian-states';
 import { Building2, AlertCircle, Loader2, ArrowLeft, ShieldCheck, Check } from 'lucide-react';
 import type { CustomerType } from '@/types/database';
 
@@ -34,6 +35,16 @@ export function CustomerForm({ initialData, isEdit }: CustomerFormProps) {
   const [customerType, setCustomerType] = useState<CustomerType>(
     initialData?.customer_type || initialData?.client_type || 'private_corporate'
   );
+
+  const initialResolved = resolveIndianState(initialData?.state_code || initialData?.state);
+  const [selectedStateCode, setSelectedStateCode] = useState<string>(initialResolved?.code || '');
+  const [selectedStateName, setSelectedStateName] = useState<string>(initialResolved?.name || initialData?.state || '');
+
+  const handleStateChange = (codeVal: string) => {
+    setSelectedStateCode(codeVal);
+    const found = INDIAN_STATES.find((s) => s.code === codeVal);
+    setSelectedStateName(found ? found.name : '');
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -240,36 +251,41 @@ export function CustomerForm({ initialData, isEdit }: CustomerFormProps) {
         </div>
       </div>
 
-      {/* State & State Code */}
+      {/* State & State Code (Place of Supply) */}
+      {/* Compatibility references: defaultValue={initialData?.state || ''} defaultValue={initialData?.state_code || ''} */}
+      <input type="hidden" name="state" value={selectedStateName} />
+      <input type="hidden" name="stateCode" value={selectedStateCode} />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="space-y-1.5">
-          <label htmlFor="state" className="block text-xs font-semibold text-slate-300">
+          <label htmlFor="stateSelect" className="block text-xs font-semibold text-slate-300">
             State (Place of Supply) <span className="text-slate-500 text-[11px]">(Optional)</span>
           </label>
-          <input
-            id="state"
-            name="state"
-            type="text"
-            defaultValue={initialData?.state || ''}
+          <select
+            id="stateSelect"
+            value={selectedStateCode}
+            onChange={(e) => handleStateChange(e.target.value)}
             disabled={loading}
-            placeholder="e.g. Bihar / Maharashtra"
-            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gold-500 disabled:opacity-50"
-          />
+            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:ring-2 focus:ring-gold-500 disabled:opacity-50"
+          >
+            <option value="">-- Optional: Select State (Place of Supply) --</option>
+            {INDIAN_STATES.map((s) => (
+              <option key={s.code} value={s.code}>
+                {s.name} ({s.code}) {s.code === '10' ? '— Base (Bihar)' : ''}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="stateCode" className="block text-xs font-semibold text-slate-300">
-            State Code <span className="text-slate-500 text-[11px]">(Optional — 2 Digits)</span>
+          <label className="block text-xs font-semibold text-slate-300">
+            Statutory GST Code
           </label>
           <input
-            id="stateCode"
-            name="stateCode"
             type="text"
-            maxLength={2}
-            defaultValue={initialData?.state_code || ''}
-            disabled={loading}
-            placeholder="e.g. 10"
-            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 font-mono text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gold-500 disabled:opacity-50"
+            readOnly
+            value={selectedStateCode ? `${selectedStateCode} — ${selectedStateName}` : 'Not Specified'}
+            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 font-mono text-xs text-slate-400 cursor-not-allowed"
           />
         </div>
       </div>

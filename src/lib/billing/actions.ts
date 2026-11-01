@@ -8,6 +8,7 @@ import {
   reconcileInvoiceBalance,
   formatStatutoryInvoiceNumber,
   isValidIndianStateCode,
+  resolveIndianState,
   type InvoiceLineItemInput,
   type InvoiceCalculatedTotals,
 } from './calculations';
@@ -43,7 +44,8 @@ export async function createInvoiceAction(
     const clientPoReference = (formData.get('clientPoReference') as string)?.trim() || null;
     const deliveryLocation = (formData.get('deliveryLocation') as string)?.trim() || null;
     const rawSupplyCode = (formData.get('placeOfSupplyStateCode') as string)?.trim();
-    const placeOfSupplyStateCode = rawSupplyCode ? rawSupplyCode.padStart(2, '0') : '';
+    const resolvedSupply = resolveIndianState(rawSupplyCode);
+    const placeOfSupplyStateCode = resolvedSupply ? resolvedSupply.code : (rawSupplyCode ? rawSupplyCode.padStart(2, '0') : '');
     const termsConditions = (formData.get('termsConditions') as string)?.trim() || null;
     const paymentInstructions = (formData.get('paymentInstructions') as string)?.trim() || null;
     const notes = (formData.get('notes') as string)?.trim() || null;
@@ -220,7 +222,9 @@ export async function updateDraftInvoiceAction(
     const invoiceType = ((formData.get('invoiceType') as string)?.trim() || 'tax_invoice') as InvoiceType;
     const invoiceDate = (formData.get('invoiceDate') as string)?.trim() || new Date().toISOString().split('T')[0];
     const dueDate = (formData.get('dueDate') as string)?.trim() || invoiceDate;
-    const placeOfSupplyStateCode = (formData.get('placeOfSupplyStateCode') as string)?.trim();
+    const rawSupplyCode = (formData.get('placeOfSupplyStateCode') as string)?.trim();
+    const resolvedSupply = resolveIndianState(rawSupplyCode);
+    const placeOfSupplyStateCode = resolvedSupply ? resolvedSupply.code : (rawSupplyCode ? rawSupplyCode.padStart(2, '0') : '');
     const deliveryLocation = (formData.get('deliveryLocation') as string)?.trim() || null;
     const clientPoReference = (formData.get('clientPoReference') as string)?.trim() || null;
     const termsConditions = (formData.get('termsConditions') as string)?.trim() || null;
@@ -1069,6 +1073,80 @@ export async function recordInvoiceDeliveryAction(
     return { success: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error logging invoice delivery.';
+    return { error: message };
+  }
+}
+
+
+/**
+ * Server Action: Discard an unissued draft invoice (BUG-044)
+ * Allows Super Admin, Admin, and Billing Managers to delete unnumbered drafts cleanly.
+ * Legally compliant with GST Rule 46: only unnumbered drafts without assigned statutory sequences can be discarded.
+ */
+export async function discardDraftInvoiceAction(
+  _prevState: ActionResponse | null,
+  formData: FormData
+): Promise<ActionResponse> {
+  try {
+    const { user, profile } = await requireStaffSession();
+
+    if (!['super_admin', 'admin', 'billing_manager'].includes(profile.role)) {
+      return { error: 'Access denied: You do not have permission to discard draft invoices.' };
+    }
+
+    const invoiceId = (formData.get('invoiceId') as string)?.trim();
+    if (!invoiceId) {
+      return { error: 'Invoice ID is required.' };
+    }
+
+    const adminClient = createAdminClient();
+
+    const { data: invoice, error: fetchErr } = await adminClient
+      .from('invoices')
+      .select('id, invoice_number, status, paid_amount')
+      .eq('id', invoiceId)
+      .single();
+
+    if (fetchErr || !invoice) {
+      return { error: 'Invoice not found.' };
+    }
+
+    if (invoice.status !== 'draft') {
+      return {
+        error: 'Only unissued draft invoices can be discarded. Formally issued invoices have assigned statutory numbers and must be cancelled or credit-noted under GST Rule 46.',
+      };
+    }
+
+    if (Number(invoice.paid_amount) > 0) {
+      return {
+        error: 'Cannot discard an invoice with recorded payments.',
+      };
+    }
+
+    // Delete line items
+    await adminClient.from('invoice_items').delete().eq('invoice_id', invoiceId);
+    // Delete invoice
+    const { error: deleteErr } = await adminClient.from('invoices').delete().eq('id', invoiceId);
+    if (deleteErr) {
+      return { error: `Failed to delete draft invoice: ${deleteErr.message}` };
+    }
+
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'invoices',
+      entity_id: invoiceId,
+      action: 'invoice_draft_discarded',
+      actor_type: 'staff',
+      actor_id: user.id,
+      previous_state: { status: 'draft' },
+      new_state: { discarded_at: new Date().toISOString() },
+    });
+
+    revalidatePath('/staff/billing');
+    revalidatePath('/staff');
+
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unexpected server error discarding invoice draft.';
     return { error: message };
   }
 }

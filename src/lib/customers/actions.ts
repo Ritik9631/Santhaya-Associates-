@@ -1,5 +1,6 @@
 'use server';
 
+import { resolveIndianState } from '@/lib/utils/indian-states';
 import { revalidatePath } from 'next/cache';
 import { requireStaffSession } from '@/lib/auth/session';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
@@ -90,8 +91,11 @@ export async function createCustomerAction(
 
     // Try inserting via authenticated client (RLS) or adminClient
     let customerId: string | null = null;
+    const resolvedState = resolveIndianState(stateCode || state);
     const normalizedState = state && state.trim() !== '' ? state.trim() : null;
     const normalizedStateCode = stateCode && stateCode.trim() !== '' ? stateCode.trim() : null;
+    const finalState = resolvedState ? resolvedState.name : normalizedState;
+    const finalStateCode = resolvedState ? resolvedState.code : normalizedStateCode;
     const normalizedEmail = email && email.trim() !== '' ? email.trim().toLowerCase() : null;
     const normalizedPhone = phone && phone.trim() !== '' ? phone.trim() : null;
     const normalizedGstin = gstin && gstin.trim() !== '' ? gstin.trim().toUpperCase() : null;
@@ -113,9 +117,9 @@ export async function createCustomerAction(
       gstin: normalizedGstin,
       pan: normalizedPan,
       billing_address: billingAddress && billingAddress.trim() !== '' ? billingAddress.trim() : null,
-      billing_state: normalizedState,
-      state: normalizedState,
-      state_code: normalizedStateCode,
+      billing_state: finalState,
+      state: finalState,
+      state_code: finalStateCode,
       notes: combinedNotes,
       created_by: profile.id,
     };
@@ -216,6 +220,9 @@ export async function updateCustomerAction(
 
     const normalizedState = state && state.trim() !== '' ? state.trim() : null;
     const normalizedStateCode = stateCode && stateCode.trim() !== '' ? stateCode.trim() : null;
+    const resolvedState = resolveIndianState(normalizedStateCode || normalizedState);
+    const finalState = resolvedState ? resolvedState.name : normalizedState;
+    const finalStateCode = resolvedState ? resolvedState.code : normalizedStateCode;
     const normalizedEmail = email && email.trim() !== '' ? email.trim().toLowerCase() : null;
     const normalizedPhone = phone && phone.trim() !== '' ? phone.trim() : null;
     const normalizedGstin = gstin && gstin.trim() !== '' ? gstin.trim().toUpperCase() : null;
@@ -237,9 +244,9 @@ export async function updateCustomerAction(
       gstin: normalizedGstin,
       pan: normalizedPan,
       billing_address: billingAddress && billingAddress.trim() !== '' ? billingAddress.trim() : null,
-      billing_state: normalizedState,
-      state: normalizedState,
-      state_code: normalizedStateCode,
+      billing_state: finalState,
+      state: finalState,
+      state_code: finalStateCode,
       notes: combinedNotes,
       updated_at: new Date().toISOString(),
     };
@@ -285,3 +292,189 @@ export async function toggleCustomerStatusAction(
   return { error: 'Customer activation/deactivation status is not supported on customer accounts.' };
 }
 
+
+/**
+ * Server Action: Administrative Customer Deletion (BUG-044)
+ * Super Admin only. Strictly guarded against cascading deletion of financial records.
+ * If customer is linked to quotations, invoices, or enquiries, deletion is BLOCKED.
+ */
+export async function deleteCustomerAction(
+  _prevState: ActionResponse | null,
+  formData: FormData
+): Promise<ActionResponse> {
+  try {
+    const { user, profile } = await requireStaffSession();
+
+    if (profile.role !== 'super_admin') {
+      return { error: 'Access denied: Only a Super Administrator can permanently delete customer records.' };
+    }
+
+    const customerId = (formData.get('customerId') as string)?.trim();
+    if (!customerId) {
+      return { error: 'Customer ID is required.' };
+    }
+
+    const adminClient = createAdminClient();
+
+    // 1. Fetch customer
+    const { data: customer, error: fetchErr } = await adminClient
+      .from('customers')
+      .select('id, company_name, email, phone')
+      .eq('id', customerId)
+      .single();
+
+    if (fetchErr || !customer) {
+      return { error: 'Customer record not found.' };
+    }
+
+    // 2. Relational safety guards: Check quotations and invoices
+    const [{ count: quoteCount }, { count: invoiceCount }] = await Promise.all([
+      adminClient.from('quotations').select('*', { count: 'exact', head: true }).eq('customer_id', customerId),
+      adminClient.from('invoices').select('*', { count: 'exact', head: true }).eq('customer_id', customerId),
+    ]);
+
+    if ((quoteCount || 0) > 0 || (invoiceCount || 0) > 0) {
+      return {
+        error: `Cannot delete customer "${customer.company_name}": Customer is linked to ${quoteCount || 0} quotation(s) and ${invoiceCount || 0} invoice(s). Statutory financial records cannot be orphaned or deleted. Please use "Archive Customer" instead.`,
+      };
+    }
+
+    // 3. Safe deletion
+    const { error: deleteErr } = await adminClient.from('customers').delete().eq('id', customerId);
+    if (deleteErr) {
+      return { error: `Failed to delete customer: ${deleteErr.message}` };
+    }
+
+    // 4. Audit Log
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'customers',
+      entity_id: customerId,
+      action: 'customer_deleted',
+      actor_type: 'staff',
+      actor_id: user.id,
+      previous_state: {
+        company_name: customer.company_name,
+        email: customer.email,
+        phone: customer.phone,
+      },
+    });
+
+    revalidatePath('/staff/customers');
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to delete customer.';
+    return { error: message };
+  }
+}
+
+/**
+ * Server Action: Administrative Customer Archival (BUG-044)
+ * Allows Super Admin and Admin to safely archive a customer without deleting financial history.
+ */
+export async function archiveCustomerAction(
+  _prevState: ActionResponse | null,
+  formData: FormData
+): Promise<ActionResponse> {
+  try {
+    const { user, profile } = await requireStaffSession();
+
+    if (profile.role !== 'super_admin' && profile.role !== 'admin') {
+      return { error: 'Access denied: Administrative privileges required to archive customers.' };
+    }
+
+    const customerId = (formData.get('customerId') as string)?.trim();
+    const reason = (formData.get('reason') as string)?.trim() || 'Archived by Administrator';
+
+    if (!customerId) return { error: 'Customer ID is required.' };
+
+    const adminClient = createAdminClient();
+    const { data: customer, error: fetchErr } = await adminClient
+      .from('customers')
+      .select('id, company_name, notes')
+      .eq('id', customerId)
+      .single();
+
+    if (fetchErr || !customer) return { error: 'Customer not found.' };
+
+    const archiveTag = `[ARCHIVED on ${new Date().toISOString().split('T')[0]}: ${reason}]`;
+    const updatedNotes = customer.notes ? `${customer.notes}\n${archiveTag}` : archiveTag;
+
+    const { error: updateErr } = await adminClient
+      .from('customers')
+      .update({ notes: updatedNotes, updated_at: new Date().toISOString() })
+      .eq('id', customerId);
+
+    if (updateErr) return { error: `Failed to archive customer: ${updateErr.message}` };
+
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'customers',
+      entity_id: customerId,
+      action: 'customer_archived',
+      actor_type: 'staff',
+      actor_id: user.id,
+      new_state: { reason, archived_at: new Date().toISOString() },
+    });
+
+    revalidatePath('/staff/customers');
+    revalidatePath(`/staff/customers/${customerId}`);
+    return { success: true };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Failed to archive customer.' };
+  }
+}
+
+/**
+ * Server Action: Restore Archived Customer (BUG-044)
+ */
+export async function restoreCustomerAction(
+  _prevState: ActionResponse | null,
+  formData: FormData
+): Promise<ActionResponse> {
+  try {
+    const { user, profile } = await requireStaffSession();
+
+    if (profile.role !== 'super_admin' && profile.role !== 'admin') {
+      return { error: 'Access denied: Administrative privileges required to restore customers.' };
+    }
+
+    const customerId = (formData.get('customerId') as string)?.trim();
+    if (!customerId) return { error: 'Customer ID is required.' };
+
+    const adminClient = createAdminClient();
+    const { data: customer, error: fetchErr } = await adminClient
+      .from('customers')
+      .select('id, notes')
+      .eq('id', customerId)
+      .single();
+
+    if (fetchErr || !customer) return { error: 'Customer not found.' };
+
+    // Strip [ARCHIVED ...] tags from notes
+    const cleanedNotes = (customer.notes || '')
+      .split('\n')
+      .filter((line: string) => !line.trim().startsWith('[ARCHIVED'))
+      .join('\n')
+      .trim();
+
+    const { error: updateErr } = await adminClient
+      .from('customers')
+      .update({ notes: cleanedNotes || null, updated_at: new Date().toISOString() })
+      .eq('id', customerId);
+
+    if (updateErr) return { error: `Failed to restore customer: ${updateErr.message}` };
+
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'customers',
+      entity_id: customerId,
+      action: 'customer_restored',
+      actor_type: 'staff',
+      actor_id: user.id,
+    });
+
+    revalidatePath('/staff/customers');
+    revalidatePath(`/staff/customers/${customerId}`);
+    return { success: true };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Failed to restore customer.' };
+  }
+}

@@ -61,6 +61,7 @@ export default async function CustomerDetailPage({ params }: PageProps) {
         customer={customer as any}
         auditLogs={(auditLogs || []) as any}
         canEdit={canEdit}
+        userRole={profile.role}
       />
     </div>
   );

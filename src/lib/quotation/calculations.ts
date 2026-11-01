@@ -10,18 +10,59 @@
  *    - Intra-State (Bihar to Bihar): CGST (Half rate) + SGST (Half rate), IGST = 0.
  *    - Inter-State (Bihar to Other States/UTs): IGST (Full rate), CGST = 0, SGST = 0.
  *    - Non-GST Quotation: Zero tax applicable.
- * 3. STATUTORY ROUNDING: Standard half-up decimal rounding to exactly 2 decimal places.
+ * 3. CANONICAL PLACE OF SUPPLY: Robust resolution of state codes and aliases (e.g. 'UP' -> '09').
+ * 4. STATUTORY ROUNDING: Standard half-up decimal rounding to exactly 2 decimal places.
  */
 
-export const COMPANY_STATE_CODE = '10'; // Bihar
-export const COMPANY_STATE_NAME = 'Bihar';
 
-export type TaxDeterminationStatus = 'intra_state' | 'inter_state' | 'undetermined' | 'not_applicable';
+export interface IndianState {
+  code: string;
+  name: string;
+  abbreviation: string;
+}
 
-/**
- * Validates whether a state code is a recognized Indian GST 2-digit state code.
- * Standard GST state codes range from 01 (Jammu & Kashmir) to 38 (Ladakh), plus 97 (Other Territory).
- */
+export const INDIAN_STATES: IndianState[] = [
+  { code: '01', name: 'Jammu & Kashmir', abbreviation: 'JK' },
+  { code: '02', name: 'Himachal Pradesh', abbreviation: 'HP' },
+  { code: '03', name: 'Punjab', abbreviation: 'PB' },
+  { code: '04', name: 'Chandigarh', abbreviation: 'CH' },
+  { code: '05', name: 'Uttarakhand', abbreviation: 'UK' },
+  { code: '06', name: 'Haryana', abbreviation: 'HR' },
+  { code: '07', name: 'Delhi', abbreviation: 'DL' },
+  { code: '08', name: 'Rajasthan', abbreviation: 'RJ' },
+  { code: '09', name: 'Uttar Pradesh', abbreviation: 'UP' },
+  { code: '10', name: 'Bihar', abbreviation: 'BR' },
+  { code: '11', name: 'Sikkim', abbreviation: 'SK' },
+  { code: '12', name: 'Arunachal Pradesh', abbreviation: 'AR' },
+  { code: '13', name: 'Nagaland', abbreviation: 'NL' },
+  { code: '14', name: 'Manipur', abbreviation: 'MN' },
+  { code: '15', name: 'Mizoram', abbreviation: 'MZ' },
+  { code: '16', name: 'Tripura', abbreviation: 'TR' },
+  { code: '17', name: 'Meghalaya', abbreviation: 'ML' },
+  { code: '18', name: 'Assam', abbreviation: 'AS' },
+  { code: '19', name: 'West Bengal', abbreviation: 'WB' },
+  { code: '20', name: 'Jharkhand', abbreviation: 'JH' },
+  { code: '21', name: 'Odisha', abbreviation: 'OD' },
+  { code: '22', name: 'Chhattisgarh', abbreviation: 'CG' },
+  { code: '23', name: 'Madhya Pradesh', abbreviation: 'MP' },
+  { code: '24', name: 'Gujarat', abbreviation: 'GJ' },
+  { code: '25', name: 'Daman & Diu', abbreviation: 'DD' },
+  { code: '26', name: 'Dadra & Nagar Haveli', abbreviation: 'DN' },
+  { code: '27', name: 'Maharashtra', abbreviation: 'MH' },
+  { code: '28', name: 'Andhra Pradesh (Old)', abbreviation: 'AP' },
+  { code: '29', name: 'Karnataka', abbreviation: 'KA' },
+  { code: '30', name: 'Goa', abbreviation: 'GA' },
+  { code: '31', name: 'Lakshadweep', abbreviation: 'LD' },
+  { code: '32', name: 'Kerala', abbreviation: 'KL' },
+  { code: '33', name: 'Tamil Nadu', abbreviation: 'TN' },
+  { code: '34', name: 'Puducherry', abbreviation: 'PY' },
+  { code: '35', name: 'Andaman & Nicobar Islands', abbreviation: 'AN' },
+  { code: '36', name: 'Telangana', abbreviation: 'TS' },
+  { code: '37', name: 'Andhra Pradesh', abbreviation: 'AD' },
+  { code: '38', name: 'Ladakh', abbreviation: 'LA' },
+  { code: '97', name: 'Other Territory', abbreviation: 'OT' },
+];
+
 export function isValidIndianStateCode(code: string | null | undefined): boolean {
   if (!code) return false;
   const trimmed = code.trim().padStart(2, '0');
@@ -30,21 +71,138 @@ export function isValidIndianStateCode(code: string | null | undefined): boolean
   return (num >= 1 && num <= 38) || num === 97;
 }
 
-/**
- * Determines statutory Indian GST classification without defaulting unknown states.
- * Missing or invalid Place of Supply is strictly 'undetermined'.
- */
+export function resolveIndianState(input: string | null | undefined): IndianState | null {
+  if (!input) return null;
+  const cleaned = input.trim();
+  if (!cleaned) return null;
+
+  if (/^\d{1,2}$/.test(cleaned)) {
+    const code = cleaned.padStart(2, '0');
+    const match = INDIAN_STATES.find((s) => s.code === code);
+    if (match) return match;
+  }
+
+  const upper = cleaned.toUpperCase();
+  const byAbbr = INDIAN_STATES.find((s) => s.abbreviation === upper);
+  if (byAbbr) return byAbbr;
+
+  const lower = cleaned.toLowerCase();
+  const byName = INDIAN_STATES.find(
+    (s) => s.name.toLowerCase() === lower || s.name.toLowerCase().replace(/[^a-z0-9]/g, '') === lower.replace(/[^a-z0-9]/g, '')
+  );
+  if (byName) return byName;
+
+  const partial = INDIAN_STATES.find(
+    (s) => lower.includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(lower)
+  );
+  if (partial) return partial;
+
+  return null;
+}
+
+export function formatPlaceOfSupply(codeOrName: string | null | undefined): string {
+  const resolved = resolveIndianState(codeOrName);
+  if (!resolved) return 'Pending Determination';
+  return `${resolved.name} (${resolved.code})`;
+}
+
+export function convertNumberToIndianWords(amount: number): string {
+  if (!amount || amount === 0) return 'Rupees Zero Only';
+
+  const singleDigits = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function convertTwoDigits(n: number): string {
+    if (n === 0) return '';
+    if (n < 10) return singleDigits[n];
+    if (n < 20) return teens[n - 10];
+    const unit = n % 10;
+    return tens[Math.floor(n / 10)] + (unit > 0 ? ' ' + singleDigits[unit] : '');
+  }
+
+  function convertThreeDigits(n: number): string {
+    const hundred = Math.floor(n / 100);
+    const rest = n % 100;
+    let res = '';
+    if (hundred > 0) {
+      res += singleDigits[hundred] + ' Hundred';
+      if (rest > 0) res += ' and ';
+    }
+    if (rest > 0) {
+      res += convertTwoDigits(rest);
+    }
+    return res.trim();
+  }
+
+  const totalPaise = Math.round(Math.abs(amount) * 100);
+  const rupees = Math.floor(totalPaise / 100);
+  const paise = totalPaise % 100;
+
+  let words = '';
+
+  if (rupees === 0) {
+    words = 'Zero Rupees';
+  } else {
+    let rem = rupees;
+    const parts: string[] = [];
+
+    if (rem >= 10000000) {
+      const crores = Math.floor(rem / 10000000);
+      rem %= 10000000;
+      if (crores >= 100) {
+        parts.push(convertThreeDigits(crores) + ' Crore');
+      } else {
+        parts.push(convertTwoDigits(crores) + ' Crore');
+      }
+    }
+
+    if (rem >= 100000) {
+      const lakhs = Math.floor(rem / 100000);
+      rem %= 100000;
+      parts.push(convertTwoDigits(lakhs) + ' Lakh');
+    }
+
+    if (rem >= 1000) {
+      const thousands = Math.floor(rem / 1000);
+      rem %= 1000;
+      parts.push(convertTwoDigits(thousands) + ' Thousand');
+    }
+
+    if (rem > 0) {
+      parts.push(convertThreeDigits(rem));
+    }
+
+    words = 'Rupees ' + parts.join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  if (paise > 0) {
+    const paiseText = convertTwoDigits(paise);
+    return `${words} and ${paiseText} Paise Only`;
+  }
+
+  return `${words} Only`;
+}
+
+export const COMPANY_STATE_CODE = '10'; // Bihar
+export const COMPANY_STATE_NAME = 'Bihar';
+
+export type TaxDeterminationStatus = 'intra_state' | 'inter_state' | 'undetermined' | 'not_applicable';
+
 export function determineTaxStatus(
   isTaxable: boolean,
   placeOfSupplyStateCode?: string | null,
   companyStateCode = COMPANY_STATE_CODE
 ): TaxDeterminationStatus {
   if (!isTaxable) return 'not_applicable';
-  if (!placeOfSupplyStateCode || !isValidIndianStateCode(placeOfSupplyStateCode)) {
+  const resolvedSupply = resolveIndianState(placeOfSupplyStateCode);
+  if (!resolvedSupply) {
     return 'undetermined';
   }
-  const normSupply = placeOfSupplyStateCode.trim().padStart(2, '0');
-  const normCompany = companyStateCode.trim().padStart(2, '0');
+  const resolvedCompany = resolveIndianState(companyStateCode);
+  const normSupply = resolvedSupply.code;
+  const normCompany = resolvedCompany ? resolvedCompany.code : companyStateCode.trim().padStart(2, '0');
+
   return normSupply === normCompany ? 'intra_state' : 'inter_state';
 }
 
@@ -134,7 +292,7 @@ export function calculateLineItem(
 
   // Gross line amount before discount
   const grossAmount = roundToTwoDecimals(quantity * unitRate);
-  
+
   // Taxable amount cannot be negative
   const taxableAmount = Math.max(0, roundToTwoDecimals(grossAmount - discountAmount));
 
@@ -158,9 +316,6 @@ export function calculateLineItem(
     // Full rate applied to IGST
     igstRate = gstRate;
     igstAmount = roundToTwoDecimals((taxableAmount * igstRate) / 100);
-  } else {
-    // taxDetermination is 'undetermined' or 'not_applicable':
-    // Zero tax assigned. Never assume intra or inter state.
   }
 
   const taxAmount = roundToTwoDecimals(cgstAmount + sgstAmount + igstAmount);
@@ -196,7 +351,8 @@ export function calculateQuotationTotals(
   isGstApplicable = true,
   placeOfSupplyStateCode?: string
 ): QuotationTotals {
-  const normalizedSupplyCode = placeOfSupplyStateCode ? placeOfSupplyStateCode.trim().padStart(2, '0') : '';
+  const resolvedSupply = resolveIndianState(placeOfSupplyStateCode);
+  const normalizedSupplyCode = resolvedSupply ? resolvedSupply.code : (placeOfSupplyStateCode?.trim() || '');
   const taxDetermination = determineTaxStatus(isGstApplicable, normalizedSupplyCode, COMPANY_STATE_CODE);
   const isIntraState = taxDetermination === 'intra_state';
   const isInterState = taxDetermination === 'inter_state';
@@ -225,7 +381,7 @@ export function calculateQuotationTotals(
 
   const totalTaxAmount = roundToTwoDecimals(cgstAmount + sgstAmount + igstAmount);
   const unroundedGrandTotal = roundToTwoDecimals(taxableAmount + totalTaxAmount);
-  
+
   // Standard rounding to nearest rupee for statutory presentation
   const grandTotalRounded = Math.round(unroundedGrandTotal);
   const roundOffAmount = roundToTwoDecimals(grandTotalRounded - unroundedGrandTotal);
@@ -262,73 +418,6 @@ export function calculateQuotationTotals(
 }
 
 /**
- * Converts a numeric amount to Indian Rupee Words (Lakhs, Crores system).
- */
-export function convertNumberToIndianWords(amount: number): string {
-  if (amount === 0) return 'Rupees Zero Only';
-
-  const singleDigits = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-
-  function convertTwoDigits(n: number): string {
-    if (n === 0) return '';
-    if (n < 10) return singleDigits[n];
-    if (n < 20) return teens[n - 10];
-    const unit = n % 10;
-    return tens[Math.floor(n / 10)] + (unit > 0 ? ' ' + singleDigits[unit] : '');
-  }
-
-  function convertThreeDigits(n: number): string {
-    const hundred = Math.floor(n / 100);
-    const rest = n % 100;
-    let res = '';
-    if (hundred > 0) {
-      res += singleDigits[hundred] + ' Hundred';
-      if (rest > 0) res += ' and ';
-    }
-    if (rest > 0) {
-      res += convertTwoDigits(rest);
-    }
-    return res;
-  }
-
-  const intPart = Math.floor(Math.abs(amount));
-  if (intPart === 0) return 'Rupees Zero Only';
-
-  let remaining = intPart;
-  const parts: string[] = [];
-
-  // Crores (>= 1,00,00,000)
-  if (remaining >= 10000000) {
-    const crores = Math.floor(remaining / 10000000);
-    parts.push(convertThreeDigits(crores) + ' Crore');
-    remaining %= 10000000;
-  }
-
-  // Lakhs (>= 1,00,000)
-  if (remaining >= 100000) {
-    const lakhs = Math.floor(remaining / 100000);
-    parts.push(convertTwoDigits(lakhs) + ' Lakh');
-    remaining %= 100000;
-  }
-
-  // Thousands (>= 1,000)
-  if (remaining >= 1000) {
-    const thousands = Math.floor(remaining / 1000);
-    parts.push(convertTwoDigits(thousands) + ' Thousand');
-    remaining %= 1000;
-  }
-
-  // Remaining hundreds, tens and units (< 1000)
-  if (remaining > 0) {
-    parts.push(convertThreeDigits(remaining));
-  }
-
-  return 'Rupees ' + parts.join(' ') + ' Only';
-}
-
-/**
  * Validates allowed lifecycle state transitions for quotations.
  */
 export type QuotationStatus =
@@ -357,4 +446,3 @@ export function isAllowedStatusTransition(current: QuotationStatus, next: Quotat
   const allowed = ALLOWED_STATUS_TRANSITIONS[current] || [];
   return allowed.includes(next);
 }
-

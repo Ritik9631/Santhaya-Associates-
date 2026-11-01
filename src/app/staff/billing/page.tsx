@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { requireStaffSession } from '@/lib/auth/session';
+import { calculateFinancialSummary } from '@/lib/billing/financial-aggregation';
+import { formatCompactRupee, formatIndianRupee } from '@/lib/utils/currency';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { formatIndianDate } from '@/lib/utils/date';
-import { formatIndianRupee, formatCompactRupee } from '@/lib/utils/currency';
 import {
   Receipt,
   Plus,
@@ -60,7 +61,7 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
     `)
     .order('created_at', { ascending: false });
 
-  if (statusFilter && statusFilter !== 'all') {
+  if (statusFilter && statusFilter !== 'all' && statusFilter !== 'outstanding') {
     query = query.eq('status', statusFilter as any);
   }
 
@@ -69,6 +70,11 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
 
   // Filter in memory for search query
   const filteredInvoices = allInvoices.filter((inv: any) => {
+    if (statusFilter === 'outstanding') {
+      const isPendingBalance = Number(inv.balance_amount || 0) > 0;
+      const isNotDraftOrCancelled = inv.status !== 'draft' && inv.status !== 'cancelled';
+      if (!isPendingBalance || !isNotDraftOrCancelled) return false;
+    }
     if (!searchQuery) return true;
     const num = inv.invoice_number?.toLowerCase() || '';
     const cust = inv.customer_billing_name?.toLowerCase() || '';
@@ -76,14 +82,16 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
     return num.includes(searchQuery) || cust.includes(searchQuery) || gstin.includes(searchQuery);
   });
 
-  // Calculate Financial KPIs across non-cancelled invoices
-  const activeInvoices = allInvoices.filter((inv: any) => inv.status !== 'cancelled');
+  // Calculate Financial KPIs using strict financial aggregation (BUG-041 & BUG-046)
   const todayStr = new Date().toISOString().split('T')[0];
-
-  const totalInvoiced = activeInvoices.reduce((sum, inv) => sum + Number(inv.grand_total_amount || 0), 0);
-  const totalCollected = activeInvoices.reduce((sum, inv) => sum + Number(inv.paid_amount || 0), 0);
-  const totalOutstanding = activeInvoices.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0);
-  const overdueCount = activeInvoices.filter((inv) => inv.balance_amount > 0 && inv.due_date < todayStr).length;
+  const financialSummary = calculateFinancialSummary(allInvoices, todayStr);
+  const totalInvoiced = financialSummary.totalInvoiced;
+  const totalCollected = financialSummary.collectedRevenue;
+  const totalOutstanding = financialSummary.outstandingBalance;
+  const overdueCount = financialSummary.overdueCount;
+  const activeInvoiceCount = financialSummary.activeInvoiceCount;
+  const draftInvoiceCount = financialSummary.draftInvoiceCount;
+  const draftInvoiceValue = financialSummary.draftInvoiceValue;
 
   const statusColors: Record<string, string> = {
     draft: 'bg-amber-100 text-amber-800 border-amber-300',
@@ -97,6 +105,7 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
 
   const tabs = [
     { label: 'All Invoices', value: '' },
+    { label: 'Outstanding Dues', value: 'outstanding' },
     { label: 'Drafts', value: 'draft' },
     { label: 'Issued', value: 'issued' },
     { label: 'Partially Paid', value: 'partially_paid' },
@@ -131,6 +140,23 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
         )}
       </div>
 
+      {/* Draft Invoices Segregation Notice (BUG-041) */}
+      {draftInvoiceCount > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 px-4 flex items-center justify-between text-xs text-amber-200">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-amber-300">Draft Invoices (Unissued Proposals):</span>
+            <span className="font-mono text-white font-medium">{draftInvoiceCount} drafts ({formatCompactRupee(draftInvoiceValue)})</span>
+            <span className="text-slate-400 hidden sm:inline">— Excluded from statutory revenue and accounts receivable ledgers.</span>
+          </div>
+          <Link
+            href="/staff/billing?status=draft"
+            className="text-gold-400 hover:text-gold-300 font-semibold underline shrink-0 ml-2"
+          >
+            Review Drafts
+          </Link>
+        </div>
+      )}
+
       {/* KPI Cards — Responsive and Compact Currency (BUG-024 & BUG-025) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Invoiced */}
@@ -143,7 +169,7 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
             <p className="text-2xl font-bold text-slate-900 mt-1 font-mono truncate">
               {formatCompactRupee(totalInvoiced)}
             </p>
-            <p className="text-xs text-slate-500 mt-1 truncate">{activeInvoices.length} active invoices</p>
+            <p className="text-xs text-slate-500 mt-1 truncate">{activeInvoiceCount} active invoices</p>
           </div>
           <div className="w-11 h-11 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center shrink-0 ml-2">
             <TrendingUp className="w-6 h-6" />
@@ -169,22 +195,23 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
           </div>
         </div>
 
-        {/* Outstanding Balance */}
-        <div
-          className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-center justify-between min-w-0"
-          title={`Outstanding Balance: ${formatIndianRupee(totalOutstanding)}`}
+        {/* Outstanding Balance (BUG-043: Actionable Filter Link) */}
+        <Link
+          href="/staff/billing?status=outstanding"
+          className="bg-white hover:bg-amber-50/40 rounded-xl border border-slate-200 hover:border-amber-300 p-4 shadow-sm flex items-center justify-between min-w-0 transition group cursor-pointer"
+          title={`Outstanding Balance: ${formatIndianRupee(totalOutstanding)} (Click to filter)`}
         >
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Outstanding Balance</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider truncate group-hover:text-amber-800">Outstanding Balance</p>
             <p className="text-2xl font-bold text-amber-700 mt-1 font-mono truncate">
               {formatCompactRupee(totalOutstanding)}
             </p>
-            <p className="text-xs text-slate-500 mt-1 truncate">Pending customer settlement</p>
+            <p className="text-xs text-slate-500 mt-1 truncate group-hover:text-amber-700">Filter outstanding settlements →</p>
           </div>
-          <div className="w-11 h-11 bg-amber-50 text-amber-700 rounded-lg flex items-center justify-center shrink-0 ml-2">
+          <div className="w-11 h-11 bg-amber-50 text-amber-700 group-hover:bg-amber-100 rounded-lg flex items-center justify-center shrink-0 ml-2 transition">
             <Clock className="w-6 h-6" />
           </div>
-        </div>
+        </Link>
 
         {/* Overdue Invoices (BUG-025) */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-center justify-between min-w-0">
@@ -276,11 +303,31 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
                     <Receipt className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-                    <p className="font-medium text-slate-700">No invoices found</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {searchQuery
-                        ? 'No invoices match your search query.'
-                        : 'Generate a new invoice or convert an accepted quotation.'}
+                    <p className="font-medium text-slate-700 text-sm">
+                      {statusFilter === 'outstanding'
+                        ? 'Zero Outstanding Dues'
+                        : statusFilter === 'draft'
+                        ? 'No Draft Invoices Pending'
+                        : statusFilter === 'paid'
+                        ? 'No Fully Paid Invoices'
+                        : statusFilter === 'cancelled'
+                        ? 'No Cancelled Invoices'
+                        : searchQuery
+                        ? 'No Matching Invoices Found'
+                        : 'No Invoices Recorded'}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                      {statusFilter === 'outstanding'
+                        ? 'All issued tax invoices have been settled in full. There are currently no pending receivables.'
+                        : statusFilter === 'draft'
+                        ? 'There are no active draft proposals. Click Create Invoice to draft a new invoice.'
+                        : statusFilter === 'paid'
+                        ? 'Settled invoices with zero remaining balance will appear here once full payments are recorded.'
+                        : statusFilter === 'cancelled'
+                        ? 'No invoices have been voided or cancelled under GST Rule 46.'
+                        : searchQuery
+                        ? `No invoices found matching query "${searchQuery}". Try searching by customer name or invoice number.`
+                        : 'Create a direct invoice or convert an accepted quotation to begin billing operations.'}
                     </p>
                     {canManage && (
                       <div className="mt-4">

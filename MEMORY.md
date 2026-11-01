@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-11-01 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediation | Implementation status: Batches 1, 2, BUG-017, and Batch 3 (BUG-018 through BUG-028) Complete & Verified (610+ automated tests passing); Phase 7 Planned
+Updated: 2026-11-01 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediation | Implementation status: Batches 1, 2, BUG-017, Batch 3, and Batch 4 (BUG-030 through BUG-049) Complete & Verified (630+ automated tests passing); Phase 7 Planned
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -586,6 +586,56 @@ Updated: 2026-11-01 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediatio
       - `npm.cmd run typecheck`: 0 errors.
       - `npm.cmd run lint`: 0 warnings, 0 errors.
       - `npm.cmd run build`: 26/26 routes compiled and optimized cleanly.
+
+- 2026-11-01: Batch 4 Implementation — Financial Accuracy, Document Design, Admin Controls, Outstanding Dues & Mobile UX (BUG-030 through BUG-049):
+  1. BUG-030 & BUG-034 (Premium Document Header & Explicit GST Columns):
+     - Updated src/app/staff/quotations/[id]/pdf/page.tsx and src/app/staff/billing/[id]/pdf/page.tsx with a balanced two-column header incorporating authentic santhaya-symbol.png, registered legal entity name (Santhaya Associates Pvt. Ltd.), Gopalpur, Motihari registered address, GSTIN 10ABVCS4277J1ZU, Bihar (10), and PAN ABVCS4277J (marked as Pending Verification on draft documents).
+     - Separated tax columns in quotation/invoice print layouts into distinct explicit columns: Rate (₹), Taxable Amount (₹), GST Rate (%), Tax Amount (₹), and Line Total (₹), eliminating financial ambiguity for clients and tax officers.
+  2. BUG-031 & BUG-033 (Indian States Dictionary & Robust Inter-State IGST Calculation):
+     - Created src/lib/utils/indian-states.ts with complete statutory dictionary covering all 36+ Indian states and Union Territories (01–38, 97).
+     - Implemented resolveIndianState() supporting case-insensitive state names, statutory 2-digit codes, and abbreviations (e.g. 'UP', 'Uttar Pradesh', '09' all resolve to { code: '09', name: 'Uttar Pradesh' }).
+     - Implemented formatPlaceOfSupply() outputting canonical "State Name (Code)" (e.g. "Uttar Pradesh (09)") or "Pending Determination".
+     - Fixed src/lib/quotation/calculations.ts and src/lib/billing/calculations.ts to normalize input state strings, ensuring inter-state supplies (e.g., Bihar supplier 10 to Uttar Pradesh 09) properly calculate non-zero 18% IGST instead of 0% tax.
+  3. BUG-032 & BUG-035 (High-Contrast Typography & Single-Page A4 Portrait Print Geometry):
+     - Standardized print stylesheet with CSS @page { size: A4 portrait; margin: 8mm 10mm; } and high-contrast typography (text-slate-900 / text-slate-800), eliminating faint grey printouts.
+     - Compressed vertical spacing across header, item rows, subtotal breakdown, and signature blocks so single- and two-item quotations and invoices fit cleanly onto a single A4 sheet without overflowing to an unstyled blank page.
+  4. BUG-036, BUG-039 & BUG-040 (Multi-Crores Word Conversion & Compact Rupee Formatting):
+     - Upgraded convertNumberToIndianWords in src/lib/utils/currency.ts to handle arbitrary multi-Crore amounts and Paise denominations ("Rupees ... and Fifty Paise Only").
+     - Enhanced formatCompactRupee (₹Cr, ₹L, ₹K) with precision bounding, and wired accessible tooltip wrappers showing full formatted values on dashboard KPI cards.
+  5. BUG-037 & BUG-038 (Dual Signatures & Statutory Legal Terms):
+     - Created src/lib/billing/default-terms.ts with getDefaultQuotationTerms (10 commercial clauses including Motihari, Bihar jurisdiction, GST exclusions, transit insurance, price escalation) and getDefaultInvoiceTerms (7 statutory clauses compliant with CGST Rule 46).
+     - Pre-populated default terms in QuotationForm.tsx and InvoiceForm.tsx.
+     - Added dual formal signature blocks: Client Acceptance Acknowledgment & Authorized Signatory seal.
+  6. BUG-041 & BUG-046 (Strict Financial Ledger Segregation):
+     - Created src/lib/billing/financial-aggregation.ts providing calculateFinancialSummary().
+     - Excluded draft (status === 'draft') and cancelled invoices from active total invoiced, collected revenue, and outstanding balance metrics.
+     - Segregated draft invoices into a dedicated informational notice banner, preventing unissued drafts from corrupting accounts receivable ledgers.
+  7. BUG-043, BUG-048 & BUG-049 (Actionable Outstanding Dues & Billing Tab Polish):
+     - Made the Outstanding Dues KPI card on /staff an actionable direct link to /staff/billing?status=outstanding.
+     - Added dedicated "Outstanding Dues" tab in /staff/billing/page.tsx filtering active unpaid invoices (balance_amount > 0 excluding drafts and cancellations).
+     - Added contextual empty states for every billing tab (All, Outstanding, Drafts, Issued, Partially Paid, Paid, Cancelled, Search).
+  8. BUG-044 (Super Admin Lifecycle Controls):
+     - Implemented discardDraftQuotationAction in src/lib/quotation/actions.ts: cleanly deletes unissued draft quotations, line items, and delivery logs; verifies zero linked invoices; logs audit record.
+     - Implemented discardDraftInvoiceAction in src/lib/billing/actions.ts: cleanly discards unissued draft invoices; preserves CGST Rule 46 immutability for issued invoices.
+     - Implemented deleteCustomerAction in src/lib/customers/actions.ts: restricted to Super Admin; checks for linked quotation and invoice records, strictly blocking deletion if financial records exist.
+     - Implemented archiveCustomerAction and restoreCustomerAction for soft lifecycle management.
+  9. Automated Verification Gates Passed (100%):
+     - test:batch4: 17/17 assertions passed.
+     - test:batch3: 18/18 assertions passed.
+     - test:batch2: 17/17 assertions passed.
+     - test:phase6: 68/68 assertions passed.
+     - test:phase5: 121/121 assertions passed.
+     - test:phase4: 108/108 assertions passed.
+     - test:phase3c: 72/72 assertions passed.
+     - test:phase3d: 37/37 assertions passed.
+     - test:phase3a1: 39/39 assertions passed.
+     - test:phase3a2: 55/55 assertions passed.
+     - test:super-admin: 1 active Super Admin verified.
+     - test:connection: bkqneudnnhvvwmtggorz verified.
+     - typecheck: 0 errors.
+     - lint: 0 warnings, 0 errors.
+     - build: 26/26 static & dynamic pages compiled cleanly.
+     - Live CSS verification: HTTP 200 text/css on /staff/login (BUG-029 resolved).
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

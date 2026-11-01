@@ -8,6 +8,8 @@ import {
   type LineItemInput,
   type QuotationTotals,
 } from '@/lib/quotation/calculations';
+import { INDIAN_STATES, resolveIndianState } from '@/lib/utils/indian-states';
+import { getDefaultQuotationTerms } from '@/lib/billing/default-terms';
 import { Plus, Trash2, CheckCircle2, AlertCircle, ArrowLeft, FileCheck } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -80,8 +82,9 @@ export default function QuotationForm({
     initialData?.customer_id || defaultCustomerId || (customers[0]?.id || '')
   );
   const [enquiryId, setEnquiryId] = useState(defaultEnquiryId || '');
+  const defaultSupplyResolved = resolveIndianState(initialData?.place_of_supply_state_code || defaultCust?.state_code || defaultCust?.state);
   const [placeOfSupplyStateCode, setPlaceOfSupplyStateCode] = useState(
-    initialData?.place_of_supply_state_code ?? (defaultCust?.state_code || '')
+    defaultSupplyResolved ? defaultSupplyResolved.code : ''
   );
   const [isGstApplicable, setIsGstApplicable] = useState(initialData?.is_gst_applicable ?? true);
   const [validityDays, setValidityDays] = useState(initialData?.validity_days ?? 30);
@@ -90,7 +93,9 @@ export default function QuotationForm({
     initialData?.payment_terms ||
       '100% advance against Proforma Invoice or 30 days credit on approved LC'
   );
-  const [termsConditions, setTermsConditions] = useState(initialData?.terms_conditions || '');
+  const [termsConditions, setTermsConditions] = useState(
+    initialData?.terms_conditions ?? getDefaultQuotationTerms(initialData?.validity_days ?? 30)
+  );
   const [notes, setNotes] = useState(initialData?.notes || '');
 
   // Line items state
@@ -115,7 +120,8 @@ export default function QuotationForm({
   const handleCustomerChange = (id: string) => {
     setCustomerId(id);
     const selected = customers.find((c) => c.id === id);
-    setPlaceOfSupplyStateCode(selected?.state_code || '');
+    const resolved = resolveIndianState(selected?.state_code || selected?.state);
+    setPlaceOfSupplyStateCode(resolved?.code || '');
   };
 
   // Add line item
@@ -300,17 +306,11 @@ export default function QuotationForm({
               className={formSelectClasses}
             >
               <option value="">-- Place of Supply Pending (Required for Taxable Quote) --</option>
-              <option value="10">10 — Bihar (Intra-State: CGST + SGST)</option>
-              <option value="07">07 — Delhi (Inter-State: IGST)</option>
-              <option value="09">09 — Uttar Pradesh (Inter-State: IGST)</option>
-              <option value="06">06 — Haryana (Inter-State: IGST)</option>
-              <option value="20">20 — Jharkhand (Inter-State: IGST)</option>
-              <option value="19">19 — West Bengal (Inter-State: IGST)</option>
-              <option value="21">21 — Odisha (Inter-State: IGST)</option>
-              <option value="08">08 — Rajasthan (Inter-State: IGST)</option>
-              <option value="27">27 — Maharashtra (Inter-State: IGST)</option>
-              <option value="23">23 — Madhya Pradesh (Inter-State: IGST)</option>
-              <option value="24">24 — Gujarat (Inter-State: IGST)</option>
+              {INDIAN_STATES.map((st) => (
+                <option key={st.code} value={st.code}>
+                  {st.code} — {st.name} {st.code === '10' ? '(Intra-State: CGST + SGST)' : '(Inter-State: IGST)'}
+                </option>
+              ))}
             </select>
           </div>
         </div>

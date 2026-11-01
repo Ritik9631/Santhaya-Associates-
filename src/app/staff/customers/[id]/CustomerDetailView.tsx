@@ -13,7 +13,12 @@ import {
   MapPin,
   History,
 } from 'lucide-react';
-import type { CustomerType } from '@/types/database';
+import type { CustomerType, StaffRole } from '@/types/database';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { resolveIndianState, formatPlaceOfSupply } from '@/lib/utils/indian-states';
+import { deleteCustomerAction, archiveCustomerAction, restoreCustomerAction } from '@/lib/customers/actions';
+import { Trash2, Archive, RotateCcw, AlertCircle } from 'lucide-react';
 
 interface CustomerDetailViewProps {
   customer: {
@@ -43,9 +48,59 @@ interface CustomerDetailViewProps {
     new_state: Record<string, unknown> | null;
   }>;
   canEdit: boolean;
+  userRole?: StaffRole;
 }
 
-export function CustomerDetailView({ customer, auditLogs, canEdit }: CustomerDetailViewProps) {
+export function CustomerDetailView({ customer, auditLogs, canEdit, userRole }: CustomerDetailViewProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const isSuperAdmin = userRole === 'super_admin';
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const isArchived = customer.notes?.includes('[ARCHIVED');
+
+  const handleDeleteCustomer = async () => {
+    if (!confirm(`Are you sure you want to permanently delete '${customer.company_name}'? This action cannot be undone and will be blocked if linked quotations or invoices exist.`)) {
+      return;
+    }
+    setActionError(null);
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.append('customerId', customer.id);
+      const res = await deleteCustomerAction(null, formData);
+      if (res.error) {
+        setActionError(res.error);
+      } else {
+        router.push('/staff/customers');
+      }
+    });
+  };
+
+  const handleArchiveToggle = async () => {
+    setActionError(null);
+    if (isArchived) {
+      if (!confirm(`Restore '${customer.company_name}' to active customer directory?`)) return;
+      startTransition(async () => {
+        const formData = new FormData();
+        formData.append('customerId', customer.id);
+        const res = await restoreCustomerAction(null, formData);
+        if (res.error) setActionError(res.error);
+        else router.refresh();
+      });
+    } else {
+      const reason = prompt(`Enter reason for archiving '${customer.company_name}':`, 'Account deactivation / dormant');
+      if (reason === null) return;
+      startTransition(async () => {
+        const formData = new FormData();
+        formData.append('customerId', customer.id);
+        formData.append('reason', reason);
+        const res = await archiveCustomerAction(null, formData);
+        if (res.error) setActionError(res.error);
+        else router.refresh();
+      });
+    }
+  };
   const typeLabels: Record<string, string> = {
     private_corporate: 'Private Corporate / Commercial',
     government: 'Government / Public Sector',
@@ -148,7 +203,7 @@ export function CustomerDetailView({ customer, auditLogs, canEdit }: CustomerDet
             </span>
             <p className="text-slate-300 whitespace-pre-wrap">{customer.billing_address || 'No billing address recorded.'}</p>
             <p className="text-slate-500 text-[11px]">
-              State: {customer.state ? `${customer.state}${customer.state_code ? ` (Code: ${customer.state_code})` : ''}` : 'Not Specified'}
+              State / Place of Supply: {formatPlaceOfSupply(customer.state_code || customer.state)}
             </p>
           </div>
 

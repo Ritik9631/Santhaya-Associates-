@@ -1,5 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
+import { calculateFinancialSummary } from '@/lib/billing/financial-aggregation';
+import { formatCompactRupee, formatIndianRupee } from '@/lib/utils/currency';
 import { requireStaffSession } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
@@ -69,7 +71,7 @@ export default async function StaffOverviewPage() {
     adminClient.from('products_services').select('*', { count: 'exact', head: true }),
     adminClient.from('quotations').select('id, status'),
     canViewFinancials
-      ? adminClient.from('invoices').select('id, status, grand_total_amount, balance_amount')
+      ? adminClient.from('invoices').select('id, status, grand_total_amount, balance_amount, paid_amount, due_date')
       : Promise.resolve({ data: [] }),
     adminClient.from('email_outbox').select('id, status'),
     adminClient
@@ -96,13 +98,12 @@ export default async function StaffOverviewPage() {
   const issuedQuotes = quoteRows?.filter((q) => q.status === 'issued').length || 0;
   const acceptedQuotes = quoteRows?.filter((q) => q.status === 'accepted').length || 0;
 
-  // Aggregate Invoices (Role Protected)
+  // Aggregate Invoices with strict draft/cancelled exclusion (BUG-041 & BUG-046)
+  const financialSummary = calculateFinancialSummary((invoiceRows || []) as any);
+  const totalInvoiced = financialSummary.totalInvoiced;
+  const totalBalanceOutstanding = financialSummary.outstandingBalance;
+  const issuedInvoices = financialSummary.activeInvoiceCount;
   const totalInvoices = invoiceRows?.length || 0;
-  const issuedInvoices = invoiceRows?.filter((i) => i.status !== 'draft' && i.status !== 'cancelled').length || 0;
-  const totalBalanceOutstanding = (invoiceRows || []).reduce(
-    (acc, inv) => acc + Number(inv.balance_amount || 0),
-    0
-  );
 
   // Aggregate Outbox Communications
   const totalOutbox = outboxRows?.length || 0;
@@ -222,18 +223,19 @@ export default async function StaffOverviewPage() {
           </div>
         </Link>
 
-        {/* Financial Billing KPI (Role-Governed) */}
+        {/* Financial Billing KPI (Role-Governed) — Actionable link to ?status=outstanding with compact currency (BUG-040 & BUG-043) */}
         {canViewFinancials ? (
           <Link
-            href="/staff/billing"
+            href="/staff/billing?status=outstanding"
+            title={`Total Outstanding Dues: ${formatIndianRupee(totalBalanceOutstanding)}`}
             className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-xl p-4 space-y-1.5 transition group"
           >
             <div className="flex items-center justify-between text-slate-400 text-xs">
               <span className="font-semibold uppercase tracking-wider text-[11px]">Outstanding Dues</span>
               <Receipt className="w-4 h-4 text-gold-400 group-hover:scale-110 transition-transform" />
             </div>
-            <div className="text-2xl font-bold text-white">
-              ₹{totalBalanceOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <div className="text-2xl font-bold text-white font-mono truncate">
+              {formatCompactRupee(totalBalanceOutstanding)}
             </div>
             <div className="text-[11px] text-slate-400 font-mono">
               {issuedInvoices} active invoices • CGST Rule 46

@@ -7,6 +7,8 @@ import {
   updateDraftInvoiceAction,
   convertQuotationToInvoiceAction,
 } from '@/lib/billing/actions';
+import { INDIAN_STATES, resolveIndianState } from '@/lib/utils/indian-states';
+import { getDefaultInvoiceTerms } from '@/lib/billing/default-terms';
 import {
   calculateInvoiceTotals,
   isValidIndianStateCode,
@@ -108,8 +110,7 @@ export default function InvoiceForm({
   const [clientPoReference, setClientPoReference] = useState(initialData?.client_po_reference || '');
   const [deliveryLocation, setDeliveryLocation] = useState(initialData?.delivery_location || '');
   const [termsConditions, setTermsConditions] = useState(
-    initialData?.terms_conditions ||
-      'Payment due within 30 days from invoice date. Subject to Motihari, Bihar jurisdiction.'
+    initialData?.terms_conditions || getDefaultInvoiceTerms(dueDate)
   );
   const [paymentInstructions, setPaymentInstructions] = useState(
     initialData?.payment_instructions || getPaymentInstructions(companyProfile)
@@ -122,8 +123,9 @@ export default function InvoiceForm({
     [customers, customerId]
   );
 
+  const defaultSupplyResolved = resolveIndianState(initialData?.placeOfSupplyStateCode || selectedCustomer?.state_code || selectedCustomer?.state);
   const [placeOfSupplyStateCode, setPlaceOfSupplyStateCode] = useState(
-    initialData?.placeOfSupplyStateCode ?? (selectedCustomer?.state_code || '')
+    defaultSupplyResolved ? defaultSupplyResolved.code : ''
   );
 
   // Line items state
@@ -155,7 +157,8 @@ export default function InvoiceForm({
   const handleCustomerChange = (newCustId: string) => {
     setCustomerId(newCustId);
     const cust = customers.find((c) => c.id === newCustId);
-    setPlaceOfSupplyStateCode(cust?.state_code || '');
+    const resolved = resolveIndianState(cust?.state_code || cust?.state);
+    setPlaceOfSupplyStateCode(resolved?.code || '');
   };
 
   // Add line item
@@ -400,32 +403,19 @@ export default function InvoiceForm({
                 <label className={formLabelClasses}>
                   Place of Supply (State Code) <span className="text-red-500">*</span>
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    maxLength={2}
-                    value={placeOfSupplyStateCode}
-                    onChange={(e) => setPlaceOfSupplyStateCode(e.target.value)}
-                    placeholder="10"
-                    className="w-20 text-sm font-mono rounded-lg border border-slate-300 bg-white text-slate-900 p-2.5 focus:ring-2 focus:ring-[#10243B] uppercase text-center font-bold"
-                    required
-                  />
-                  <div className="flex-1 flex items-center text-xs">
-                    {!placeOfSupplyStateCode || !isValidIndianStateCode(placeOfSupplyStateCode) ? (
-                      <span className="text-amber-800 font-semibold bg-amber-100 border border-amber-300 px-2.5 py-1 rounded">
-                        Undetermined Code
-                      </span>
-                    ) : placeOfSupplyStateCode === (companyProfile.stateCode || '10') ? (
-                      <span className="text-emerald-800 font-semibold bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded">
-                        Intra-State (CGST+SGST)
-                      </span>
-                    ) : (
-                      <span className="text-blue-800 font-semibold bg-blue-100 border border-blue-300 px-2.5 py-1 rounded">
-                        Inter-State (IGST)
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <select
+                  value={placeOfSupplyStateCode}
+                  onChange={(e) => setPlaceOfSupplyStateCode(e.target.value)}
+                  className={formSelectClasses}
+                  required
+                >
+                  <option value="">-- Select Place of Supply (Required) --</option>
+                  {INDIAN_STATES.map((st) => (
+                    <option key={st.code} value={st.code}>
+                      {st.code} — {st.name} {st.code === (companyProfile.stateCode || '10') ? '(Intra-State: CGST+SGST)' : '(Inter-State: IGST)'}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

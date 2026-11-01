@@ -2,6 +2,10 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { resolveIndianState, formatPlaceOfSupply } from '@/lib/utils/indian-states';
+import { determineTaxStatus } from '@/lib/quotation/calculations';
+import { Trash2 } from 'lucide-react';
 import {
   FileText,
   Printer,
@@ -27,6 +31,7 @@ import {
   recordQuotationAcceptanceAction,
   updateQuotationStatusAction,
   recordQuotationDeliveryAction,
+  discardDraftQuotationAction,
 } from '@/lib/quotation/actions';
 import { convertNumberToIndianWords } from '@/lib/quotation/calculations';
 import { formatIndianDate, formatIndianDateTime } from '@/lib/utils/date';
@@ -40,6 +45,7 @@ interface QuotationDetailViewProps {
 }
 
 export default function QuotationDetailView({ quotation, userRole }: QuotationDetailViewProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [activeVersionNumber, setActiveVersionNumber] = useState(quotation.current_version_number);
@@ -70,8 +76,10 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
   const deliveryLogs = quotation.quotation_delivery_logs || [];
 
   const isCurrentVersion = activeVersionNumber === quotation.current_version_number;
-  // BUG-022: Supplier base state is Bihar (10). Intra-state is State 10.
-  const isIntraState = quotation.place_of_supply_state_code === '10';
+  // Supplier base state is Bihar (10). Resolved against Indian states dictionary.
+  const supplyState = resolveIndianState(quotation.place_of_supply_state_code);
+  const isIntraState = supplyState?.code === '10';
+  const placeOfSupplyFormatted = formatPlaceOfSupply(quotation.place_of_supply_state_code);
   const canEdit = ['super_admin', 'admin', 'estimator', 'billing_manager'].includes(userRole);
   const isDraftEditable = quotation.status === 'draft' && isCurrentVersion && !activeVersion.is_locked;
 
@@ -138,6 +146,19 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
         setError(res.error);
       } else {
         setShowDeliveryModal(false);
+      }
+    });
+  };
+
+  const handleDiscardDraft = () => {
+    if (!confirm('Are you sure you want to discard this draft quotation? All draft line items and revision records will be permanently removed.')) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await discardDraftQuotationAction(quotation.id);
+      if (res.error) {
+        setError(res.error);
+      } else {
+        router.push('/staff/quotations');
       }
     });
   };
@@ -266,6 +287,17 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
 
           {quotation.status === 'draft' && isCurrentVersion && canEdit && (
             <button
+              onClick={handleDiscardDraft}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-950/60 hover:bg-rose-900 text-rose-200 border border-rose-700/60 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              Discard Draft
+            </button>
+          )}
+
+          {quotation.status === 'draft' && isCurrentVersion && canEdit && (
+            <button
               onClick={handleIssue}
               disabled={isPending}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold shadow transition disabled:opacity-50"
@@ -372,6 +404,7 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
           <h3 className="font-bold text-[#10243B] uppercase tracking-wider text-[11px] pb-2 border-b border-slate-100">
             Commercial Parameters
           </h3>
+          <p><span className="font-semibold text-slate-700">Place of Supply:</span> <span className="font-medium text-slate-900">{placeOfSupplyFormatted}</span> {!supplyState && quotation.is_gst_applicable ? <span className="text-amber-600 font-semibold">(Pending Determination)</span> : ''}</p>
           <p><span className="font-semibold text-slate-700">Delivery Destination:</span> {activeVersion.delivery_location || 'Ex-Works / Unspecified'}</p>
           <p><span className="font-semibold text-slate-700">Payment Terms:</span> {activeVersion.payment_terms || 'Standard 30 Days'}</p>
           <p>
@@ -487,15 +520,7 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
         grandTotalAmount={Number(activeVersion.grand_total_amount || 0)}
         amountInWords={convertNumberToIndianWords(activeVersion.grand_total_amount || 0)}
         isGstApplicable={quotation.is_gst_applicable}
-        taxDetermination={
-          !quotation.is_gst_applicable
-            ? 'not_applicable'
-            : !quotation.place_of_supply_state_code
-            ? 'undetermined'
-            : isIntraState
-            ? 'intra_state'
-            : 'inter_state'
-        }
+        taxDetermination={determineTaxStatus(quotation.is_gst_applicable, quotation.place_of_supply_state_code, '10')}
         rateBreakdown={rateBreakdowns}
         isDark={false}
       />

@@ -9,7 +9,10 @@ import {
   cancelInvoiceAction,
   recordInvoiceDeliveryAction,
 } from '@/lib/billing/actions';
-import { convertNumberToIndianWords } from '@/lib/quotation/calculations';
+import { convertNumberToIndianWords, determineTaxStatus } from '@/lib/quotation/calculations';
+import { resolveIndianState, formatPlaceOfSupply } from '@/lib/utils/indian-states';
+import { discardDraftInvoiceAction } from '@/lib/billing/actions';
+import { Trash2 } from 'lucide-react';
 import { formatIndianDate, formatIndianDateTime } from '@/lib/utils/date';
 import { formatIndianRupee } from '@/lib/utils/currency';
 import { TaxBreakdownCard, type RateTaxSummary } from '@/components/ui/TaxBreakdownCard';
@@ -159,6 +162,21 @@ export default function InvoiceDetailView({
   };
 
   // Handle Cancel Invoice
+  const handleDiscardDraft = async () => {
+    if (!confirm('Are you sure you want to discard this draft invoice? All draft items will be permanently removed.')) return;
+    setServerError(null);
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.append('invoiceId', invoice.id);
+      const res = await discardDraftInvoiceAction(null, formData);
+      if (res.error) {
+        setServerError(res.error);
+      } else {
+        router.push('/staff/billing');
+      }
+    });
+  };
+
   const handleCancelInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError(null);
@@ -234,6 +252,18 @@ export default function InvoiceDetailView({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Discard Draft Invoice Action (BUG-044) */}
+          {invoice.status === 'draft' && canManage && (
+            <button
+              onClick={handleDiscardDraft}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-950/60 hover:bg-rose-900 text-rose-200 border border-rose-700/60 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              Discard Draft
+            </button>
+          )}
+
           {/* BUG-020: Edit Draft Invoice Action */}
           {invoice.status === 'draft' && canManage && (
             <Link
@@ -491,13 +521,7 @@ export default function InvoiceDetailView({
         grandTotalAmount={Number(invoice.grand_total_amount || 0)}
         amountInWords={convertNumberToIndianWords(invoice.grand_total_amount || 0)}
         isGstApplicable={true}
-        taxDetermination={
-          !invoice.place_of_supply_state_code
-            ? 'undetermined'
-            : isIntraState
-            ? 'intra_state'
-            : 'inter_state'
-        }
+        taxDetermination={determineTaxStatus(true, invoice.place_of_supply_state_code, '10')}
         rateBreakdown={rateBreakdowns}
         isDark={false}
       />

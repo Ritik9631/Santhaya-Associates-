@@ -8,6 +8,7 @@ import {
   calculateQuotationTotals,
   isAllowedStatusTransition,
   isValidIndianStateCode,
+  resolveIndianState,
   type LineItemInput,
   type QuotationStatus,
   type QuotationTotals,
@@ -40,7 +41,8 @@ export async function createQuotationAction(
     const customerId = (formData.get('customerId') as string)?.trim();
     const enquiryId = (formData.get('enquiryId') as string)?.trim() || null;
     const rawSupplyCode = (formData.get('placeOfSupplyStateCode') as string)?.trim();
-    const placeOfSupplyStateCode = rawSupplyCode ? rawSupplyCode.padStart(2, '0') : '';
+    const resolvedSupply = resolveIndianState(rawSupplyCode);
+    const placeOfSupplyStateCode = resolvedSupply ? resolvedSupply.code : (rawSupplyCode ? rawSupplyCode.padStart(2, '0') : '');
     const isGstApplicable = formData.get('isGstApplicable') !== 'false';
     const validityDays = parseInt((formData.get('validityDays') as string) || '30', 10);
     const deliveryLocation = (formData.get('deliveryLocation') as string)?.trim();
@@ -246,7 +248,8 @@ export async function updateDraftQuotationAction(
 
     const customerId = (formData.get('customerId') as string)?.trim();
     const rawSupplyCode = (formData.get('placeOfSupplyStateCode') as string)?.trim();
-    const placeOfSupplyStateCode = rawSupplyCode ? rawSupplyCode.padStart(2, '0') : '';
+    const resolvedSupply = resolveIndianState(rawSupplyCode);
+    const placeOfSupplyStateCode = resolvedSupply ? resolvedSupply.code : (rawSupplyCode ? rawSupplyCode.padStart(2, '0') : '');
     const isGstApplicable = formData.get('isGstApplicable') !== 'false';
     const validityDays = parseInt((formData.get('validityDays') as string) || '30', 10);
     const deliveryLocation = (formData.get('deliveryLocation') as string)?.trim();
@@ -902,4 +905,116 @@ export async function recordQuotationDeliveryAction(
     const message = err instanceof Error ? err.message : 'Unexpected error logging delivery.';
     return { error: message };
   }
+}
+
+
+/**
+ * Server Action: Discard an unissued draft quotation (BUG-044)
+ * Allows Super Admin, Admin, and Estimator to delete unneeded drafts and their version records cleanly.
+ */
+export async function discardDraftQuotationAction(
+  quotationIdOrPrevState: ActionResponse | string | null,
+  maybeFormData?: FormData
+): Promise<ActionResponse> {
+  try {
+    const { user, profile } = await requireStaffSession();
+
+    if (!['super_admin', 'admin', 'estimator'].includes(profile.role)) {
+      return { error: 'Access denied: You do not have permission to discard quotations.' };
+    }
+
+    let quotationId: string = '';
+    if (typeof quotationIdOrPrevState === 'string') {
+      quotationId = quotationIdOrPrevState.trim();
+    } else if (maybeFormData instanceof FormData) {
+      quotationId = (maybeFormData.get('quotationId') as string)?.trim() || '';
+    }
+
+    if (!quotationId) {
+      return { error: 'Quotation ID is required.' };
+    }
+
+    const adminClient = createAdminClient();
+
+    const { data: quote, error: quoteErr } = await adminClient
+      .from('quotations')
+      .select('id, quotation_number, status')
+      .eq('id', quotationId)
+      .single();
+
+    if (quoteErr || !quote) {
+      return { error: 'Quotation not found.' };
+    }
+
+    if (quote.status !== 'draft') {
+      return {
+        error: `Only draft quotations can be discarded. Quotations in '${quote.status}' status must be cancelled or revised to preserve statutory audit sequence.`,
+      };
+    }
+
+    // Check if any invoice references this quotation
+    const { data: linkedInvoices } = await adminClient
+      .from('invoices')
+      .select('id, invoice_number')
+      .eq('quotation_id', quotationId);
+
+    if (linkedInvoices && linkedInvoices.length > 0) {
+      return {
+        error: 'Cannot discard quotation: It is already linked to or converted into an invoice.',
+      };
+    }
+
+    // Fetch all versions for this quotation
+    const { data: versions } = await adminClient
+      .from('quotation_versions')
+      .select('id')
+      .eq('quotation_id', quotationId);
+
+    if (versions && versions.length > 0) {
+      const versionIds = versions.map((v) => v.id);
+      await adminClient.from('quotation_items').delete().in('quotation_version_id', versionIds);
+    }
+
+    await adminClient.from('quotation_delivery_logs').delete().eq('quotation_id', quotationId);
+    await adminClient.from('quotation_versions').delete().eq('quotation_id', quotationId);
+    await adminClient.from('quotations').delete().eq('id', quotationId);
+
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'quotations',
+      entity_id: quotationId,
+      action: 'quotation_draft_discarded',
+      actor_type: 'staff',
+      actor_id: user.id,
+      previous_state: { quotation_number: quote.quotation_number, status: 'draft' },
+      new_state: { discarded_at: new Date().toISOString() },
+    });
+
+    revalidatePath('/staff/quotations');
+    revalidatePath('/staff');
+
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unexpected error discarding quotation.';
+    return { error: message };
+  }
+}
+
+/**
+ * Server Action: Form-compatible Cancel Quotation Action (BUG-044)
+ */
+export async function cancelQuotationAction(
+  _prevState: ActionResponse | null,
+  formData: FormData
+): Promise<ActionResponse> {
+  const quotationId = (formData.get('quotationId') as string)?.trim();
+  const reason = (formData.get('reason') as string)?.trim();
+
+  if (!quotationId) {
+    return { error: 'Quotation ID is required.' };
+  }
+  if (!reason || reason.length < 5) {
+    return { error: 'A specific cancellation reason (minimum 5 characters) is required.' };
+  }
+
+  return updateQuotationStatusAction(quotationId, 'cancelled', reason);
 }
