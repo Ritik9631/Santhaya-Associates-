@@ -13,6 +13,8 @@ import {
   type QuotationStatus,
   type QuotationTotals,
 } from './calculations';
+import { generateServerQuotationNumber } from './numbering';
+import { getDefaultQuotationTerms, getSimplifiedQuotationTerms } from '@/lib/billing/default-terms';
 import type { QuotationDeliveryChannel } from '@/types/database';
 
 export interface ActionResponse<T = Record<string, unknown>> {
@@ -46,7 +48,7 @@ export async function createQuotationAction(
     const isGstApplicable = formData.get('isGstApplicable') !== 'false';
     const validityDays = parseInt((formData.get('validityDays') as string) || '30', 10);
     const deliveryLocation = (formData.get('deliveryLocation') as string)?.trim();
-    const paymentTerms = (formData.get('paymentTerms') as string)?.trim() || '100% advance against Proforma Invoice or 30 days credit on approved LC';
+    const paymentTerms = (formData.get('paymentTerms') as string)?.trim() || '100% advance against Proforma Invoice prior to dispatch';
     const termsConditions = (formData.get('termsConditions') as string)?.trim() || null;
     const notes = (formData.get('notes') as string)?.trim() || null;
     const itemsRaw = formData.get('itemsJson') as string;
@@ -102,38 +104,47 @@ export async function createQuotationAction(
       return { error: 'Selected customer record could not be found in the database.' };
     }
 
-    // Generate Sequential Quotation Number: QTN-YYYY-XXXXX
-    const year = new Date().getFullYear();
-    let quoteNumber = `QTN-${year}-${Date.now().toString().slice(-5)}`;
-    try {
-      const { data: generatedNum } = await adminClient.rpc('generate_quotation_number');
-      if (generatedNum) quoteNumber = generatedNum;
-    } catch {
-      // Fallback format if migration is pending in dev
-    }
-
-    const versionCode = `${quoteNumber}-R0`;
+    // Generate Sequential Quotation Number: QT-YYYY-YY-NNN (Indian FY format)
+    let newQuotation: any = null;
+    let quoteNumberToUse = await generateServerQuotationNumber(adminClient);
+    let versionCode = `${quoteNumberToUse}-R0`;
     const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    // Attempt database insertion
-    const { data: newQuotation, error: quoteErr } = await adminClient
-      .from('quotations')
-      .insert({
-        quotation_number: quoteNumber,
-        customer_id: customerId,
-        enquiry_id: enquiryId,
-        status: 'draft',
-        place_of_supply_state_code: placeOfSupplyStateCode,
-        is_gst_applicable: isGstApplicable,
-        current_version_number: 1,
-        created_by_staff_id: user.id,
-        notes,
-      })
-      .select('id, quotation_number')
-      .single();
+    // Concurrency-safe insertion with collision retry
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data: insertedQuote, error: quoteErr } = await adminClient
+        .from('quotations')
+        .insert({
+          quotation_number: quoteNumberToUse,
+          customer_id: customerId,
+          enquiry_id: enquiryId,
+          status: 'draft',
+          place_of_supply_state_code: placeOfSupplyStateCode,
+          is_gst_applicable: isGstApplicable,
+          current_version_number: 1,
+          created_by_staff_id: user.id,
+          notes,
+        })
+        .select('id, quotation_number')
+        .single();
 
-    if (quoteErr) {
-      return { error: `Database error creating quotation: ${quoteErr.message}` };
+      if (!quoteErr && insertedQuote) {
+        newQuotation = insertedQuote;
+        versionCode = `${quoteNumberToUse}-R0`;
+        break;
+      }
+
+      // If unique constraint violation on quotation_number (code 23505), re-query sequence and retry
+      if (quoteErr && (quoteErr.code === '23505' || quoteErr.message?.includes('duplicate key') || quoteErr.message?.includes('unique'))) {
+        quoteNumberToUse = await generateServerQuotationNumber(adminClient);
+        continue;
+      }
+
+      return { error: `Database error creating quotation: ${quoteErr?.message}` };
+    }
+
+    if (!newQuotation) {
+      return { error: 'Failed to assign a unique quotation number. Please retry.' };
     }
 
     // Insert Version 1 snapshot
@@ -206,7 +217,7 @@ export async function createQuotationAction(
       actor_type: 'staff',
       actor_id: user.id,
       new_state: {
-        quotation_number: quoteNumber,
+        quotation_number: newQuotation.quotation_number,
         version: 1,
         grand_total: totals.grand_total_amount,
         customer: customer.company_name,
@@ -218,7 +229,7 @@ export async function createQuotationAction(
 
     return {
       success: true,
-      data: { quotationId: newQuotation.id, quotationNumber: quoteNumber },
+      data: { quotationId: newQuotation.id, quotationNumber: newQuotation.quotation_number },
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error creating quotation.';
@@ -253,7 +264,7 @@ export async function updateDraftQuotationAction(
     const isGstApplicable = formData.get('isGstApplicable') !== 'false';
     const validityDays = parseInt((formData.get('validityDays') as string) || '30', 10);
     const deliveryLocation = (formData.get('deliveryLocation') as string)?.trim();
-    const paymentTerms = (formData.get('paymentTerms') as string)?.trim() || '100% advance against Proforma Invoice or 30 days credit on approved LC';
+    const paymentTerms = (formData.get('paymentTerms') as string)?.trim() || '100% advance against Proforma Invoice prior to dispatch';
     const termsConditions = (formData.get('termsConditions') as string)?.trim() || null;
     const notes = (formData.get('notes') as string)?.trim() || null;
     const itemsRaw = formData.get('itemsJson') as string;
@@ -423,6 +434,93 @@ export async function updateDraftQuotationAction(
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unexpected error editing quotation draft.';
+    return { error: message };
+  }
+}
+
+/**
+ * Server Action: Explicitly apply a Terms & Conditions preset to an existing draft quotation
+ * Strictly restricted to draft quotations only; historical and issued quotations are protected.
+ */
+export async function applyTermsPresetAction(
+  quotationId: string,
+  preset: 'standard_10_clause' | 'compact_6_clause'
+): Promise<ActionResponse<{ termsConditions: string }>> {
+  try {
+    const { user, profile } = await requireStaffSession();
+
+    if (!AUTHORIZED_CREATOR_ROLES.includes(profile.role)) {
+      return { error: 'Access denied: You do not have permission to modify quotation terms.' };
+    }
+
+    const adminClient = createAdminClient();
+
+    const { data: quote, error: quoteErr } = await adminClient
+      .from('quotations')
+      .select('id, quotation_number, status, current_version_number')
+      .eq('id', quotationId)
+      .single();
+
+    if (quoteErr || !quote) {
+      return { error: 'Quotation not found.' };
+    }
+
+    if (quote.status !== 'draft') {
+      return {
+        error: `Cannot modify terms on quotation with status '${quote.status}'. Only draft quotations can be updated. For issued quotations, please create a new revision.`,
+      };
+    }
+
+    const { data: version, error: verErr } = await adminClient
+      .from('quotation_versions')
+      .select('id, validity_days, is_locked, terms_conditions')
+      .eq('quotation_id', quotationId)
+      .eq('version_number', quote.current_version_number)
+      .single();
+
+    if (verErr || !version || version.is_locked) {
+      return { error: 'Active quotation version snapshot is locked or could not be loaded.' };
+    }
+
+    const validityDays = version.validity_days || 30;
+    const newTerms =
+      preset === 'compact_6_clause'
+        ? getSimplifiedQuotationTerms(validityDays)
+        : getDefaultQuotationTerms(validityDays);
+
+    const { error: updateErr } = await adminClient
+      .from('quotation_versions')
+      .update({ terms_conditions: newTerms })
+      .eq('id', version.id);
+
+    if (updateErr) {
+      return { error: `Failed to update quotation terms: ${updateErr.message}` };
+    }
+
+    // Audit log
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'quotations',
+      entity_id: quotationId,
+      action: 'quotation_terms_preset_applied',
+      actor_type: 'staff',
+      actor_id: user.id,
+      previous_state: {
+        preset_action: 'terms_updated',
+        previous_terms_snippet: (version.terms_conditions || '').substring(0, 100),
+      },
+      new_state: {
+        preset,
+        clause_count: newTerms.split('\n').filter(Boolean).length,
+      },
+    });
+
+    revalidatePath(`/staff/quotations/${quotationId}`);
+    revalidatePath(`/staff/quotations/${quotationId}/pdf`);
+    revalidatePath(`/staff/quotations/${quotationId}/edit`);
+
+    return { success: true, data: { termsConditions: newTerms } };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unexpected error applying terms preset.';
     return { error: message };
   }
 }
@@ -1017,4 +1115,118 @@ export async function cancelQuotationAction(
   }
 
   return updateQuotationStatusAction(quotationId, 'cancelled', reason);
+}
+
+/**
+ * Server Action: Safe Soft-Delete Quotation
+ * Marks the quotation as deleted with audit logging, retaining statutory record.
+ * Blocks deletion if the quotation is linked to an invoice.
+ */
+export async function deleteQuotationAction(
+  quotationIdOrPrevState: ActionResponse | string | null,
+  maybeFormData?: FormData
+): Promise<ActionResponse> {
+  try {
+    const { user, profile } = await requireStaffSession();
+
+    if (!['super_admin', 'admin', 'estimator'].includes(profile.role)) {
+      return { error: 'Access denied: You do not have permission to delete quotations.' };
+    }
+
+    let quotationId = '';
+    let reason = 'Deleted by Staff';
+
+    if (typeof quotationIdOrPrevState === 'string') {
+      quotationId = quotationIdOrPrevState.trim();
+    } else if (maybeFormData instanceof FormData) {
+      quotationId = (maybeFormData.get('quotationId') as string)?.trim() || '';
+      const formReason = (maybeFormData.get('reason') as string)?.trim();
+      if (formReason) reason = formReason;
+    }
+
+    if (!quotationId) {
+      return { error: 'Quotation ID is required.' };
+    }
+
+    const adminClient = createAdminClient();
+
+    const { data: quote, error: quoteErr } = await adminClient
+      .from('quotations')
+      .select('id, quotation_number, status, notes')
+      .eq('id', quotationId)
+      .single();
+
+    if (quoteErr || !quote) {
+      return { error: 'Quotation not found.' };
+    }
+
+    // Check if quotation is linked to any invoice
+    const { data: linkedInvoices } = await adminClient
+      .from('invoices')
+      .select('id, invoice_number')
+      .eq('quotation_id', quotationId);
+
+    if (linkedInvoices && linkedInvoices.length > 0) {
+      const invoiceNumbers = linkedInvoices.map((inv) => inv.invoice_number).join(', ');
+      return {
+        error: `Cannot delete quotation ${quote.quotation_number}: It is linked to invoice(s) [${invoiceNumbers}]. To preserve statutory CGST Rule 46 audit integrity, quotations converted to or linked with invoices cannot be deleted.`,
+      };
+    }
+
+    const deletionTimestamp = new Date().toISOString();
+    const deletionNote = `[DELETED on ${deletionTimestamp} by ${profile.full_name || profile.role} (${profile.role}): ${reason}]`;
+    const updatedNotes = quote.notes ? `${quote.notes}\n${deletionNote}` : deletionNote;
+
+    // Attempt updating soft-delete columns (with fallback if migration is pending)
+    const { error: updateErr } = await adminClient
+      .from('quotations')
+      .update({
+        deleted_at: deletionTimestamp,
+        deleted_by_staff_id: user.id,
+        deletion_reason: reason,
+        notes: updatedNotes,
+      } as any)
+      .eq('id', quotationId);
+
+    if (updateErr) {
+      // Column might not exist yet if migration pending approval; update notes as fallback
+      const { error: fallbackErr } = await adminClient
+        .from('quotations')
+        .update({
+          notes: updatedNotes,
+        })
+        .eq('id', quotationId);
+
+      if (fallbackErr) {
+        return { error: `Failed to delete quotation: ${fallbackErr.message}` };
+      }
+    }
+
+    // Insert audit log
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'quotations',
+      entity_id: quotationId,
+      action: 'quotation_deleted',
+      actor_type: 'staff',
+      actor_id: user.id,
+      previous_state: {
+        quotation_number: quote.quotation_number,
+        status: quote.status,
+      },
+      new_state: {
+        deleted_at: deletionTimestamp,
+        deleted_by_staff_id: user.id,
+        deletion_reason: reason,
+      },
+    });
+
+    revalidatePath('/staff/quotations');
+    revalidatePath(`/staff/quotations/${quotationId}`);
+    revalidatePath('/staff');
+
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unexpected error deleting quotation.';
+    return { error: message };
+  }
 }

@@ -1,6 +1,7 @@
 'use server';
 
 import { resolveIndianState } from '@/lib/utils/indian-states';
+import { validateGstinAndPanMatch } from '@/lib/utils/gstin';
 import { revalidatePath } from 'next/cache';
 import { requireStaffSession } from '@/lib/auth/session';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
@@ -61,11 +62,11 @@ export async function createCustomerAction(
     if (phone && !/^[6-9]\d{9}$/.test(phone)) {
       return { error: 'Invalid Indian phone number. Must be 10 digits starting with 6-9.' };
     }
-    if (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin)) {
-      return { error: 'Invalid GSTIN format. Expected 15-character statutory format.' };
-    }
-    if (pan && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan)) {
-      return { error: 'Invalid PAN format. Expected 10-character alphanumeric PAN.' };
+
+    // Statutory GSTIN/PAN validation, Modulo 36 checksum verification, and PAN derivation
+    const gstinPanResult = validateGstinAndPanMatch(gstin, pan);
+    if (!gstinPanResult.valid) {
+      return { error: gstinPanResult.error };
     }
 
     const supabase = await createServerSupabaseClient();
@@ -99,7 +100,7 @@ export async function createCustomerAction(
     const normalizedEmail = email && email.trim() !== '' ? email.trim().toLowerCase() : null;
     const normalizedPhone = phone && phone.trim() !== '' ? phone.trim() : null;
     const normalizedGstin = gstin && gstin.trim() !== '' ? gstin.trim().toUpperCase() : null;
-    const normalizedPan = pan && pan.trim() !== '' ? pan.trim().toUpperCase() : null;
+    const normalizedPan = (pan && pan.trim() !== '' ? pan.trim().toUpperCase() : null) || gstinPanResult.derivedPan || null;
 
     const trimmedNotes = notes && notes.trim() !== '' ? notes.trim() : null;
     const trimmedShipping = shippingAddress && shippingAddress.trim() !== '' ? shippingAddress.trim() : null;
@@ -209,6 +210,20 @@ export async function updateCustomerAction(
       return { error: 'Primary contact person is required.' };
     }
 
+    // Format validation if present
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { error: 'Invalid email address format.' };
+    }
+    if (phone && !/^[6-9]\d{9}$/.test(phone)) {
+      return { error: 'Invalid Indian phone number. Must be 10 digits starting with 6-9.' };
+    }
+
+    // Statutory GSTIN/PAN validation, Modulo 36 checksum verification, and PAN derivation
+    const gstinPanResult = validateGstinAndPanMatch(gstin, pan);
+    if (!gstinPanResult.valid) {
+      return { error: gstinPanResult.error };
+    }
+
     const admin = createAdminClient();
     const { data: prevCustomer } = await admin
       .from('customers')
@@ -226,7 +241,7 @@ export async function updateCustomerAction(
     const normalizedEmail = email && email.trim() !== '' ? email.trim().toLowerCase() : null;
     const normalizedPhone = phone && phone.trim() !== '' ? phone.trim() : null;
     const normalizedGstin = gstin && gstin.trim() !== '' ? gstin.trim().toUpperCase() : null;
-    const normalizedPan = pan && pan.trim() !== '' ? pan.trim().toUpperCase() : null;
+    const normalizedPan = (pan && pan.trim() !== '' ? pan.trim().toUpperCase() : null) || gstinPanResult.derivedPan || null;
 
     const trimmedNotes = notes && notes.trim() !== '' ? notes.trim() : null;
     const trimmedShipping = shippingAddress && shippingAddress.trim() !== '' ? shippingAddress.trim() : null;

@@ -9,7 +9,7 @@ import {
   type QuotationTotals,
 } from '@/lib/quotation/calculations';
 import { INDIAN_STATES, resolveIndianState } from '@/lib/utils/indian-states';
-import { getDefaultQuotationTerms } from '@/lib/billing/default-terms';
+import { getDefaultQuotationTerms, getSimplifiedQuotationTerms } from '@/lib/billing/default-terms';
 import { Plus, Trash2, CheckCircle2, AlertCircle, ArrowLeft, FileCheck } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -91,7 +91,7 @@ export default function QuotationForm({
   const [deliveryLocation, setDeliveryLocation] = useState(initialData?.delivery_location || '');
   const [paymentTerms, setPaymentTerms] = useState(
     initialData?.payment_terms ||
-      '100% advance against Proforma Invoice or 30 days credit on approved LC'
+      '100% advance against Proforma Invoice prior to dispatch'
   );
   const [termsConditions, setTermsConditions] = useState(
     initialData?.terms_conditions ?? getDefaultQuotationTerms(initialData?.validity_days ?? 30)
@@ -579,15 +579,58 @@ export default function QuotationForm({
             value={paymentTerms}
             onChange={(e) => setPaymentTerms(e.target.value)}
             className={formInputClasses}
+            placeholder="e.g. 100% advance against Proforma Invoice prior to dispatch"
           />
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {[
+              '100% advance against Proforma Invoice prior to dispatch',
+              '50% advance with work order, balance prior to dispatch',
+              '30 days credit from invoice date (approved account)',
+              'As per agreed contractual milestone terms',
+            ].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setPaymentTerms(preset)}
+                className={`text-[10.5px] px-2 py-0.5 rounded border transition ${
+                  paymentTerms === preset
+                    ? 'bg-gold-50 border-gold-400 text-gold-900 font-semibold'
+                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {preset.split(' (')[0]}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div>
-          <label className={formLabelClasses}>
-            Quotation Terms & Conditions (Visible to Client)
-          </label>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
+            <label className={formLabelClasses}>
+              Quotation Terms & Conditions (Visible to Client)
+            </label>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[11px] text-slate-500 font-medium">Presets:</span>
+              <button
+                type="button"
+                onClick={() => setTermsConditions(getDefaultQuotationTerms(validityDays))}
+                className="text-[11px] px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium transition"
+                title="Apply standard 10 commercial clauses (system legal default)"
+              >
+                Standard 10-Clause Terms (Default)
+              </button>
+              <button
+                type="button"
+                onClick={() => setTermsConditions(getSimplifiedQuotationTerms(validityDays))}
+                className="text-[11px] px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-medium transition"
+                title="Apply 6 consolidated clauses for layout testing"
+              >
+                Compact 6-Clause Terms (Testing)
+              </button>
+            </div>
+          </div>
           <textarea
-            rows={3}
+            rows={4}
             placeholder="Statutory warranties, delivery schedule, escalation clauses..."
             value={termsConditions}
             onChange={(e) => setTermsConditions(e.target.value)}

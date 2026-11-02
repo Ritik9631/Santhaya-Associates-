@@ -21,6 +21,21 @@ export function getDefaultQuotationTerms(validityDays = 30): string {
   ].join('\n');
 }
 
+/**
+ * Revised 6-clause simplified quotation terms (Consolidated for readability & single-page fit).
+ * Subject to project owner approval before making default.
+ */
+export function getSimplifiedQuotationTerms(validityDays = 30): string {
+  return [
+    `1. VALIDITY & PRICING: This commercial quotation is valid for ${validityDays} calendar days from date of issuance. Rates are based on prevailing statutory duties; any statutory variation in applicable Indian GST prior to billing shall be to the buyer's account.`,
+    '2. SCOPE OF SUPPLY: Scope is strictly limited to the technical models, specifications, and quantities scheduled in this quotation. Any additional machinery, attachments, spare parts, civil works, or site utilities will be quoted separately.',
+    '3. PAYMENT & DELIVERY: Commercial payment milestones and dispatch schedules shall follow the specific delivery terms stated on this quotation. Mobilization or delivery timelines commence upon receipt of confirmed advance payment, site readiness, and technical clearance.',
+    '4. FREIGHT, SITE UNLOADING & WARRANTY: Transit freight, insurance, and local site unloading are for the customer\'s account unless explicitly included in the proposal. Standard OEM manufacturer warranty applies for machinery and components against defects.',
+    '5. CHANGES, CANCELLATION & FORCE MAJEURE: Order modifications or cancellations require written consent and are subject to recovery of incurred costs. Neither party shall be liable for delays caused by natural calamities, severe weather, governmental orders, or force majeure events.',
+    '6. GOVERNING LAW & JURISDICTION: This quotation and resultant contracts are governed exclusively by the laws of India, subject to the jurisdiction of competent courts at Motihari, Purbi Champaran, Bihar.',
+  ].join('\n');
+}
+
 export function getDefaultInvoiceTerms(dueDateText = 'as specified on this invoice'): string {
   return [
     `1. PAYMENT DUE DATE: Payment must be credited in full on or before the due date (${dueDateText}).`,

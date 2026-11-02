@@ -49,6 +49,7 @@ export default async function QuotationsDirectoryPage({ searchParams }: PageProp
       status,
       current_version_number,
       place_of_supply_state_code,
+      notes,
       created_at,
       updated_at,
       customers (
@@ -71,7 +72,9 @@ export default async function QuotationsDirectoryPage({ searchParams }: PageProp
   }
 
   const { data: rawQuotations } = await query;
-  const allQuotations = (rawQuotations as any[]) || [];
+  const allQuotations = ((rawQuotations as any[]) || []).filter(
+    (q: any) => !q.deleted_at && !q.notes?.includes('[DELETED')
+  );
 
   // Filter in memory for search query (customer name or quotation number)
   const filteredQuotations = allQuotations.filter((q: any) => {

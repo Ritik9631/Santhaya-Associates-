@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-11-01 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediation | Implementation status: Batches 1, 2, BUG-017, Batch 3, and Batch 4 (BUG-030 through BUG-049) Complete & Verified (630+ automated tests passing); Phase 7 Planned
+Updated: 2026-11-02 | Phase: Post-Phase 6 Acceptance Testing & Quotation 7 PDF Readability & Formatting Fix | Implementation status: Quotation 7 Readability, Gridlines, 2-Decimal Financial Summary, 2-Column Terms Grid, and Round Stamp Integration Complete & Verified (All 16 Test Suites Passing, Production Build 26/26 Routes Clean); Phase 7 Deployment on Hold
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -636,6 +636,125 @@ Updated: 2026-11-01 | Phase: Post-Phase 6 Acceptance Testing & Defect Remediatio
      - lint: 0 warnings, 0 errors.
      - build: 26/26 static & dynamic pages compiled cleanly.
      - Live CSS verification: HTTP 200 text/css on /staff/login (BUG-029 resolved).
+
+   10. Final Premium Quotation Redesign, Table Overflow Remediation & Indian Financial-Year Numbering (2026-11-02):
+      - Replaced quotation numbering format QTN-YYYY-XXXXX with statutory Indian Financial Year format QT-YYYY-YY-NNN (e.g. QT-2026-27-001).
+      - Implemented src/lib/quotation/numbering.ts with getIndianFinancialYear() enforcing Asia/Kolkata timezone (1 April to 31 March boundary rollover), formatQuotationNumber() with automatic expansion beyond 3 digits (e.g. 1000), parseQuotationNumber() supporting both new and legacy formats, and formatQuantity() displaying whole numbers without unnecessary '.00' while preserving fractional decimals.
+      - Implemented concurrency-safe server-side quotation generation with optimistic collision retry loop (Postgres error 23505 handler) in src/lib/quotation/actions.ts. Historical quotations (QTN-2026-00005, QTN-2026-00006) remain completely untouched and are never silently renumbered.
+      - Prepared idempotent database migration supabase/migrations/20261102120000_financial_year_quotation_numbering.sql for explicit human approval.
+      - Completely fixed the critical PDF table overflow issue where the rightmost Total (₹) column extended beyond the A4 page boundary:
+        * Enforced table-layout: fixed (table-fixed w-full) on line-item table.
+        * Distributed measured column widths summing to exactly 100% of usable A4 width: # (4%), Description (27%), HSN/SAC (9%), Qty (6%), Unit (6%), Rate (12%), Taxable (12%), GST % (6%), Tax (8%), Total (10%).
+        * Formatted monetary numbers with whitespace-nowrap font-mono text-right, ensuring full visibility with 10mm right margin to spare.
+      - Updated visual design in src/app/staff/quotations/[id]/pdf/page.tsx:
+        * Header: enlarged authentic santhaya-symbol.png (480x550 aspect ratio), navy badge with document title QUOTATION only (COMMERCIAL QUOTATION removed), prominent quotation number (22pt font-mono), Valid Up To: DD MMM YYYY, removed displayed revision code, removed (Pending Verification), removed redundant State: Bihar (10), preserved GSTIN and PAN.
+        * Client & Project: clean QUOTATION FOR: and PROJECT DETAILS: blocks with responsive break-words.
+        * Amount Summary: Gross Subtotal, Taxable Amount, GST breakdown, Total Tax, and Grand Total in prominent highlight box (16pt font-mono) alongside Amount in Words.
+        * Terms & Conditions: updated heading to TERMS & CONDITIONS; rendered with hanging indentation (flex items-start) for numbered clauses 1-10.
+        * Signatures: completely removed CLIENT ACCEPTANCE ACKNOWLEDGMENT; preserved compact single company authorization For Santhaya Associates Pvt. Ltd. with Authorized Signatory.
+      - Configured intelligent automatic pagination:
+        * Short quotes (1-2 items) comfortably fit on a single A4 page with zero blank second page overflow.
+        * Multi-page quotes repeat thead on continuation pages via thead { display: table-header-group !important; }, avoid mid-row text slicing via tr { page-break-inside: avoid !important; }, and keep totals/terms/signatory cohesive via print-avoid-break.
+        * Added CSS counter page numbering: Page X of Y.
+      - Implemented safe Delete Quotation feature with CGST Rule 46 invoice protection, audit trail preservation, directory filtering, and interactive confirmation modal in QuotationDetailView.tsx.
+      - Created comprehensive test suites:
+        * scripts/test-quotation-redesign-and-delete.mjs: 65/65 tests passed.
+        * scripts/test-phase7-quotation-stress-and-pagination.mjs: 47/47 tests passed (covering all 8 Numbering tests and all 10 PDF stress tests).
+      - Re-verified full test battery: 17/17 Batch 4 tests passed, 18/18 Batch 3 tests passed, 17/17 Batch 2 tests passed, typecheck 0 errors, lint 0 errors, next build 26/26 routes compiled cleanly.
+
+   11. Customer GSTIN -> PAN Auto-Population, Smart Currency Formatting & Quotation PDF Final Refinement (2026-11-02):
+      - Created src/lib/utils/gstin.ts providing validateGstinChecksum() (official Indian Modulo 36 checksum calculation), extractPanFromGstin() (characters 3-12 extraction), validatePanFormat(), and validateGstinAndPanMatch() (consistency check between GSTIN and manual PAN). Zero paid external APIs.
+      - Updated src/app/staff/customers/new/CustomerForm.tsx with reactive auto-derivation:
+        * Derives and populates PAN when 15-character valid GSTIN is entered; shows "Checksum Verified" and "Auto-derived from GSTIN" badges.
+        * Automatically clears derived PAN if GSTIN is cleared/shortened.
+        * Displays prominent rose conflict alert if a manual PAN differs from GSTIN characters 3-12, blocking submission.
+      - Hardened createCustomerAction and updateCustomerAction in src/lib/customers/actions.ts with server-side validation and auto-derivation fallback.
+      - Implemented formatSmartRupee in src/lib/utils/currency.ts: omits trailing '.00' for integer rupee values (e.g. ₹26,000.00 -> ₹26,000), while retaining exact 2 decimal places for fractional amounts with paise (e.g. ₹1,250.50).
+      - Applied formatSmartRupee across all table monetary cells and summary rows in src/app/staff/quotations/[id]/pdf/page.tsx.
+      - Refined Amount in Words typography to clean, normal readable text (eliminated heavy italics/bold card).
+      - Added dedicated Commercial Notes section with hanging indentation (flex items-start gap-1.5) without duplicating Terms & Conditions.
+      - Fixed automatic pagination for 2-item quotations: streamlined vertical rhythm and allowed natural multi-page pagination with per-clause break-inside-avoid, guaranteeing that 1- and 2-item quotations fit comfortably on 1 single A4 sheet.
+      - Widened Company Authorization Block to 72-80 width (280px printable) and added subtle verified company contact footer (Gopalpur, Motihari, Bihar - 845401 • heistofeverything@gmail.com • +91 9430986713 / +91 9608950748).
+      - Cleaned contradictory "100% advance or 30 days credit" default into distinct commercial options with quick presets in QuotationForm.tsx.
+      - Created scripts/test-quotation-refinements.mjs (26/26 tests passed).
+      - Re-verified complete test suite: 100% tests passed across all suites, typecheck 0 errors, lint 0 errors, next build 26/26 routes compiled. Dev server running on http://localhost:3000 (HTTP 200).
+
+   12. Official Round Company Stamp Integration into Quotation PDF (2026-11-02):
+      - Inspected user-provided official circular company stamp image public/santhaya-round-stamp.png (1254x1254, 1:1 aspect ratio, navy #0D1F45 and gold #FDAE04 inks).
+      - Backed up user original to public/santhaya-round-stamp-original.png and processed active public/santhaya-round-stamp.png with sharp to provide full RGBA alpha transparency:
+        * Outer background outside circle perimeter (R=542px) is 100% transparent.
+        * Paper whites inside and around text made transparent while preserving 100% ink opacity on navy and gold graphic elements.
+      - Integrated round stamp into Company Authorization Block in src/app/staff/quotations/[id]/pdf/page.tsx:
+        * Positioned vertically between 'For Santhaya Associates Pvt. Ltd.' and 'Authorized Signatory' line.
+        * Sized to 32mm diameter (w-[32mm] h-[32mm] max-w-[120px] max-h-[120px] object-contain select-none pointer-events-none).
+        * Zero distortion, zero stretching, zero cropping.
+        * Does not overlap company title, date, or signatory labels.
+      - Implemented strict corporate governance authorization rule:
+        * Stamp is only rendered on finalized/authorized quotations (['issued', 'accepted', 'converted_to_invoice'].includes(quote.status) or activeVersion.issued_at present).
+        * Draft quotations (status === 'draft') remain strictly unstamped with placeholder note '(Official seal affixed upon formal issuance)'.
+      - Protected invoice templates: verified src/app/staff/billing/[id]/pdf/page.tsx remains untouched (no stamp).
+      - Preserved strict automatic pagination integrity:
+        * Authorization block container has print-avoid-break so the stamp and signatory lines never split across page boundaries.
+        * Single-item and two-item quotations fit comfortably on a single A4 page (verified via Headless Chrome Puppeteer PDF rendering: exactly 1 page).
+        * Multi-page quotations (5 items and 20 items) paginate cleanly across 2 and 3 pages with table headers repeating on each page.
+      - Generated visual sample documents in sample_quotations/ (HTML, PDF, and high-res preview image).
+      - Created scripts/test-quotation-round-stamp.mjs (14/14 tests passed) and integrated into npm test.
+      - Re-verified full test suite: 100% passing across all 15 test suites, typecheck 0 errors, lint 0 errors, next build 26/26 routes compiled cleanly. Dev server running on http://localhost:3000 (HTTP 200).
+
+   13. Quotation 5 Final Corrections, Comprehensive 10-Scenario Generation & PDF Hardening (2026-11-02):
+      - Investigated why company seal was absent on Quotation 5.pdf (QT-2026-27-003):
+        * Direct database inspection of row QT-2026-27-003 confirmed status: 'draft', issued_at: null, and place_of_supply: ''.
+        * Under statutory billing rules (actions.ts), formal issuance requires a valid 2-digit Place of Supply code. Because place of supply was empty, the quote was never formally issued.
+        * The template's corporate governance check deliberately kept the document unstamped; unfinalized draft quotations must never carry the official corporate seal.
+      - Added unoptimized and priority props to Next.js <Image> in src/app/staff/quotations/[id]/pdf/page.tsx for instantaneous, reliable PDF rendering across all headless and print browsers.
+      - Guaranteed 1-page fit for 1- and 2-item quotations:
+        * Optimized vertical padding, table row heights (py-1), and compact section spacing.
+        * Puppeteer PDF verification confirms sample-quotation-1-item.pdf and sample-quotation-2-items.pdf render to exactly 1 single A4 page with over 150px of safety margin.
+        * Preserved cohesive multi-page pagination for longer documents: 10-item quotes span 2 pages, and 30-item stress-test quotes span 4 pages with repeating thead headers.
+      - Upgraded footer/NAP visibility:
+        * Increased font size to 9pt (text-[9pt]) in high-contrast dark slate (text-slate-800 / #10243B).
+        * Clean 2-line layout with verified company name, address (Gopalpur, Motihari, Bihar - 845401), verified phone numbers (+91 9430986713 / +91 9608950748), verified email (heistofeverything@gmail.com), and GSTIN (10ABVCS4277J1ZU).
+      - Smart Financial Summary & Tax Handling:
+        * Displayed Gross Subtotal, Taxable Amount, Applicable GST, Total Tax Amount, and Grand Total.
+        * Applied formatSmartRupee: whole integer rupee values omit trailing '.00', while fractional paise retain exact decimals.
+        * Confirmed GST (valid Place of Supply): calculates and displays intra-state CGST+SGST or inter-state IGST with 'GRAND TOTAL (INR)'.
+        * Pending GST (undetermined Place of Supply): displays 'Pending Determination' badge, 'Pending' tax total, labels total box 'SUBTOTAL BEFORE GST (INR)' rather than final total, displays statutory destination notice, and outputs amount in words as 'AMOUNT IN WORDS (SUBTOTAL BEFORE GST): ... (Exclusive of GST)'.
+      - Simplified 6-Clause Terms & Conditions:
+        * Implemented getSimplifiedQuotationTerms(validityDays) in src/lib/billing/default-terms.ts consolidating terms into 6 standard clauses.
+        * Formatted with hanging indentation (shrink-0 w-4 text-right select-none) and per-clause break-inside-avoid.
+      - Customer Contact Label:
+        * Replaced 'Attn:' with 'Contact Person:'. Omitted completely when primary contact person is empty.
+      - Commercial Notes:
+        * Formatted with hanging bullet indentation (flex items-start gap-2).
+      - Generated all 10 required PDF and HTML test scenarios in sample_quotations/:
+        1. sample-quotation-draft.pdf (1 page, unstamped)
+        2. sample-quotation-authorized.pdf (1 page, stamped)
+        3. sample-quotation-1-item.pdf (1 page)
+        4. sample-quotation-2-items.pdf (1 page)
+        5. sample-quotation-10-items.pdf (2 pages)
+        6. sample-quotation-30-items.pdf (4 pages, stress test)
+        7. sample-quotation-pending-gst.pdf (1 page, pending GST notice & subtotal before GST)
+        8. sample-quotation-confirmed-cgst-sgst.pdf (1 page, CGST/SGST)
+        9. sample-quotation-confirmed-igst.pdf (1 page, IGST)
+        10. sample-quotation-amounts-with-paise.pdf (1 page, paise values)
+      - Updated scripts/test-quotation-round-stamp.mjs (24/24 tests passed) and scripts/test-quotation-refinements.mjs (26/26 tests passed).
+      - Re-verified entire automated test suite (npm test): 100% passing across all 16 test suites.
+      - typecheck 0 errors, lint 0 errors, next build 26/26 routes compiled cleanly. Dev server running on http://localhost:3000 (HTTP 200).
+  - 2026-11-02: Quotation 7 PDF Readability, Gridlines, 2-Decimal Financial Summary & Stamp Integration:
+      - Diagnosed and resolved regression issues on real quotation QT-2026-27-007 (1-item draft) and QT-2026-27-005 (2-item draft with discount).
+      - Established readable typographic hierarchy: regular body at 10–11pt (Customer Name 11pt, Items 10pt, FY Quote Number 19pt, Subheadings 10pt), supporting text at 9–9.5pt, zero essential text below 9pt.
+      - Solved 1-2 item page overflow with a responsive 2-column print grid for Terms & Conditions (cut vertical height from 548px to 307px), allowing all 10 clauses to fit on exactly 1 A4 page with clear bold clause titles.
+      - Strengthened all table gridlines to crisp slate-500/600 (#475569) borders on outer boundary and all internal column/row dividers.
+      - Enforced strict two decimal places in financial summary (Taxable: ₹1,00,000.00, IGST: ₹18,000.00, Grand Total: ₹1,18,000.00) using formatIndianRupee(amount, 2).
+      - Created public/branding/santhaya-round-stamp.png and loaded it dynamically in PDF generator (32mm diameter, object-contain, transparent background) for officially issued quotations.
+      - Declared @page { size: A4 portrait; margin: 8mm 10mm; } at root stylesheet and @media print.
+      - Verified real route /staff/quotations/[id]/pdf via Puppeteer: QT-2026-27-007 (1 page), QT-2026-27-005 (1 page), issued quote with round stamp (1 page), custom terms quote (1 page), 10-item stress test (2 pages). All 5 PDFs verified at 209.9 x 297.0 mm (A4).
+      - Verified npm test (16/16 test batteries passed), npm run typecheck (0 errors), npm run lint (0 warnings), npm run build (26/26 routes compiled cleanly). Dev server running on http://localhost:3000 (HTTP 200).
+      - Development Paused & Desktop Handover (2026-11-02):
+        * Latest test quotation reference: QT-2026-27-008.
+        * Remaining issue 1 (postponed): Item Total (₹) values overlap or clip for large amounts (7–9 digits).
+        * Remaining issue 2 (postponed): Official stamp appears centered in exported PDFs; it must be right-aligned inside the authorization section, matching the intended preview.
+        * Quality gates verified clean; safe git commit and push to origin/master prepared.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

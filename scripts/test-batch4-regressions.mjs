@@ -351,7 +351,8 @@ test('BUG-030 & BUG-034: Quotation PDF uses santhaya-symbol.png and explicit lin
   assert(qPdf.includes('GST %'));
   assert(qPdf.includes('Tax (₹)'));
   assert(qPdf.includes('Total (₹)'));
-  assert(qPdf.includes('Client Acceptance Acknowledgment:'));
+  assert(!qPdf.includes('Client Acceptance Acknowledgment:'));
+  assert(qPdf.includes('Authorized Signatory'));
   assert(qPdf.includes('For Santhaya Associates Pvt. Ltd.'));
 });
 

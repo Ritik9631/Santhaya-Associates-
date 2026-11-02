@@ -107,7 +107,7 @@ export default async function QuotationDetailPage({ params }: PageProps) {
     .eq('id', params.id)
     .single();
 
-  if (quoteErr || !quote) {
+  if (quoteErr || !quote || (quote as any).deleted_at || (quote as any).notes?.includes('[DELETED')) {
     notFound();
   }
 

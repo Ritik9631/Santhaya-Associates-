@@ -32,6 +32,8 @@ import {
   updateQuotationStatusAction,
   recordQuotationDeliveryAction,
   discardDraftQuotationAction,
+  deleteQuotationAction,
+  applyTermsPresetAction,
 } from '@/lib/quotation/actions';
 import { convertNumberToIndianWords } from '@/lib/quotation/calculations';
 import { formatIndianDate, formatIndianDateTime } from '@/lib/utils/date';
@@ -51,6 +53,8 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
   const [activeVersionNumber, setActiveVersionNumber] = useState(quotation.current_version_number);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('Commercial terms superseded / No longer required');
 
   // Acceptance Form State
   const [acceptContactName, setAcceptContactName] = useState(quotation.customers?.primary_contact_person || '');
@@ -133,6 +137,20 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
     });
   };
 
+  const handleApplyTermsPreset = (preset: 'standard_10_clause' | 'compact_6_clause') => {
+    const label = preset === 'compact_6_clause' ? '6-Clause Testing' : '10-Clause Standard';
+    if (!confirm(`Apply the ${label} terms to this draft quotation? Historical and issued quotations will not be affected.`)) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await applyTermsPresetAction(quotation.id, preset);
+      if (res.error) {
+        setError(res.error);
+      } else {
+        router.refresh();
+      }
+    });
+  };
+
   const handleDeliverySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -158,6 +176,24 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
       if (res.error) {
         setError(res.error);
       } else {
+        router.push('/staff/quotations');
+      }
+    });
+  };
+
+  const handleDeleteSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    const formData = new FormData();
+    formData.append('quotationId', quotation.id);
+    formData.append('reason', deleteReason);
+
+    startTransition(async () => {
+      const res = await deleteQuotationAction(null, formData);
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setShowDeleteModal(false);
         router.push('/staff/quotations');
       }
     });
@@ -347,6 +383,18 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
               Cancel Quote
             </button>
           )}
+
+          {canEdit && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-950/70 hover:bg-rose-900 text-rose-200 border border-rose-700/70 rounded-lg text-xs font-semibold transition disabled:opacity-50"
+              title="Delete Quotation (Safe Soft Deletion with Audit History)"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              Delete Quotation
+            </button>
+          )}
         </div>
       </div>
 
@@ -524,6 +572,63 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
         rateBreakdown={rateBreakdowns}
         isDark={false}
       />
+
+      {/* Quotation Terms & Conditions Section */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm text-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-[#10243B] uppercase tracking-wider text-[11px]">
+              Commercial Terms & Conditions
+            </h3>
+            <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-mono">
+              {(activeVersion.terms_conditions || '').split('\n').filter(Boolean).length === 6
+                ? '6 Clauses (Layout Testing)'
+                : (activeVersion.terms_conditions || '').split('\n').filter(Boolean).length === 10
+                ? '10 Clauses (Legal Default)'
+                : `${(activeVersion.terms_conditions || '').split('\n').filter(Boolean).length} Clauses`}
+            </span>
+          </div>
+
+          {isDraftEditable && canEdit && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-slate-500 font-medium">Apply Preset:</span>
+              <button
+                type="button"
+                onClick={() => handleApplyTermsPreset('compact_6_clause')}
+                disabled={isPending}
+                className="text-[11px] px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-medium transition disabled:opacity-50"
+                title="Apply 6 consolidated clauses for layout testing"
+              >
+                Apply 6-Clause Testing Terms
+              </button>
+              <button
+                type="button"
+                onClick={() => handleApplyTermsPreset('standard_10_clause')}
+                disabled={isPending}
+                className="text-[11px] px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium transition disabled:opacity-50"
+                title="Reset to 10 standard legal commercial clauses"
+              >
+                Reset to 10-Clause Standard
+              </button>
+            </div>
+          )}
+
+          {!isDraftEditable && (
+            <span className="text-[11px] text-slate-400 italic">
+              Terms locked for this version. Create a revision to modify.
+            </span>
+          )}
+        </div>
+
+        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-700 text-[11px] leading-relaxed max-h-48 overflow-y-auto space-y-1">
+          {(activeVersion.terms_conditions || 'No terms specified.')
+            .split('\n')
+            .filter(Boolean)
+            .map((clause: string, idx: number) => (
+              <p key={idx}>{clause}</p>
+            ))}
+        </div>
+      </div>
 
       {/* Acceptance Record Section (If accepted) */}
       {acceptances.length > 0 && (
@@ -732,6 +837,69 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal (Phase 4: Safe Soft-Delete with Audit Preservation) */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-rose-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-rose-600">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <h3 className="text-base font-bold text-slate-900">Delete Quotation</h3>
+              </div>
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-600">
+              <p>
+                Are you sure you want to delete quotation{' '}
+                <strong className="text-slate-900 font-mono text-sm">{quotation.quotation_number}</strong>?
+              </p>
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-lg leading-relaxed">
+                <strong>Safety Notice:</strong> This quotation will be safely removed from active quotation listings and searches. To comply with commercial accounting standards, full audit history and the quotation number will be securely preserved. Quotations linked to invoices cannot be deleted.
+              </div>
+
+              <form onSubmit={handleDeleteSubmit} className="space-y-3 pt-1">
+                <div>
+                  <label className="block font-semibold text-slate-700 uppercase mb-1">
+                    Reason for Deletion
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={deleteReason}
+                    onChange={(e) => setDeleteReason(e.target.value)}
+                    placeholder="e.g. Client cancelled project requirement / Superseded by alternative proposal"
+                    className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900 focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteModal(false)}
+                    className="px-4 py-2 border border-slate-300 rounded text-slate-700 hover:bg-slate-50 font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded font-semibold transition disabled:opacity-50 inline-flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {isPending ? 'Deleting...' : 'Confirm Delete'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

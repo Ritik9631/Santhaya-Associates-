@@ -26,6 +26,39 @@ export function formatIndianRupee(
 }
 
 /**
+ * Smart Indian Rupee formatting for Quotations & Invoices:
+ * - Omits unnecessary trailing '.00' for whole integer amounts (e.g. ₹26,000.00 -> ₹26,000)
+ * - Retains exact 2 decimal places for fractional amounts with nonzero paise (e.g. ₹1,250.50 -> ₹1,250.50)
+ * - Maintains Indian numbering locale ('en-IN') and right-aligned font-mono formatting
+ *
+ * @param amount - Number or string representation of the amount
+ * @param includeSymbol - Whether to prepend the '₹' currency symbol (defaults to true)
+ */
+export function formatSmartRupee(
+  amount: number | string | null | undefined,
+  includeSymbol = true
+): string {
+  const num = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
+  if (isNaN(num)) return includeSymbol ? '₹0' : '0';
+
+  const absNum = Math.abs(num);
+  const sign = num < 0 ? '-' : '';
+
+  // Check if fractional paise exists (round to nearest cent to prevent IEEE 754 inaccuracies)
+  const paise = Math.round(absNum * 100) % 100;
+  const isWholeRupee = paise === 0;
+  const decimals = isWholeRupee ? 0 : 2;
+
+  const formattedNumber = absNum.toLocaleString('en-IN', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+
+  const prefix = includeSymbol ? '₹' : '';
+  return `${sign}${prefix}${formattedNumber}`;
+}
+
+/**
  * Formats large amounts into human-readable compact Indian scales:
  * >= 1,00,00,000 (1 Crore): "₹622.56 Cr"
  * >= 1,00,000 (1 Lakh):    "₹45.75 L"

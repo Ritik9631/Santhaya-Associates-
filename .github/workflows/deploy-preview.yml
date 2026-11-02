@@ -1,0 +1,56 @@
+name: Deploy GitHub Pages Preview
+
+on:
+  workflow_dispatch:
+
+# Grant minimum necessary permissions for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Prevent concurrent deployment runs
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Static Preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Project Dependencies
+        run: npm ci
+
+      - name: Compile Isolated Static Preview
+        run: npm run build:preview
+        env:
+          NEXT_PUBLIC_SITE_URL: "https://ritik9631.github.io/Santhaya-Associates-"
+          NEXT_PUBLIC_IS_PREVIEW: "true"
+
+      - name: Upload GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+  deploy:
+    name: Deploy to GitHub Pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy Pages Bundle
+        id: deployment
+        uses: actions/deploy-pages@v4
+

@@ -1,24 +1,20 @@
 # SANTHAYA ASSOCIATES — CROSS-DEVICE DEVELOPMENT HANDOVER GUIDE
 
-**Document Version:** 6.0.0  
-**Effective Date:** October 31, 2026  
+**Document Version:** 7.0.0  
+**Effective Date:** November 2, 2026  
 **Primary Project Workspace:** `D:\video\Santhaya-Associates-20261031T005519Z-1-001\Santhaya-Associates`  
 **GitHub Remote:** `https://github.com/Ritik9631/Santhaya-Associates-.git`  
 **Target Git Branch:** `master`  
 **Development Supabase Reference:** `bkqneudnnhvvwmtggorz` (`ap-southeast-2`)  
 **Scope Lock:** Industrial tenders, construction machinery supply, manufacturing machinery supply, staff ERP, quotation estimation, and statutory GST tax invoicing. Public visitors never authenticate; all ERP operations reside strictly under `/staff/*`.
 
-> [!CAUTION]
-> **Workspace Boundary Rule:**
-> Never access, modify, or merge the legacy `D:\video\Santhaya-Associates-Clean-Starter` folder. All active code lives strictly within `D:\video\Santhaya-Associates-20261031T005519Z-1-001\Santhaya-Associates`.
-
 ---
 
 ## 1. PROJECT IMPLEMENTATION STATUS & PHASE SUMMARY
 
-| Platform Phase | Subsystem Description | Implementation Status | Database Migration Status | Automated Verification |
+| Platform Phase / Module | Subsystem Description | Implementation Status | Database Migration Status | Automated Verification |
 | :--- | :--- | :--- | :--- | :--- |
-| **Phase 1** | Next.js 14 App Router, responsive header, authentic logo, service pillars | **COMPLETE — VERIFIED** | N/A | 25/25 production routes, zero horizontal overflow |
+| **Phase 1** | Next.js 14 App Router, responsive header, authentic logo, service pillars | **COMPLETE — VERIFIED** | N/A | 26/26 production routes, zero horizontal overflow |
 | **Phase 2A–2D** | Quotation intake API, rate limiting, anti-spam honeypot, outbox queue | **COMPLETE — VERIFIED** | **Applied & Verified** (`20261026120000`, `20261028120000`) | Outbox & security suites passed |
 | **Phase 3A** | Staff authentication, RBAC, Super Admin interactive bootstrap | **COMPLETE — VERIFIED** | **Applied & Verified** (`20261029120000`, `20261029120001`) | Exactly 1 Super Admin active in dev DB |
 | **Phase 3B** | Customer management (optional contacts), Master SKU catalog | **COMPLETE — VERIFIED** | **Applied & Verified** (`20261029140000`) | `test:phase3b` (28/28 passed) |
@@ -27,139 +23,155 @@
 | **Phase 4** | Communications hub, multi-channel delivery, Resend integration | **COMPLETE — VERIFIED** | **Local Specification** (`20261031120000`) | `test:phase4` (114/114 passed) |
 | **Phase 5** | UI/UX polish, Command Center (`/staff`), multi-viewport QA, native SEO | **COMPLETE — VERIFIED** | N/A | `test:phase5-browser` (121/121 passed) |
 | **Phase 6** | Production readiness, security headers, runbooks, handoff | **COMPLETE — VERIFIED** | Verified tier independence | `test:phase6` (68/68 passed) |
-| **Phase 7** | Production deployment, live domain cutover, final UAT | **PLANNED** | Awaits owner authorization | Ready to execute after break |
+| **Batch 1–4 Fixes** | Form contrast, Motihari profile, PAN auto-derive, draft soft delete | **COMPLETE — VERIFIED** | Prepared local specification | `test:batch2`, `test:batch3`, `test:batch4` |
+| **Quotation PDF Suite** | Readability (10–11pt), 2-col terms, gridlines, 2-decimals, round seal | **COMPLETE — VERIFIED** | Prepared local specification | `test:refinements` (26/26), `test:stamp` (24/24) |
+| **Phase 7** | Production deployment, live domain cutover, final UAT | **ON HOLD** | Awaits owner authorization | Ready to resume upon approval |
 
 ---
 
-## 2. RECONCILED TEST BATTERY AUDIT (428 PASSED, 0 FAILED)
+## 2. RECONCILED TEST BATTERY AUDIT (ALL 16 SUITES PASSING)
 
-All platform test suites have been executed and verified against the development environment. The exact totals across all 11 suites sum to **428 assertions**:
+All test batteries pass cleanly with zero failures against the development sandbox:
 
-| Test Suite | Command | Assertions | Status |
-| :--- | :--- | :---: | :---: |
-| **Lifecycle Integration** | `npm.cmd run test:lifecycle` | 14 | **PASSED** |
-| **Phase 3B Customer & Catalog** | `npm.cmd run test:phase3b` | 28 | **PASSED** |
-| **Phase 3C Quotation Pipeline** | `npm.cmd run test:phase3c` | 37 | **PASSED** |
-| **Phase 3D Statutory Invoicing** | `npm.cmd run test:phase3d` | 46 | **PASSED** |
-| **Phase 4 Outbox Worker & Retries** | `npm.cmd run test:phase4-outbox` | 14 | **PASSED** |
-| **Phase 4 Customer Enquiry Intake**| `npm.cmd run test:phase4-enquiries`| 11 | **PASSED** |
-| **Phase 4 Quotation Delivery** | `npm.cmd run test:phase4-quotation` | 15 | **PASSED** |
-| **Phase 4 Invoice Delivery** | `npm.cmd run test:phase4-invoice` | 17 | **PASSED** |
-| **Phase 4 Security Perimeter** | `npm.cmd run test:phase4-security` | 10 | **PASSED** |
-| **Phase 4 Browser Automation** | `npm.cmd run test:phase4-browser` | 47 | **PASSED** |
-| **Phase 5 Multi-Viewport QA** | `npm.cmd run test:phase5-browser` | 121 | **PASSED** |
-| **Phase 6 Production Readiness** | `npm.cmd run test:phase6` | 68 | **PASSED** |
-| **TOTAL VERIFIED ASSERTIONS** | — | **428** | **100% PASS** |
+| Test Suite | Command | Coverage Scope | Status |
+| :--- | :--- | :--- | :---: |
+| **1. Connection Verifier** | `npm.cmd run test:connection` | Supabase anon & service-role read-only handshake | **PASSED** |
+| **2. Super Admin Check** | `npm.cmd run test:super-admin` | Verifies exactly 1 active Super Administrator | **PASSED** |
+| **3. Phase 2D Security** | `npm.cmd run test:phase2d` | Contact validation, spoofed IP defense, outbox claim | **PASSED** |
+| **4. Phase 3A-1 Auth Guard** | `npm.cmd run test:phase3a1` | Staff route protection, public site zero auth leaks | **PASSED** |
+| **5. Phase 3A-2 Session** | `npm.cmd run test:phase3a2` | Cookie security, session validation, active status | **PASSED** |
+| **6. Phase 3A-3 RBAC Matrix**| `npm.cmd run test:phase3a3` | Anti-self-escalation, lockout defense, role reassign | **PASSED** |
+| **7. Phase 3B Customer/SKU** | `npm.cmd run test:phase3b` | Customer optional contacts, master SKU catalog | **PASSED** |
+| **8. Phase 3C Quotation** | `npm.cmd run test:phase3c` | Quotation calculation, tax splits, Rupee words | **PASSED** |
+| **9. Phase 3D Invoicing** | `npm.cmd run test:phase3d` | Gapless invoice numbering, ledger reconciliation | **PASSED** |
+| **10. Phase 4 Comms Hub** | `npm.cmd run test:phase4` | Delivery logging, outbox retry, quota exhaustion | **PASSED** |
+| **11. Phase 6 Production** | `npm.cmd run test:phase6` | Security headers, tier separation, public integrity | **PASSED** |
+| **12. Batch 2 Verification** | `npm.cmd run test:batch2` | Place of supply classification, draft issuance guard | **PASSED** |
+| **13. Batch 3 Verification** | `npm.cmd run test:batch3` | High-contrast inputs, A4 print styles, date formats | **PASSED** |
+| **14. Batch 4 Verification** | `npm.cmd run test:batch4` | Quotation soft delete, FY sequence generation | **PASSED** |
+| **15. Quotation Refinements**| `npm.cmd run test:refinements` | GSTIN checksum, derived PAN, 2-decimal summary | **PASSED** (26/26) |
+| **16. Round Stamp Harness** | `npm.cmd run test:stamp` | 32mm circular stamp, draft/issued guard, 1-page fit | **PASSED** (24/24) |
+| **TOTAL TEST STATUS** | `npm.cmd test` | **All 16 test suites run consecutively** | **100% PASS** |
 
 ---
 
-## 3. RESUMING DEVELOPMENT ON ANOTHER DESKTOP
+## 3. LATEST QUOTATION PDF IMPROVEMENTS (NOVEMBER 2, 2026)
 
-Follow these exact steps when continuing on another device:
+The quotation export/print template (`src/app/staff/quotations/[id]/pdf/page.tsx`) underwent comprehensive visual and structural refinement:
 
-### Step 3.1: Clone or Pull Latest Code
+1. **Typographic Hierarchy & Readability:**
+   - **Regular body text:** Standardized to **10–11 pt** (Client Name `11pt`, Item Name `10pt`, FY Quotation Number `19pt`, Subheadings `10pt`).
+   - **Supporting text:** Standardized to **9–9.5 pt** (Addresses, HSN/SAC, Unit Rates, Taxable Amounts, Commercial Notes, Terms).
+   - **No essential text smaller than 9 pt.**
+   - Balanced spacing across header, customer grid, item table, and summary cards.
+2. **Responsive 2-Column Terms & Conditions Grid:**
+   - Stored 10-clause legal standard (`1,662` chars) now renders in a responsive 2-column print grid (`print:grid-cols-2 gap-x-4 gap-y-1`).
+   - Reduces vertical terms height by nearly 50% (`307 px` down from `548 px`), enabling 1-item and 2-item quotations with all 10 clauses to fit on **exactly 1 A4 page**.
+   - Clause headings (`1. HEADING: Details...`) parse automatically and render with bold, high-contrast labels.
+   - Staff can toggle between `Standard 10-Clause Terms (Default)` and `Compact 6-Clause Terms (Testing)` via preset buttons in `QuotationDetailView.tsx` and `QuotationForm.tsx`.
+3. **Genuine Company Round Stamp Integration:**
+   - Authentic circular seal created at `public/branding/santhaya-round-stamp.png` (1254×1254, transparent background).
+   - Formally issued/authorized quotations render the seal at **32mm diameter** (`w-[32mm] h-[32mm]`, `object-contain`, zero distortion) between the company name and signatory line.
+   - Unissued draft quotations remain strictly unstamped per corporate governance rules; an informative banner appears in the staff UI, and print outputs display `(Official seal affixed upon formal issuance)`.
+4. **Crisp Medium-Dark Table Gridlines:**
+   - Replaced washed-out cell borders with visible medium-dark slate dividers (`border-slate-400 print:border-slate-500` / `#475569`).
+   - Table wrapper reinforced with `border-2 border-slate-700 print:border-slate-800`.
+   - Header styled with dark navy `#10243B`, white text, and `border-b-2 border-slate-900`.
+5. **Exact Two-Decimal Financial Summary Enforcement:**
+   - Applied `formatIndianRupee(amount, 2)` across all financial summary fields:
+     - Taxable Amount: **₹1,00,000.00**
+     - Integrated GST (IGST): **₹18,000.00**
+     - Total Tax Amount: **₹18,000.00**
+     - GRAND TOTAL (INR): **₹1,18,000.00**
+   - Retained `formatSmartRupee()` on line-item rates to keep item display clean and configurable.
+6. **Enforced A4 Print Geometry:**
+   - Declared `@page { size: A4 portrait; margin: 8mm 10mm; }` both globally and inside `@media print`, overriding browser/OS paper size defaults.
+
+---
+
+## 4. REMAINING ISSUES POSTPONED TO NEXT SESSION
+
+Two minor layout issues have been identified on large-value / high-digit quotation records (e.g., test quotation `QT-2026-27-008`). Development is intentionally paused with these two items queued for the next session:
+
+1. **Remaining Issue 1 — Item Total (₹) Column Clipping for Large Amounts:**  
+   On quotation line items with large amounts (7–9 digits, such as `₹8,00,000.00` or `₹1,00,00,000.00`), the `Total (₹)` column width (`w-[9%]`) can experience text wrapping or horizontal clipping against the table edge.  
+   *Planned Solution for Next Session:* Rebalance table column widths (e.g., increase `Total (₹)` to `w-[11–12%]` while shaving 1% from `Description` or `Taxable`), or remove `whitespace-nowrap` on monetary values while preserving `font-mono`.
+2. **Remaining Issue 2 — Official Stamp Horizontal Alignment:**  
+   In exported PDFs, the official company round stamp appears horizontally centered within the authorization block, whereas the intended visual design requires it to align toward the right, directly centered over the `Authorized Signatory` signature line.  
+   *Planned Solution for Next Session:* Adjust flex alignment in the authorization block from `justify-center` to `justify-end` / `pr-4` to achieve right-aligned stamp positioning matching the design preview.
+
+**Latest Test Quotation Reference:** `QT-2026-27-008` (draft record in development database).
+
+---
+
+## 5. RESUMING DEVELOPMENT ON THE NEW DESKTOP
+
+Follow these steps to set up the project on the new desktop:
+
+### Step 5.1: Clone the Repository
 ```powershell
-# If pulling into an existing clone:
+git clone https://github.com/Ritik9631/Santhaya-Associates-.git
+cd Santhaya-Associates-
+```
+*(Or if pulling into an existing clone on the desktop:)*
+```powershell
 git fetch origin master
 git checkout master
 git pull origin master
-
-# If cloning fresh on a new machine:
-git clone https://github.com/Ritik9631/Santhaya-Associates-.git
-cd Santhaya-Associates
 ```
 
-### Step 3.2: Install Clean Dependencies
+### Step 5.2: Install Clean Dependencies
 ```powershell
 npm.cmd ci
 ```
 
-### Step 3.3: Securely Restore `.env.local`
-> [!IMPORTANT]
-> `.env.local` is intentionally Git-ignored and is never pushed to GitHub. You must recreate `.env.local` manually on the new desktop. Do not commit or share this file.
+### Step 5.3: Recreate `.env.local`
+> [!CAUTION]
+> `.env.local` is strictly Git-ignored and is never committed to GitHub. Recreate `.env.local` manually in the project root on the new desktop. Populate the values securely from your development password manager or team vault.
 
-Create `.env.local` in the project root with the following keys (populate with your existing development Supabase credentials from your password manager):
-
+**Required Environment Variable Names (Populate values securely):**
 ```env
-# Supabase Development Configuration (Project: bkqneudnnhvvwmtggorz)
-NEXT_PUBLIC_SUPABASE_URL=https://bkqneudnnhvvwmtggorz.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-development-anon-key>
-SUPABASE_SERVICE_ROLE_KEY=<your-development-service-role-key>
-
-# Application Base URL
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
-
-# Security & Anti-Spam Salt
-RATE_LIMIT_SALT=<your-development-rate-limit-salt>
-
-# Transactional Email Engine (Development operates in mock mode by default)
+RATE_LIMIT_SALT=
 EMAIL_PROVIDER=mock
-EMAIL_FROM_ADDRESS="Santhaya Associates <onboarding@resend.dev>"
+EMAIL_FROM_ADDRESS=
 EMAIL_DAILY_LIMIT=80
 EMAIL_MONTHLY_LIMIT=2500
-
-# Optional Outbox Worker Cron Secret
-CRON_SECRET=<your-development-cron-secret>
+CRON_SECRET=
 ALLOW_DEV_CRON=true
+ALLOW_TEST_ENV=true
 ```
 
-### Step 3.4: Verify Database Connection & Super Admin Account
+### Step 5.4: Execute Quality Gates & Verifications
+Run the standard validation commands to ensure the desktop environment is sound:
 ```powershell
-# Verify migration status
-npm.cmd run test:phase3a-status
-
-# Verify existing Super Admin account
-npm.cmd run test:super-admin
-```
-*Expected Result:* Both Phase 3A migration steps active; exactly 1 active Super Administrator verified.
-
-### Step 3.5: Run Quality Gates
-```powershell
-# Verify TypeScript compilation (must return 0 errors)
+# 1. Verify TypeScript types (must return 0 errors)
 npm.cmd run typecheck
 
-# Verify ESLint (must return 0 warnings/errors)
+# 2. Verify ESLint (must return 0 warnings/errors)
 npm.cmd run lint
 
-# Run Phase 6 Production Readiness suite (must return 68 passed)
-npm.cmd run test:phase6
+# 3. Verify all 16 test suites (must return 100% pass)
+npm.cmd test
 ```
 
-### Step 3.6: Start Development Server
+### Step 5.5: Start Development Server
 ```powershell
 npm.cmd run dev
 ```
-Open `http://localhost:3000` for the public portal and `http://localhost:3000/staff/login` for the staff ERP.
+Open `http://localhost:3000` for the public website and `http://localhost:3000/staff/login` for the staff ERP.
 
 ---
 
-## 4. CURRENT ACTIVE STAFF ERP MODULES
+## 6. OUTSTANDING RISKS & UNAPPLIED SPECIFICATIONS
 
-The staff ERP encompasses six fully operational subsystems accessible to authenticated staff:
-1. **Command Center (`/staff`):** Real-time operational metrics (Customers, SKUs, Quotations pipeline, Financial Receivables, Outbox telemetry).
-2. **Customer Directory (`/staff/customers`):** Directory, optional contact handling, GSTIN validation, state tax codes.
-3. **Master Catalog (`/staff/catalog`):** SKU pricing, HSN/SAC codes, and GST rates.
-4. **Quotation Engine (`/staff/quotations`):** Proposal generation, versioning (R0/R1), PO recording, conversion to invoice.
-5. **Statutory GST Billing (`/staff/billing`):** CGST Rule 46 gapless numbering (`SA/26-27/0001`), payment ledger reconciliation, printable high-DPI PDF invoice.
-6. **Communications Hub (`/staff/communications`):** Outbox queue, delivery channels (Email, WhatsApp, Phone, In-Person), worker status, quota telemetry.
-7. **Staff Administration (`/staff/team`):** Role administration, user provisioning, active session audit logs.
-
----
-
-## 5. KNOWN STATUS & OUTSTANDING APPROVALS
-
-- **Phase 4 Communications Database Migration (`20261031120000_phase4_communications.sql`):**  
-  *Status:* Local specification; unapplied in development. The application detects its absence (`PGRST205`) and seamlessly logs invoice deliveries via `email_outbox` and `audit_logs` without runtime error. Ready for execution whenever approved.
-- **Production Infrastructure:**  
-  *Status:* Not provisioned. Completely planned and documented in `docs/PHASE6-PRODUCTION-READINESS.md` and `docs/PRODUCTION-DEPLOYMENT-RUNBOOK.md`.
-
----
-
-## 6. PHASE 7 TASK OUTLINE (NEXT STEPS)
-
-When resuming development for Phase 7:
-1. **Owner Confirmation of Business Registry:** Confirm official corporate name, address, 15-digit GSTIN, PAN, and SBI bank account details.
-2. **Production Supabase Setup:** Create production project in Mumbai (`ap-south-1`) and execute migrations 1 through 8.
-3. **Production Super Admin Bootstrap:** Run `node scripts/bootstrap-super-admin.mjs` against production DB.
-4. **Hosting Deployment:** Link GitHub repo to Vercel, configure production secrets, and bind custom domain (`santhaya.com`).
-5. **Final User Acceptance Testing (UAT):** Owner performs end-to-end manual testing as a commercial customer and staff administrator.
+1. **Unapplied Prepared Migrations:**
+   - `supabase/migrations/20261031120000_phase4_communications.sql`: Delivery tracking table.
+   - `supabase/migrations/20261102100000_add_quotation_soft_delete.sql`: Soft deletion columns (`deleted_at`, `deletion_reason`).
+   - `supabase/migrations/20261102120000_financial_year_quotation_numbering.sql`: Database sequence function for FY numbering (`QT-YYYY-YY-NNN`).
+   *Status:* Application code includes resilient fallbacks (graceful error handling, application-level sequence fallback, notes tagging) so the application functions 100% correctly in development without applying them until explicitly approved.
+2. **Production Infrastructure (Phase 7):**
+   - Paused per user instruction. Do not configure production Vercel or production Supabase until directed.

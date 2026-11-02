@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createCustomerAction, updateCustomerAction } from '@/lib/customers/actions';
 import { INDIAN_STATES, resolveIndianState } from '@/lib/utils/indian-states';
+import { validateGstinChecksum, extractPanFromGstin } from '@/lib/utils/gstin';
 import { Building2, AlertCircle, Loader2, ArrowLeft, ShieldCheck, Check } from 'lucide-react';
 import type { CustomerType } from '@/types/database';
 
@@ -40,15 +41,78 @@ export function CustomerForm({ initialData, isEdit }: CustomerFormProps) {
   const [selectedStateCode, setSelectedStateCode] = useState<string>(initialResolved?.code || '');
   const [selectedStateName, setSelectedStateName] = useState<string>(initialResolved?.name || initialData?.state || '');
 
+  // GSTIN & PAN Controlled State with Auto-Derivation
+  const [gstin, setGstin] = useState<string>(initialData?.gstin || '');
+  const [pan, setPan] = useState<string>(initialData?.pan || '');
+  const [panIsAutoDerived, setPanIsAutoDerived] = useState<boolean>(() => {
+    if (initialData?.gstin && initialData?.pan) {
+      return (
+        initialData.gstin.length === 15 &&
+        initialData.gstin.slice(2, 12).toUpperCase() === initialData.pan.toUpperCase()
+      );
+    }
+    return false;
+  });
+  const [panConflictWarning, setPanConflictWarning] = useState<string | null>(null);
+
   const handleStateChange = (codeVal: string) => {
     setSelectedStateCode(codeVal);
     const found = INDIAN_STATES.find((s) => s.code === codeVal);
     setSelectedStateName(found ? found.name : '');
   };
 
+  const handleGstinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value.toUpperCase();
+    setGstin(rawVal);
+
+    if (rawVal.length === 15) {
+      if (validateGstinChecksum(rawVal)) {
+        const derived = rawVal.slice(2, 12);
+        if (!pan || panIsAutoDerived || pan === derived) {
+          setPan(derived);
+          setPanIsAutoDerived(true);
+          setPanConflictWarning(null);
+        } else if (pan && pan !== derived) {
+          setPanConflictWarning(`Entered PAN (${pan}) conflicts with GSTIN-derived PAN (${derived}).`);
+        }
+      } else {
+        setPanConflictWarning('GSTIN has an invalid checksum character. Verify the 15-digit statutory GSTIN.');
+      }
+    } else {
+      if (panIsAutoDerived) {
+        setPan('');
+        setPanIsAutoDerived(false);
+      }
+      setPanConflictWarning(null);
+    }
+  };
+
+  const handlePanChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value.toUpperCase();
+    setPan(rawVal);
+    setPanIsAutoDerived(false);
+
+    if (gstin.length === 15 && validateGstinChecksum(gstin)) {
+      const derived = gstin.slice(2, 12);
+      if (rawVal && rawVal !== derived) {
+        setPanConflictWarning(`Entered PAN (${rawVal}) conflicts with GSTIN characters 3–12 (${derived}).`);
+      } else {
+        setPanConflictWarning(null);
+      }
+    } else {
+      setPanConflictWarning(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+
+    if (panConflictWarning) {
+      setError(panConflictWarning);
+      return;
+    }
+
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
@@ -185,36 +249,69 @@ export function CustomerForm({ initialData, isEdit }: CustomerFormProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         {/* GSTIN */}
         <div className="space-y-1.5">
-          <label htmlFor="gstin" className="block text-xs font-semibold text-slate-300">
-            Statutory GSTIN <span className="text-slate-500 text-[11px]">(Optional — 15 Characters)</span>
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="gstin" className="block text-xs font-semibold text-slate-300">
+              Statutory GSTIN <span className="text-slate-500 text-[11px]">(Optional — 15 Characters)</span>
+            </label>
+            {gstin.length === 15 && validateGstinChecksum(gstin) && (
+              <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-1.5 py-0.5 rounded">
+                Checksum Verified
+              </span>
+            )}
+          </div>
           <input
             id="gstin"
             name="gstin"
             type="text"
             maxLength={15}
-            defaultValue={initialData?.gstin || ''}
+            value={gstin}
+            onChange={handleGstinChange}
             disabled={loading}
-            placeholder="e.g. 33AAAAA0000A1Z5"
+            placeholder="e.g. 10ABVCS4277J1ZU"
             className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 font-mono text-xs text-gold-400 placeholder-slate-500 uppercase focus:outline-none focus:ring-2 focus:ring-gold-500 disabled:opacity-50"
           />
+          <p className="text-[10.5px] text-slate-500 leading-tight">
+            Entering a valid GSTIN automatically derives and populates the 10-character PAN.
+          </p>
         </div>
 
         {/* PAN */}
         <div className="space-y-1.5">
-          <label htmlFor="pan" className="block text-xs font-semibold text-slate-300">
-            Statutory PAN <span className="text-slate-500 text-[11px]">(Optional — 10 Characters)</span>
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="pan" className="block text-xs font-semibold text-slate-300">
+              Statutory PAN <span className="text-slate-500 text-[11px]">(Optional — 10 Characters)</span>
+            </label>
+            {panIsAutoDerived && (
+              <span className="text-[10px] font-semibold text-gold-400 bg-gold-950/60 border border-gold-800/60 px-1.5 py-0.5 rounded">
+                Auto-derived from GSTIN
+              </span>
+            )}
+          </div>
           <input
             id="pan"
             name="pan"
             type="text"
             maxLength={10}
-            defaultValue={initialData?.pan || ''}
+            value={pan}
+            onChange={handlePanChange}
             disabled={loading}
-            placeholder="e.g. ABCDE1234F"
-            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 font-mono text-xs text-gold-400 placeholder-slate-500 uppercase focus:outline-none focus:ring-2 focus:ring-gold-500 disabled:opacity-50"
+            placeholder="e.g. ABVCS4277J"
+            className={`w-full px-3 py-2 rounded-lg bg-slate-950 border font-mono text-xs text-gold-400 placeholder-slate-500 uppercase focus:outline-none focus:ring-2 disabled:opacity-50 ${
+              panConflictWarning
+                ? 'border-rose-500 focus:ring-rose-500'
+                : 'border-slate-700 focus:ring-gold-500'
+            }`}
           />
+          {panConflictWarning ? (
+            <p className="text-[10.5px] text-rose-400 flex items-center gap-1 font-medium">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              {panConflictWarning}
+            </p>
+          ) : (
+            <p className="text-[10.5px] text-slate-500 leading-tight">
+              Characters 3–12 of GSTIN for registered businesses, or direct PAN for individuals.
+            </p>
+          )}
         </div>
       </div>
 

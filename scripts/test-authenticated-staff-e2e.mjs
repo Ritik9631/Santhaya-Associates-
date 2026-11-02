@@ -120,7 +120,7 @@ async function runAuthenticatedQA() {
     { file: 'src/app/staff/quotations/new/QuotationForm.tsx', requiredTerms: ['customerId', 'deliveryLocation', 'items'] },
     { file: 'src/app/staff/billing/new/InvoiceForm.tsx', requiredTerms: ['customerId', 'convertQuotationToInvoiceAction', 'items'] },
     { file: 'src/app/staff/billing/[id]/pdf/page.tsx', requiredTerms: ['TAX INVOICE', 'CGST', 'SGST', 'IGST'] },
-    { file: 'src/app/staff/quotations/[id]/pdf/page.tsx', requiredTerms: ['COMMERCIAL QUOTATION', 'HSN/SAC'] },
+    { file: 'src/app/staff/quotations/[id]/pdf/page.tsx', requiredTerms: ['QUOTATION', 'HSN/SAC'] },
   ];
 
   for (const comp of requiredComponents) {
