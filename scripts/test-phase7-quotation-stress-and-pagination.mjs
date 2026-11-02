@@ -158,17 +158,17 @@ test('PDF Test 1 & 2: Short quotations (1-2 items) fit comfortably inside single
   assert(pdfContent.includes('margin: 8mm 10mm;'), 'Uses compact 8mm top/bottom margin for single page fit');
 });
 
-test('PDF Test 3: Five items (standard quote) columns fit inside 100% printable width', () => {
+test('PDF Test 3: Five items (standard quote) columns fit inside 100% printable width without clipping', () => {
   const pdfContent = fs.readFileSync(path.join(rootDir, 'src/app/staff/quotations/[id]/pdf/page.tsx'), 'utf8');
-  // Column percentages for GST:
-  // 4% + 27% + 9% + 6% + 6% + 12% + 12% + 6% + 8% + 10% = 100%
+  // Column percentages for GST (sums to 100%, with 17% for Total to prevent clipping):
+  // 4% + 27% + 8% + 5% + 5% + 10% + 10% + 5% + 9% + 17% = 100%
   assert(pdfContent.includes("w-[4%]"), 'Col 1: 4%');
   assert(pdfContent.includes("w-[27%]"), 'Col 2: 27%');
-  assert(pdfContent.includes("w-[9%]"), 'Col 3: 9%');
-  assert(pdfContent.includes("w-[6%]"), 'Col 4, 5, 8: 6%');
-  assert(pdfContent.includes("w-[12%]"), 'Col 6, 7: 12%');
-  assert(pdfContent.includes("w-[8%]"), 'Col 9: 8%');
-  assert(pdfContent.includes("w-[10%]"), 'Col 10: 10%');
+  assert(pdfContent.includes("w-[8%]"), 'Col 3: 8%');
+  assert(pdfContent.includes("w-[5%]"), 'Col 4, 5, 8: 5%');
+  assert(pdfContent.includes("w-[10%]"), 'Col 6, 7: 10%');
+  assert(pdfContent.includes("w-[9%]"), 'Col 9: 9%');
+  assert(pdfContent.includes("w-[17%]"), 'Col 10: 17%');
 });
 
 test('PDF Test 4 & 5: Long & multi-page quotes (20-50 items) repeat thead and avoid split rows', () => {

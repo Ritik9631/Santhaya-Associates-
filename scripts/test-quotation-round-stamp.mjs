@@ -152,7 +152,7 @@ await test('Invoice PDF generator does NOT contain the round quotation stamp', (
 // SECTION 4: Generated PDF Pagination and Single-Page Verification
 console.log('\n--- Section 4: Generated PDF Verification ---');
 
-const sampleDir = 'C:/Users/ritik/.gemini/antigravity/brain/26a96ae2-7d28-4640-80b9-553f236fc3f0/sample_quotations';
+const sampleDir = path.resolve(process.env.SAMPLE_DIR || 'sample_quotations');
 
 function countPdfPages(filePath) {
   const buf = fs.readFileSync(filePath);

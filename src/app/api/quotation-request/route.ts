@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { processOutboxBatch } from '@/lib/email/outbox-worker';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import {
   quotationApiSchema,
@@ -196,6 +197,11 @@ export async function POST(req: NextRequest) {
           console.warn('[Quotation API] Non-fatal customer confirmation enqueue error:', enqueueErr);
         }
       }
+
+      // Trigger non-blocking outbox worker execution to process pending notification jobs immediately
+      processOutboxBatch(adminClient, { batchSize: 5 }).catch((workerErr) => {
+        console.warn('[Quotation API] Non-fatal background outbox dispatch trigger error:', workerErr?.message || workerErr);
+      });
 
       return NextResponse.json(
         {

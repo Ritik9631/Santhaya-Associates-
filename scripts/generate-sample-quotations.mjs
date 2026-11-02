@@ -22,7 +22,7 @@ import puppeteer from 'puppeteer-core';
 import { formatSmartRupee, convertNumberToIndianWords } from '../src/lib/utils/currency.ts';
 import { getSimplifiedQuotationTerms } from '../src/lib/billing/default-terms.ts';
 
-const outputDir = 'C:/Users/ritik/.gemini/antigravity/brain/26a96ae2-7d28-4640-80b9-553f236fc3f0/sample_quotations';
+const outputDir = path.resolve(process.env.SAMPLE_DIR || 'sample_quotations');
 if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
@@ -364,15 +364,15 @@ function generateHtml({
         </p>
 
         <!-- Circular Stamp Placement (32mm diameter, positioned between company name and signatory line) -->
-        <div style="padding: 2px 0; display: flex; align-items: center; justify-content: center; min-height: 32mm;">
+        <div style="padding: 2px 0; display: flex; align-items: center; justify-content: flex-end; min-height: 32mm;">
           ${isAuthorized ? `
             <img
               src="data:image/png;base64,${stampBase64}"
               alt="Santhaya Associates Official Circular Company Stamp"
-              style="width: 32mm; height: 32mm; max-width: 120px; max-height: 120px; object-fit: contain; pointer-events: none; user-select: none;"
+              style="width: 32mm; height: 32mm; max-width: 120px; max-height: 120px; object-fit: contain; pointer-events: none; user-select: none; margin-left: auto;"
             />
           ` : `
-            <div style="height: 32mm; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 7.5pt; font-style: italic;">
+            <div style="height: 32mm; display: flex; align-items: center; justify-content: flex-end; color: #94a3b8; font-size: 7.5pt; font-style: italic;">
               (Official seal affixed upon formal issuance)
             </div>
           `}
@@ -595,6 +595,26 @@ async function generateAllSamples() {
     items: samplePaiseItems,
   });
 
+  // 11. Five-Item Quotation (2 page proof)
+  const fiveItemsHtml = generateHtml({
+    quoteNumber: 'QT-2026-27-011',
+    customerName: 'Patna Ring Road Project Division',
+    customerContactPerson: 'Er. R. K. Choudhary (Executive Engineer)',
+    isAuthorized: true,
+    isTaxDetermined: true,
+    items: sampleTenItems.slice(0, 5),
+  });
+
+  // 12. 20-Item Quotation (3 page proof)
+  const twentyItemsHtml = generateHtml({
+    quoteNumber: 'QT-2026-27-012',
+    customerName: 'Bihar Urban Infrastructure Development Corporation (BUIDCO)',
+    customerContactPerson: 'Ajay Sinha (Chief Engineer)',
+    isAuthorized: true,
+    isTaxDetermined: true,
+    items: sampleThirtyItems.slice(0, 20),
+  });
+
   const allJobs = [
     { html: draftHtml, name: 'sample-quotation-draft.pdf', htmlName: 'sample-quotation-draft.html', label: '1. Draft Quotation (Unstamped)' },
     { html: authorizedHtml, name: 'sample-quotation-authorized.pdf', htmlName: 'sample-quotation-authorized.html', label: '2. Authorized Quotation (Stamped)' },
@@ -606,6 +626,10 @@ async function generateAllSamples() {
     { html: confirmedCgstSgstHtml, name: 'sample-quotation-confirmed-cgst-sgst.pdf', htmlName: 'sample-quotation-confirmed-cgst-sgst.html', label: '8. Confirmed CGST/SGST Quotation' },
     { html: confirmedIgstHtml, name: 'sample-quotation-confirmed-igst.pdf', htmlName: 'sample-quotation-confirmed-igst.html', label: '9. Confirmed IGST Quotation' },
     { html: paiseHtml, name: 'sample-quotation-amounts-with-paise.pdf', htmlName: 'sample-quotation-amounts-with-paise.html', label: '10. Amounts with Paise Quotation' },
+    { html: oneItemHtml, name: 'sample-quotation-single-item.pdf', htmlName: 'sample-quotation-single-item.html', label: 'Single-Item Quotation (1 Page)' },
+    { html: twoItemsHtml, name: 'sample-quotation-two-items.pdf', htmlName: 'sample-quotation-two-items.html', label: 'Two-Item Quotation (1 Page)' },
+    { html: fiveItemsHtml, name: 'sample-quotation-five-items.pdf', htmlName: 'sample-quotation-five-items.html', label: 'Five-Item Quotation (2 Pages)' },
+    { html: twentyItemsHtml, name: 'sample-quotation-multi-page-20-items.pdf', htmlName: 'sample-quotation-multi-page-20-items.html', label: '20-Item Quotation (3 Pages)' },
   ];
 
   for (const job of allJobs) {

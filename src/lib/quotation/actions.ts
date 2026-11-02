@@ -928,7 +928,13 @@ export async function updateQuotationStatusAction(
 export async function recordQuotationDeliveryAction(
   quotationId: string,
   deliveryChannel: QuotationDeliveryChannel,
-  details?: { recipientEmail?: string; recipientPhone?: string; notes?: string }
+  details?: {
+    recipientEmail?: string;
+    recipientPhone?: string;
+    notes?: string;
+    status?: 'sharing_initiated' | 'manually_sent' | 'downloaded' | 'logged' | 'enqueued';
+    updateCustomerContact?: boolean;
+  }
 ): Promise<ActionResponse> {
   try {
     const { user, profile } = await requireStaffSession();
@@ -936,7 +942,7 @@ export async function recordQuotationDeliveryAction(
 
     const { data: quote } = await adminClient
       .from('quotations')
-      .select('id, quotation_number, current_version_number, customers ( company_name, primary_contact_person )')
+      .select('id, quotation_number, customer_id, current_version_number, customers ( id, company_name, primary_contact_person )')
       .eq('id', quotationId)
       .single();
 
@@ -951,10 +957,24 @@ export async function recordQuotationDeliveryAction(
 
     if (!version) return { error: 'Quotation version not found.' };
 
-    // If channel is email, validate recipient and enqueue outbox job
-    if (deliveryChannel === 'email') {
+    // Update customer contact info if staff explicitly opted in (BUG-056)
+    if (details?.updateCustomerContact && quote.customer_id) {
+      const updatePayload: { phone?: string; email?: string } = {};
+      if (details.recipientPhone) updatePayload.phone = details.recipientPhone.trim();
+      if (details.recipientEmail) updatePayload.email = details.recipientEmail.trim().toLowerCase();
+      if (Object.keys(updatePayload).length > 0) {
+        await adminClient.from('customers').update(updatePayload).eq('id', quote.customer_id);
+      }
+    }
+
+    const effectiveStatus =
+      details?.status ||
+      (deliveryChannel === 'email' ? 'enqueued' : deliveryChannel === 'download' ? 'downloaded' : 'logged');
+
+    // If channel is email and enqueued for automated outbox queue
+    if (deliveryChannel === 'email' && effectiveStatus === 'enqueued') {
       const email = details?.recipientEmail?.trim();
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (!email || !/^[^s@]+@[^s@]+.[^s@]+$/.test(email)) {
         return { error: 'Valid recipient email address is required for email delivery.' };
       }
 
@@ -984,16 +1004,32 @@ export async function recordQuotationDeliveryAction(
       });
     }
 
-    // Record delivery log in quotation_delivery_logs
+    // Record delivery log in quotation_delivery_logs (BUG-059: accurate statuses)
     await adminClient.from('quotation_delivery_logs').insert({
       quotation_id: quotationId,
       quotation_version_id: version.id,
       delivery_channel: deliveryChannel,
       recipient_email: details?.recipientEmail?.trim() || null,
       recipient_phone: details?.recipientPhone?.trim() || null,
-      delivery_status: deliveryChannel === 'email' ? 'enqueued' : deliveryChannel === 'download' ? 'downloaded' : 'logged',
+      delivery_status: effectiveStatus,
       notes: details?.notes?.trim() || null,
       recorded_by_staff_id: user.id,
+    });
+
+    // Record immutable audit log
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'quotation',
+      entity_id: quotationId,
+      action: `document_delivery_${deliveryChannel}_${effectiveStatus}`,
+      actor_type: 'staff',
+      actor_id: user.id,
+      new_state: {
+        channel: deliveryChannel,
+        status: effectiveStatus,
+        recipient_email: details?.recipientEmail || null,
+        recipient_phone: details?.recipientPhone || null,
+        notes: details?.notes || null,
+      },
     });
 
     revalidatePath(`/staff/quotations/${quotationId}`);
@@ -1004,7 +1040,6 @@ export async function recordQuotationDeliveryAction(
     return { error: message };
   }
 }
-
 
 /**
  * Server Action: Discard an unissued draft quotation (BUG-044)

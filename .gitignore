@@ -37,3 +37,6 @@ supabase/.temp/
 # QA artifacts
 /docs/qa/
 /.qa_screenshots/
+
+# Sample PDFs
+/sample_quotations/

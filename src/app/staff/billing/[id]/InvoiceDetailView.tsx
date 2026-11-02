@@ -12,7 +12,8 @@ import {
 import { convertNumberToIndianWords, determineTaxStatus } from '@/lib/quotation/calculations';
 import { resolveIndianState, formatPlaceOfSupply } from '@/lib/utils/indian-states';
 import { discardDraftInvoiceAction } from '@/lib/billing/actions';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Share2 } from 'lucide-react';
+import DocumentShareModal from '@/components/documents/DocumentShareModal';
 import { formatIndianDate, formatIndianDateTime } from '@/lib/utils/date';
 import { formatIndianRupee } from '@/lib/utils/currency';
 import { TaxBreakdownCard, type RateTaxSummary } from '@/components/ui/TaxBreakdownCard';
@@ -309,13 +310,13 @@ export default function InvoiceDetailView({
             </button>
           )}
 
-          {invoice.status !== 'draft' && invoice.status !== 'cancelled' && canManage && (
+          {invoice.status !== 'cancelled' && canManage && (
             <button
               onClick={() => setShowDeliveryModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 border border-emerald-600/50 rounded-lg text-xs font-bold transition shadow-sm"
             >
-              <Send className="w-4 h-4" />
-              Send / Deliver
+              <Share2 className="w-4 h-4 text-emerald-300" />
+              Share / Deliver
             </button>
           )}
 
@@ -607,7 +608,7 @@ export default function InvoiceDetailView({
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500 bg-slate-50">
-                  <th className="py-2.5 px-3 font-semibold">Channel</th>
+                  <th className="py-2.5 px-3 font-semibold">Delivery Channel</th>
                   <th className="py-2.5 px-3 font-semibold">Recipient / Contact</th>
                   <th className="py-2.5 px-3 font-semibold">Status</th>
                   <th className="py-2.5 px-3 font-semibold">Logged At</th>
@@ -776,105 +777,32 @@ export default function InvoiceDetailView({
         </div>
       )}
 
-      {/* Invoice Delivery Modal */}
-      {showDeliveryModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Send className="w-5 h-5 text-gold-500" />
-                Dispatch / Log Invoice Delivery
-              </h3>
-              <button
-                onClick={() => setShowDeliveryModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleDeliverySubmit} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 uppercase mb-1">
-                  Delivery Channel <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={deliveryChannel}
-                  onChange={(e) => setDeliveryChannel(e.target.value as any)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
-                >
-                  <option value="email">Email Transmission (Outbox Queue)</option>
-                  <option value="whatsapp">WhatsApp PDF Transmission</option>
-                  <option value="phone">Phone Discussion / Notification</option>
-                  <option value="in_person">In-Person Handover / Printed</option>
-                  <option value="download">Direct Staff PDF Download</option>
-                </select>
-              </div>
-
-              {deliveryChannel === 'email' && (
-                <div>
-                  <label className="block font-semibold text-slate-700 uppercase mb-1">
-                    Recipient Email Address <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={deliveryEmail}
-                    onChange={(e) => setDeliveryEmail(e.target.value)}
-                    placeholder="client@company.com"
-                    className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
-                  />
-                </div>
-              )}
-
-              {deliveryChannel === 'whatsapp' && (
-                <div>
-                  <label className="block font-semibold text-slate-700 uppercase mb-1">
-                    Recipient Phone Number
-                  </label>
-                  <input
-                    type="text"
-                    value={deliveryPhone}
-                    onChange={(e) => setDeliveryPhone(e.target.value)}
-                    placeholder="e.g. 9876543210"
-                    className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block font-semibold text-slate-700 uppercase mb-1">
-                  Delivery Notes / Remarks
-                </label>
-                <textarea
-                  rows={2}
-                  value={deliveryNotes}
-                  onChange={(e) => setDeliveryNotes(e.target.value)}
-                  placeholder="e.g. Sent formal Tax Invoice to accounts department."
-                  className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowDeliveryModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="px-4 py-2 bg-[#10243B] text-white rounded font-semibold hover:bg-slate-800 disabled:opacity-50"
-                >
-                  {isPending ? 'Logging...' : 'Confirm Delivery'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Modern Multi-Channel Document Sharing Hub (BUG-054 to BUG-059) */}
+      <DocumentShareModal
+        isOpen={showDeliveryModal}
+        onClose={() => setShowDeliveryModal(false)}
+        documentType="invoice"
+        documentId={invoice.id}
+        documentNumber={invoice.invoice_number || 'DRAFT (Unissued)'}
+        isDraft={invoice.status === 'draft'}
+        customerName={invoice.customer_billing_name}
+        customerPhone={invoice.customers?.phone || null}
+        customerEmail={invoice.customers?.email || null}
+        pdfUrl={`/staff/billing/${invoice.id}/pdf`}
+        dateStr={formatIndianDate(invoice.invoice_date)}
+        dueOrValidityStr={formatIndianDate(invoice.due_date)}
+        grandTotal={invoice.grand_total_amount}
+        balanceAmount={invoice.balance_amount}
+        onRecordDelivery={async (payload) => {
+          return await recordInvoiceDeliveryAction(invoice.id, payload.channel as any, {
+            recipientEmail: payload.recipientEmail,
+            recipientPhone: payload.recipientPhone,
+            notes: payload.notes,
+            status: payload.status,
+            updateCustomerContact: payload.updateCustomerContact,
+          });
+        }}
+      />
 
       {/* Void / Cancel Modal */}
       {showCancelModal && (

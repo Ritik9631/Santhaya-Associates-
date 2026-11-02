@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-11-02 | Phase: Post-Phase 6 Acceptance Testing & Quotation 7 PDF Readability & Formatting Fix | Implementation status: Quotation 7 Readability, Gridlines, 2-Decimal Financial Summary, 2-Column Terms Grid, and Round Stamp Integration Complete & Verified (All 16 Test Suites Passing, Production Build 26/26 Routes Clean); Phase 7 Deployment on Hold
+Updated: 2026-11-03 | Phase: Post-Phase 6 Acceptance Testing & Batch 5 Implementation (BUG-050 to BUG-059) | Implementation status: Batch 5 Document Sharing, WhatsApp/Email Modals, Indian Phone Validation, Draft Invoice Safeguards, Date Column Formatting, and Outbox Mock Transparency Complete & Verified (All 17 Test Suites Passing, Production Build 26/26 Routes Clean); Phase 7 Deployment on Hold
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -752,9 +752,59 @@ Updated: 2026-11-02 | Phase: Post-Phase 6 Acceptance Testing & Quotation 7 PDF R
       - Verified npm test (16/16 test batteries passed), npm run typecheck (0 errors), npm run lint (0 warnings), npm run build (26/26 routes compiled cleanly). Dev server running on http://localhost:3000 (HTTP 200).
       - Development Paused & Desktop Handover (2026-11-02):
         * Latest test quotation reference: QT-2026-27-008.
-        * Remaining issue 1 (postponed): Item Total (₹) values overlap or clip for large amounts (7–9 digits).
-        * Remaining issue 2 (postponed): Official stamp appears centered in exported PDFs; it must be right-aligned inside the authorization section, matching the intended preview.
-        * Quality gates verified clean; safe git commit and push to origin/master prepared.
+        * Resolved Remaining issue 1: Item Total (₹) values expanded from w-[9%] (71.1px) to w-[17%] (134.3px). Eliminates clipping on 7-9 digit amounts like ₹11,18,906.68 (scrollWidth 134px <= clientWidth 134.28px).
+        * Resolved Remaining issue 2: Official circular company stamp centered shift fixed across both screen and print. Aligns flush-right (right edge at 1114.0px screen / 786.69px print) directly beneath 'FOR SANTHAYA ASSOCIATES PVT. LTD.' and above 'Authorized Signatory'.
+        * Verified on real issued quotation QT-2026-27-008 via Puppeteer / Chrome print-to-PDF export.
+        * Full test suite passing (test:stamp 24/24, test:refinements 26/26, test:batch4 17/17, test:batch3 18/18, test:batch2 17/17, typecheck 0 errors, lint 0 errors, next build 26/26 routes).
+  - 2026-11-02: Fix Quotation PDF Official Stamp Moving During Print Export:
+      - Root Cause Analysis:
+        1. Hardcoded 'justify-center' classes on the stamp container and image wrapper in src/app/staff/quotations/[id]/pdf/page.tsx.
+        2. Authorization box used invalid Tailwind class 'sm:w-76', falling back to full-width (w-full) in A4 print media (~718px width < 768px md: breakpoint), which threw centered stamp to page center.
+      - CSS & Layout Remediation:
+        1. Replaced 'justify-center' with 'justify-end' and added 'ml-auto'.
+        2. Standardized box class to 'stamp-authorization-box w-full sm:w-80 md:w-80 print:w-80 ml-auto'.
+        3. Injected print media overrides forcing 320px width, text-align right, and margin-left: auto !important.
+      - Line Item Table Width Redistribution:
+        1. Re-balanced percentage columns: # 4%, Desc 27%, HSN 8%, Qty 5%, Unit 5%, Rate 10%, Taxable 10%, GST% 5%, Tax 9%, Total 17%.
+        2. Eliminates clipping on multi-lakh and crore figures.
+      - Verification: Real Chromium print bounding box verification confirms perfect alignment:
+        Screen right edge: Company header 1114.0px, Stamp container 1114.0px, Stamp image 1114.0px, Signatory 1114.0px.
+        Print right edge: Company header 786.69px, Stamp container 786.69px, Stamp image 786.69px, Signatory 786.69px.
+  - 2026-11-03: Batch 5 Implementation — Communication Delivery, WhatsApp/Email Sharing, Public Enquiry Notifications, Draft Invoice Safety & UI Improvements (BUG-050 to BUG-059):
+      - BUG-050: Quotation New Form Heading Contrast & Accessibility:
+        * Fixed dark header contrast in src/app/staff/quotations/new/page.tsx replacing text-slate-900 / text-slate-500 with high-contrast text-white and text-slate-400.
+        * Accented with gold-400 icon and accessible button hover styles.
+      - BUG-051: Public Quotation Request Notification & Outbox Worker:
+        * Connected non-blocking processOutboxBatch trigger immediately following quotation request persistence in src/app/api/quotation-request/route.ts.
+        * Verified development mock provider safety (MockEmailProvider), simulating outbox dispatch without real emails, network exposure, or cost.
+        * Hardened /staff/communications Communications Center with prominent amber sandbox banner, verified vs mock KPI metrics, and Mock — Not Sent badges for simulated dispatches.
+      - BUG-052: Draft Invoice Safeguards & Watermark:
+        * Enforced statutory disclaimers on draft invoices: badge renders bold amber 'DRAFT — NOT A TAX INVOICE'.
+        * Injected prominent statutory warning citing Section 31 of CGST Act, 2017 and prohibiting Input Tax Credit (ITC) claims.
+        * Rendered diagonal repeating watermark 'DRAFT — NOT A TAX INVOICE' across screen and print layouts (print:block).
+        * Replaced signature line with '(Affixed upon issuance)' and labeled billing directory button 'Preview Draft PDF'.
+      - BUG-053: Billing Directory Date Column Wrapping:
+        * Added whitespace-nowrap min-w-[130px] to Date / Due header and cells in src/app/staff/billing/page.tsx, enforcing clean two-line date layout (02 Nov 2026 / Due: 02 Dec 2026) without mid-word breaks.
+      - BUG-054 & BUG-057: Free, Staff-Controlled WhatsApp & Email Sharing:
+        * Built DocumentShareModal (src/components/documents/DocumentShareModal.tsx) supporting multi-channel sharing with zero paid APIs.
+        * Generates valid https://wa.me/91XXXXXXXXXX?text=... URI and mailto: URI pre-populated with document number, customer name, totals, balance due, and PDF download link.
+        * Included copy subject and copy message buttons with instant feedback.
+      - BUG-055: Channel Segregation & Attestation:
+        * Replaced misleading 'Confirm Delivery' button with segregated tabs (WhatsApp Share, Email Client, Manual Handover).
+        * Attestation button clearly labeled 'Confirm Manually Sent' alongside a clear manual transmission disclaimer.
+      - BUG-056: Indian Mobile Phone Validation Utility:
+        * Created src/lib/utils/phone.ts enforcing 10-digit national numbers starting with 6, 7, 8, 9 with support for +91, 91, and 0 prefixes.
+        * Normalized to 10 digits, 91XXXXXXXXXX (wa.me), and formatted display (+91 XXXXX XXXXX).
+        * Added optional customer phone update checkbox, allowing contact updates without forcing overwrite.
+      - BUG-058: Touch-Friendly 5-Step Sharing Guide:
+        * Implemented 5-step workflow (Step 1: Download PDF, Step 2: Open Client, Step 3: Attach PDF with Windows & Android instructions, Step 4: Send, Step 5: Confirm Manually Sent).
+      - BUG-059: Status Separation & Detail Views Integration:
+        * Updated recordQuotationDeliveryAction and recordInvoiceDeliveryAction to support accurate statuses (prepared, sharing_initiated, manually_sent, downloaded, logged) and record immutable audit log entries.
+        * Replaced legacy delivery modal with DocumentShareModal in QuotationDetailView.tsx and InvoiceDetailView.tsx (enabled for both drafts and issued invoices) with prominent Share / Deliver buttons.
+      - Automated QA & Verification:
+        * Created scripts/test-batch5-regressions.mjs (17/17 tests passing).
+        * Full test suite npm test passing (17 test batteries, 100% pass rate).
+        * Zero TypeScript errors (tsc --noEmit), zero ESLint errors (next lint), clean production build (next build, 26/26 routes). Phase 7 deployment remains on hold.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

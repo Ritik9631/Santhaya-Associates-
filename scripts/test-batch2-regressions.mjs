@@ -186,7 +186,7 @@ it('Quotation issuance action blocks issuance when taxable quotation lacks valid
 });
 
 it('Invoice issuance action blocks issuance when tax_invoice lacks valid Place of Supply', () => {
-  const code = fs.readFileSync('src/lib/billing/actions.ts', 'utf8');
+  const code = fs.readFileSync('src/lib/billing/actions.ts', 'utf8').replace(/\r\n/g, '\n');
   assert.ok(
     code.includes("invoice.invoice_type === 'tax_invoice' &&\n      (!invoice.place_of_supply_state_code || !isValidIndianStateCode(invoice.place_of_supply_state_code))"),
     'issueInvoiceAction checks for valid place_of_supply_state_code'

@@ -3,7 +3,7 @@ import { requireStaffSession } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import PrintButton from '@/components/PrintButton';
 import {
   determineTaxStatus,
@@ -57,15 +57,21 @@ export default async function InvoicePdfPage({ params }: PageProps) {
 
   const lineItems = items || [];
 
-  // Determine statutory document title
-  let docTitle = 'TAX INVOICE';
-  let subDocTitle = 'Issued under Section 31 of CGST Act, 2017 & Rule 46 of CGST Rules, 2017';
-  if (invoice.invoice_type === 'bill_of_supply') {
-    docTitle = 'BILL OF SUPPLY';
-    subDocTitle = 'Issued under Section 31(3)(c) of CGST Act, 2017';
-  } else if (invoice.invoice_type === 'non_gst') {
-    docTitle = 'COMMERCIAL INVOICE';
-    subDocTitle = 'Non-GST Supply of Goods / Services';
+  // Determine statutory document title (BUG-052: Draft safeguards)
+  const isDraft = invoice.status === 'draft';
+  let docTitle = isDraft ? 'DRAFT — NOT A TAX INVOICE' : 'TAX INVOICE';
+  let subDocTitle = isDraft
+    ? 'UNISSUED DRAFT PREVIEW — Not a statutory tax invoice under Section 31 of CGST Act, 2017. Cannot be used for Input Tax Credit (ITC).'
+    : 'Issued under Section 31 of CGST Act, 2017 & Rule 46 of CGST Rules, 2017';
+
+  if (!isDraft) {
+    if (invoice.invoice_type === 'bill_of_supply') {
+      docTitle = 'BILL OF SUPPLY';
+      subDocTitle = 'Issued under Section 31(3)(c) of CGST Act, 2017';
+    } else if (invoice.invoice_type === 'non_gst') {
+      docTitle = 'COMMERCIAL INVOICE';
+      subDocTitle = 'Non-GST Supply of Goods / Services';
+    }
   }
 
   const isTaxInvoice = invoice.invoice_type === 'tax_invoice';
@@ -127,7 +133,28 @@ export default async function InvoicePdfPage({ params }: PageProps) {
       </div>
 
       {/* Main A4 Printable Sheet */}
-      <div className="max-w-[850px] mx-auto bg-white p-6 sm:p-8 shadow-lg border border-slate-300 print:border-none print:shadow-none print:p-0 print:max-w-none text-xs leading-normal">
+      <div className="max-w-[850px] mx-auto bg-white p-6 sm:p-8 shadow-lg border border-slate-300 print:border-none print:shadow-none print:p-0 print:max-w-none text-xs leading-normal relative overflow-hidden">
+        {/* BUG-052: Repeating Diagonal Watermark for Draft Invoices */}
+        {isDraft && (
+          <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center overflow-hidden select-none">
+            <div className="text-red-500/15 print:text-red-600/20 font-black text-5xl sm:text-7xl md:text-8xl -rotate-45 tracking-widest uppercase border-4 border-dashed border-red-500/20 print:border-red-600/30 p-8 rounded-3xl text-center">
+              DRAFT — NOT A TAX INVOICE
+              <div className="text-xl sm:text-2xl mt-2 tracking-normal font-bold">
+                Unissued Draft Preview • No Statutory Standing
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* BUG-052: Prominent Top Notice for Draft Invoices */}
+        {isDraft && (
+          <div className="mb-4 p-3 bg-amber-50 border-2 border-amber-500 rounded-xl text-amber-900 text-xs font-semibold flex items-center gap-2 print:border-amber-600">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <span>
+              <strong>STATUTORY NOTICE (DRAFT PREVIEW):</strong> This invoice is in <strong>Draft</strong> status and has not been formally issued. It does NOT constitute a statutory Tax Invoice under Rule 46 of CGST Rules, 2017.
+            </span>
+          </div>
+        )}
         {/* Balanced Two-Column Header Block (BUG-030) - Header asset reference: /santhaya-logo-header.png */}
         <div className="border-b-2 border-[#10243B] pb-3.5" data-header-asset="/santhaya-logo-header.png">
           <div className="flex justify-between items-start gap-4">
@@ -161,7 +188,13 @@ export default async function InvoicePdfPage({ params }: PageProps) {
             </div>
 
             <div className="text-right shrink-0">
-              <span className="inline-block px-3 py-1 bg-[#10243B] text-[#F4B323] font-bold text-xs tracking-wider uppercase rounded shadow-sm">
+              <span
+                className={`inline-block px-3 py-1 font-bold text-xs tracking-wider uppercase rounded shadow-sm ${
+                  isDraft
+                    ? 'bg-amber-500 text-slate-950 font-black border border-amber-600'
+                    : 'bg-[#10243B] text-[#F4B323]'
+                }`}
+              >
                 {docTitle}
               </span>
               <p className="text-[10px] text-slate-500 mt-1 max-w-[210px] leading-tight">
@@ -449,7 +482,7 @@ export default async function InvoicePdfPage({ params }: PageProps) {
             <div className="h-10 print:h-8"></div>
             <div className="border-t border-dashed border-slate-300 pt-1 flex justify-between text-[10px] text-slate-600">
               <span>Date: {formatIndianDate(invoice.invoice_date)}</span>
-              <span>Authorized Signatory</span>
+              <span>{isDraft ? '(Affixed upon issuance)' : 'Authorized Signatory'}</span>
             </div>
           </div>
         </div>

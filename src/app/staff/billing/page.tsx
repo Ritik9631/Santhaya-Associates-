@@ -291,7 +291,7 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
               <tr>
                 <th className="px-4 py-3">Invoice Details</th>
                 <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Date / Due</th>
+                <th className="px-4 py-3 whitespace-nowrap min-w-[130px]">Date / Due</th>
                 <th className="px-4 py-3 text-right">Grand Total</th>
                 <th className="px-4 py-3 text-right">Balance Due</th>
                 <th className="px-4 py-3 text-center">Status</th>
@@ -370,9 +370,9 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
                         </p>
                       </td>
 
-                      <td className="px-4 py-3 text-xs">
-                        <p className="text-slate-800">{formatIndianDate(inv.invoice_date)}</p>
-                        <p className={`text-[11px] ${isOverdue ? 'text-rose-600 font-medium' : 'text-slate-500'}`}>
+                      <td className="px-4 py-3 text-xs whitespace-nowrap">
+                        <p className="font-medium text-slate-800">{formatIndianDate(inv.invoice_date)}</p>
+                        <p className={`text-[11px] ${isOverdue ? 'text-rose-600 font-semibold' : 'text-slate-500'}`}>
                           Due: {formatIndianDate(inv.due_date)}
                         </p>
                       </td>
@@ -419,7 +419,7 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
                         <Link
                           href={`/staff/billing/${inv.id}/pdf`}
                           target="_blank"
-                          title="Print / View PDF"
+                          title={inv.status === 'draft' ? 'Preview Draft PDF' : 'Print / View Tax Invoice'}
                           className="inline-flex items-center p-1.5 text-slate-500 hover:text-slate-800 rounded-md hover:bg-slate-100"
                         >
                           <Printer className="w-3.5 h-3.5" />

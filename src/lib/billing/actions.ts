@@ -952,40 +952,25 @@ export async function cancelInvoiceAction(
 export async function recordInvoiceDeliveryAction(
   invoiceId: string,
   deliveryChannel: 'email' | 'whatsapp' | 'phone' | 'in_person' | 'download',
-  details?: { recipientEmail?: string; recipientPhone?: string; notes?: string }
+  details?: {
+    recipientEmail?: string;
+    recipientPhone?: string;
+    notes?: string;
+    status?: 'sharing_initiated' | 'manually_sent' | 'downloaded' | 'logged' | 'enqueued';
+    updateCustomerContact?: boolean;
+  }
 ): Promise<ActionResponse> {
   try {
     const { user, profile } = await requireStaffSession();
-    if (!['super_admin', 'admin', 'billing_manager'].includes(profile.role)) {
-      return { error: 'UNAUTHORIZED: Insufficient permissions to dispatch invoices.' };
-    }
-
     const adminClient = createAdminClient();
 
-    const { data: invoice, error: fetchErr } = await adminClient
+    const { data: invoice } = await adminClient
       .from('invoices')
-      .select(`
-        id,
-        invoice_number,
-        invoice_type,
-        status,
-        invoice_date,
-        due_date,
-        taxable_amount,
-        cgst_amount,
-        sgst_amount,
-        igst_amount,
-        grand_total_amount,
-        balance_amount,
-        is_intra_state,
-        customer_state_code,
-        customer_billing_name,
-        customer_gstin
-      `)
+      .select('*')
       .eq('id', invoiceId)
       .single();
 
-    if (fetchErr || !invoice) {
+    if (!invoice) {
       return { error: 'Invoice not found.' };
     }
 
@@ -997,13 +982,26 @@ export async function recordInvoiceDeliveryAction(
       return { error: 'Cannot deliver a cancelled invoice.' };
     }
 
+    // Update customer contact info if staff explicitly opted in (BUG-056)
+    if (details?.updateCustomerContact && invoice.customer_id) {
+      const updatePayload: { phone?: string; email?: string } = {};
+      if (details.recipientPhone) updatePayload.phone = details.recipientPhone.trim();
+      if (details.recipientEmail) updatePayload.email = details.recipientEmail.trim().toLowerCase();
+      if (Object.keys(updatePayload).length > 0) {
+        await adminClient.from('customers').update(updatePayload).eq('id', invoice.customer_id);
+      }
+    }
+
+    const effectiveStatus =
+      details?.status ||
+      (deliveryChannel === 'email' ? 'enqueued' : deliveryChannel === 'download' ? 'downloaded' : 'logged');
     const customerName = invoice.customer_billing_name || 'Valued Customer';
     const isIntraState = invoice.is_intra_state ?? (invoice.customer_state_code === '10');
 
-    // If channel is email, validate recipient and enqueue outbox job
-    if (deliveryChannel === 'email') {
+    // If channel is email and enqueued for automated outbox queue
+    if (deliveryChannel === 'email' && effectiveStatus === 'enqueued') {
       const email = details?.recipientEmail?.trim();
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (!email || !/^[^s@]+@[^s@]+.[^s@]+$/.test(email)) {
         return { error: 'Valid recipient email address is required for email delivery.' };
       }
 
@@ -1046,20 +1044,21 @@ export async function recordInvoiceDeliveryAction(
         },
       });
     } else {
-      // Record manual delivery event into email_outbox with status 'sent'
+      // Record manual delivery event into email_outbox with explicit status (BUG-059)
       await adminClient.from('email_outbox').insert({
         recipient_email: details?.recipientEmail || `${deliveryChannel}_manual_delivery@santhaya.local`,
         subject: `Manual Delivery [${deliveryChannel.toUpperCase()}]: Invoice ${invoice.invoice_number}`,
         email_type: 'invoice_manual_delivery',
         related_entity_type: 'invoice',
         related_entity_id: invoiceId,
-        status: 'sent',
+        status: effectiveStatus === 'manually_sent' ? 'sent' : 'pending',
         attempts: 1,
         processed_at: new Date().toISOString(),
         payload: {
           invoiceNumber: invoice.invoice_number,
           customerName,
           deliveryChannel,
+          deliveryStatus: effectiveStatus,
           recipientPhone: details?.recipientPhone || null,
           notes: details?.notes || null,
           recordedByStaffId: user.id,
@@ -1067,16 +1066,30 @@ export async function recordInvoiceDeliveryAction(
       });
     }
 
+    // Record immutable audit log
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'invoice',
+      entity_id: invoiceId,
+      action: `document_delivery_${deliveryChannel}_${effectiveStatus}`,
+      actor_type: 'staff',
+      actor_id: user.id,
+      new_state: {
+        channel: deliveryChannel,
+        status: effectiveStatus,
+        recipient_phone: details?.recipientPhone || null,
+        recipient_email: details?.recipientEmail || null,
+        notes: details?.notes || null,
+      },
+    });
+
     revalidatePath(`/staff/billing/${invoiceId}`);
     revalidatePath('/staff/communications');
-
     return { success: true };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unexpected error logging invoice delivery.';
+    const message = err instanceof Error ? err.message : 'Unexpected error logging delivery.';
     return { error: message };
   }
 }
-
 
 /**
  * Server Action: Discard an unissued draft invoice (BUG-044)

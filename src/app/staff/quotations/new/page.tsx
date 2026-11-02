@@ -2,7 +2,7 @@ import { requireStaffSession } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import QuotationForm from './QuotationForm';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileSpreadsheet } from 'lucide-react';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -41,13 +41,16 @@ export default async function NewQuotationPage({ searchParams }: PageProps) {
       <div className="flex items-center gap-3">
         <Link
           href="/staff/quotations"
-          className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition"
+          className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Create New Quotation</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <FileSpreadsheet className="w-6 h-6 text-gold-400" />
+            Create New Quotation
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
             Generate an official commercial proposal with statutory GST allocation and multi-item line pricing.
           </p>
         </div>

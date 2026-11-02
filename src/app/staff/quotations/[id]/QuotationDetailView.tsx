@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { resolveIndianState, formatPlaceOfSupply } from '@/lib/utils/indian-states';
 import { determineTaxStatus } from '@/lib/quotation/calculations';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Share2 } from 'lucide-react';
+import DocumentShareModal from '@/components/documents/DocumentShareModal';
 import {
   FileText,
   Printer,
@@ -315,10 +316,10 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
 
           <button
             onClick={() => setShowDeliveryModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 border border-emerald-600/50 rounded-lg text-xs font-bold transition shadow-sm"
           >
-            <Send className="w-3.5 h-3.5" />
-            Log Delivery
+            <Share2 className="w-3.5 h-3.5 text-emerald-300" />
+            Share / Deliver
           </button>
 
           {quotation.status === 'draft' && isCurrentVersion && canEdit && (
@@ -747,99 +748,31 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
         </div>
       )}
 
-      {/* Delivery Log Modal */}
-      {showDeliveryModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Log Quotation Delivery</h3>
-              <button
-                onClick={() => setShowDeliveryModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleDeliverySubmit} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 uppercase mb-1">
-                  Delivery Channel <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={deliveryChannel}
-                  onChange={(e) => setDeliveryChannel(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
-                >
-                  <option value="email">Email Transmission</option>
-                  <option value="whatsapp">WhatsApp PDF Transmission</option>
-                  <option value="phone">Phone Discussion / Quoted</option>
-                  <option value="in_person">In-Person Handover / Printed</option>
-                  <option value="download">Direct Staff PDF Download</option>
-                </select>
-              </div>
-
-              {deliveryChannel === 'email' && (
-                <div>
-                  <label className="block font-semibold text-slate-700 uppercase mb-1">
-                    Recipient Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={deliveryEmail}
-                    onChange={(e) => setDeliveryEmail(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
-                  />
-                </div>
-              )}
-
-              {deliveryChannel === 'whatsapp' && (
-                <div>
-                  <label className="block font-semibold text-slate-700 uppercase mb-1">
-                    Recipient Phone Number
-                  </label>
-                  <input
-                    type="text"
-                    value={deliveryPhone}
-                    onChange={(e) => setDeliveryPhone(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block font-semibold text-slate-700 uppercase mb-1">
-                  Delivery Notes
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Sent PDF to managing director via email."
-                  value={deliveryNotes}
-                  onChange={(e) => setDeliveryNotes(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowDeliveryModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="px-4 py-2 bg-[#10243B] text-white rounded font-semibold hover:bg-slate-800"
-                >
-                  Log Delivery Event
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Modern Multi-Channel Document Sharing Hub (BUG-054 to BUG-059) */}
+      <DocumentShareModal
+        isOpen={showDeliveryModal}
+        onClose={() => setShowDeliveryModal(false)}
+        documentType="quotation"
+        documentId={quotation.id}
+        documentNumber={quotation.quotation_number}
+        isDraft={quotation.status === 'draft'}
+        customerName={customer.company_name || 'Client'}
+        customerPhone={(quotation.customers as any)?.phone || null}
+        customerEmail={(quotation.customers as any)?.email || null}
+        pdfUrl={`/staff/quotations/${quotation.id}/pdf`}
+        dateStr={formatIndianDate(quotation.created_at)}
+        dueOrValidityStr={`${activeVersion.validity_days || 30} calendar days`}
+        grandTotal={activeVersion.grand_total_amount || 0}
+        onRecordDelivery={async (payload) => {
+          return await recordQuotationDeliveryAction(quotation.id, payload.channel as any, {
+            recipientEmail: payload.recipientEmail,
+            recipientPhone: payload.recipientPhone,
+            notes: payload.notes,
+            status: payload.status,
+            updateCustomerContact: payload.updateCustomerContact,
+          });
+        }}
+      />
 
       {/* Delete Confirmation Modal (Phase 4: Safe Soft-Delete with Audit Preservation) */}
       {showDeleteModal && (

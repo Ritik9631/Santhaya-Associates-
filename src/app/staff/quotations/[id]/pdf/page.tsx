@@ -214,6 +214,33 @@ export default async function QuotationPdfPage({ params }: PageProps) {
           .quotation-grid-table td {
             border-color: #475569 !important;
           }
+          .stamp-authorization-box {
+            width: 320px !important;
+            max-width: 320px !important;
+            margin-left: auto !important;
+            margin-right: 0 !important;
+            text-align: right !important;
+          }
+          .stamp-align-container {
+            display: flex !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+            text-align: right !important;
+            margin-left: auto !important;
+            margin-right: 0 !important;
+            width: 100% !important;
+          }
+          .stamp-image-wrapper {
+            display: flex !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+            margin-left: auto !important;
+            margin-right: 0 !important;
+          }
+          .stamp-image-wrapper img {
+            margin-left: auto !important;
+            margin-right: 0 !important;
+          }
         }
       `}} />
 
@@ -267,7 +294,7 @@ export default async function QuotationPdfPage({ params }: PageProps) {
               />
             </div>
             <div className="space-y-0.5">
-              <h2 className="text-lg sm:text-[16pt] font-extrabold text-[#10243B] leading-tight tracking-tight">
+              <h2 className="text-lg sm:text-[17pt] font-extrabold text-[#10243B] leading-tight tracking-tight">
                 Santhaya Associates Pvt. Ltd.
               </h2>
               <p className="text-[9pt] text-slate-700 leading-snug">
@@ -287,7 +314,7 @@ export default async function QuotationPdfPage({ params }: PageProps) {
             <span className="inline-block bg-[#10243B] text-[#F4B323] text-[8.5pt] font-extrabold tracking-widest uppercase px-2.5 py-0.5 rounded shadow-sm">
               QUOTATION
             </span>
-            <h1 className="text-xl sm:text-[19pt] font-black text-slate-900 mt-0.5 font-mono tracking-tight">
+            <h1 className="text-xl sm:text-[22pt] font-black text-slate-900 mt-0.5 font-mono tracking-tight">
               {quote.quotation_number}
             </h1>
             <div className="text-[8.5pt] text-slate-700 mt-0.5 space-y-0.5">
@@ -372,42 +399,42 @@ export default async function QuotationPdfPage({ params }: PageProps) {
         </div>
 
         {/* Itemized Table (Crisp Borders, Visible Column Gridlines, Readable 9.5-10pt Body) */}
-        <div className="my-1.5 print:my-1 border-2 border-slate-700 print:border-slate-800 rounded-lg overflow-hidden w-full">
+        <div className="my-2.5 print:my-1 border-2 border-slate-700 print:border-slate-800 rounded-lg overflow-hidden w-full">
           <table className="quotation-grid-table w-full text-left border-collapse table-fixed">
             <thead className="bg-[#10243B] text-white font-bold border-b-2 border-slate-900">
               <tr>
                 <th className="py-1.5 print:py-1 px-1 text-center w-[4%] border-r border-slate-500 text-[8.5pt] uppercase tracking-wider">#</th>
-                <th className={`py-1.5 print:py-1 px-2 border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[28%]' : 'w-[38%]'} text-[8.5pt] uppercase tracking-wider`}>
+                <th className={`py-1.5 print:py-1 px-2 border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[27%]' : 'w-[37%]'} text-[8.5pt] uppercase tracking-wider`}>
                   Item Description
                 </th>
-                <th className={`py-1.5 print:py-1 px-1 text-center border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[9%]' : 'w-[11%]'} text-[8.5pt] uppercase tracking-wider`}>
+                <th className={`py-1.5 print:py-1 px-1 text-center border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[8%]' : 'w-[9%]'} text-[8.5pt] uppercase tracking-wider`}>
                   HSN/SAC
                 </th>
-                <th className={`py-1.5 print:py-1 px-1 text-right border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[6%]' : 'w-[8%]'} text-[8.5pt] uppercase tracking-wider`}>
+                <th className={`py-1.5 print:py-1 px-1 text-right border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[5%]' : 'w-[6%]'} text-[8.5pt] uppercase tracking-wider`}>
                   Qty
                 </th>
-                <th className={`py-1.5 print:py-1 px-1 text-center border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[6%]' : 'w-[8%]'} text-[8.5pt] uppercase tracking-wider`}>
+                <th className={`py-1.5 print:py-1 px-1 text-center border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[5%]' : 'w-[6%]'} text-[8.5pt] uppercase tracking-wider`}>
                   Unit
                 </th>
-                <th className={`py-1.5 print:py-1 px-1.5 text-right border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[12%]' : 'w-[15%]'} text-[8.5pt] uppercase tracking-wider`}>
+                <th className={`py-1.5 print:py-1 px-1.5 text-right border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[10%]' : 'w-[15%]'} text-[8.5pt] uppercase tracking-wider`}>
                   Rate (₹)
                 </th>
                 {quote.is_gst_applicable && (
-                  <th className="py-1.5 print:py-1 px-1.5 text-right border-r border-slate-500 w-[12%] text-[8.5pt] uppercase tracking-wider">
+                  <th className="py-1.5 print:py-1 px-1.5 text-right border-r border-slate-500 w-[10%] text-[8.5pt] uppercase tracking-wider">
                     Taxable (₹)
                   </th>
                 )}
                 {quote.is_gst_applicable && (
                   <>
-                    <th className="py-1.5 print:py-1 px-1 text-center border-r border-slate-500 w-[6%] text-[8.5pt] uppercase tracking-wider">
+                    <th className="py-1.5 print:py-1 px-1 text-center border-r border-slate-500 w-[5%] text-[8.5pt] uppercase tracking-wider">
                       GST %
                     </th>
-                    <th className="py-1.5 print:py-1 px-1.5 text-right border-r border-slate-500 w-[8%] text-[8.5pt] uppercase tracking-wider">
+                    <th className="py-1.5 print:py-1 px-1.5 text-right border-r border-slate-500 w-[9%] text-[8.5pt] uppercase tracking-wider">
                       Tax (₹)
                     </th>
                   </>
                 )}
-                <th className={`py-1.5 print:py-1 px-2 text-right ${quote.is_gst_applicable ? 'w-[9%]' : 'w-[14%]'} text-[8.5pt] uppercase tracking-wider`}>
+                <th className={`py-1.5 print:py-1 px-1.5 text-right ${quote.is_gst_applicable ? 'w-[17%]' : 'w-[17%]'} text-[8.5pt] uppercase tracking-wider`}>
                   Total (₹)
                 </th>
               </tr>
@@ -472,7 +499,7 @@ export default async function QuotationPdfPage({ params }: PageProps) {
                         </td>
                       </>
                     )}
-                    <td className="py-1.5 print:py-1 px-2 text-right font-black text-slate-950 font-mono align-top whitespace-nowrap text-[9.5pt]">
+                    <td className="py-1.5 print:py-1 px-1.5 text-right font-black text-slate-950 font-mono align-top whitespace-nowrap text-[9.5pt]">
                       {isTaxDetermined || !quote.is_gst_applicable
                         ? formatSmartRupee(item.line_total, false)
                         : formatSmartRupee(item.taxable_amount, false)}
@@ -608,7 +635,7 @@ export default async function QuotationPdfPage({ params }: PageProps) {
             {isTaxDetermined || !quote.is_gst_applicable ? (
               <div className="flex justify-between items-center text-xs font-bold text-[#10243B] pt-1 mt-0.5 border-t-2 border-[#10243B] bg-white p-1.5 rounded-lg border border-slate-200 shadow-xs">
                 <span className="tracking-wide text-[9pt]">GRAND TOTAL (INR):</span>
-                <span className="text-[13.5pt] font-mono font-black text-[#10243B]">
+                <span className="text-[16pt] font-mono font-black text-[#10243B]">
                   {formatIndianRupee(activeVersion.grand_total_amount, 2)}
                 </span>
               </div>
@@ -641,7 +668,7 @@ export default async function QuotationPdfPage({ params }: PageProps) {
                 if (headingMatch) {
                   return (
                     <div key={idx} className="flex items-start gap-1.5 break-inside-avoid">
-                      <span className="font-bold text-[#10243B] shrink-0 w-3.5 text-right select-none">{headingMatch[1]}.</span>
+                      <span className="font-bold text-[#10243B] shrink-0 w-5 text-right select-none">{headingMatch[1]}.</span>
                       <p className="flex-1 text-slate-800">
                         <strong className="font-bold text-slate-900">{headingMatch[2]}: </strong>
                         <span className="text-slate-700">{headingMatch[3]}</span>
@@ -655,7 +682,7 @@ export default async function QuotationPdfPage({ params }: PageProps) {
                 if (simpleMatch) {
                   return (
                     <div key={idx} className="flex items-start gap-1.5 break-inside-avoid">
-                      <span className="font-bold text-[#10243B] shrink-0 w-3.5 text-right select-none">{simpleMatch[1]}.</span>
+                      <span className="font-bold text-[#10243B] shrink-0 w-5 text-right select-none">{simpleMatch[1]}.</span>
                       <p className="flex-1 text-slate-700">{simpleMatch[2]}</p>
                     </div>
                   );
@@ -673,27 +700,27 @@ export default async function QuotationPdfPage({ params }: PageProps) {
 
         {/* Company Authorization Block (Genuine Round Stamp, Clean Geometry) */}
         <div className="flex justify-end pt-1.5 text-[9pt] print-avoid-break">
-          <div className="w-full sm:w-76 md:w-80 border border-slate-300 rounded-lg p-2 print:p-1.5 bg-white text-right space-y-0.5">
+          <div className="stamp-authorization-box w-full sm:w-80 md:w-80 print:w-80 border border-slate-300 rounded-lg p-2 print:p-1.5 bg-white text-right space-y-0.5 ml-auto">
             <p className="font-bold text-slate-900 uppercase text-[8.5pt] tracking-wide">
               For Santhaya Associates Pvt. Ltd.
             </p>
 
             {/* Official Circular Stamp: Displayed only for officially authorized/issued quotations */}
-            <div className={`py-0.5 flex items-center justify-center ${isAuthorized ? 'min-h-[32mm]' : 'min-h-[20px]'}`}>
+            <div className={`stamp-align-container py-0.5 flex items-center justify-end w-full ${isAuthorized ? 'min-h-[32mm]' : 'min-h-[20px]'}`}>
               {isAuthorized ? (
-                <div className="relative flex items-center justify-center">
+                <div className="stamp-image-wrapper relative flex items-center justify-end ml-auto">
                   <Image
                     src="/branding/santhaya-round-stamp.png"
                     alt="Santhaya Associates Official Company Stamp"
                     width={1254}
                     height={1254}
-                    className="w-[32mm] h-[32mm] max-w-[120px] max-h-[120px] object-contain select-none pointer-events-none"
+                    className="w-[32mm] h-[32mm] max-w-[120px] max-h-[120px] object-contain select-none pointer-events-none ml-auto"
                     priority
                     unoptimized
                   />
                 </div>
               ) : (
-                <div className="py-0.5 flex items-center justify-center text-[8.5pt] text-slate-400 italic">
+                <div className="py-0.5 flex items-center justify-end text-[8.5pt] text-slate-400 italic">
                   (Official seal affixed upon formal issuance)
                 </div>
               )}
