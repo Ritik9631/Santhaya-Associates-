@@ -43,6 +43,7 @@
     "test:batch5": "node --experimental-strip-types scripts/test-batch5-regressions.mjs",
     "test:refinements": "node --experimental-strip-types scripts/test-quotation-refinements.mjs",
     "test:stamp": "node scripts/test-quotation-round-stamp.mjs",
+    "test:db-health": "node scripts/verify-database-health.mjs",
     "build:preview": "node scripts/build-preview.mjs"
   },
   "dependencies": {
