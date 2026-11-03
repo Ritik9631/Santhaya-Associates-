@@ -93,12 +93,15 @@ export async function createQuotationAction(
 
     const adminClient = createAdminClient();
 
-    // Verify Customer exists
-    const { data: customer, error: custErr } = await adminClient
-      .from('customers')
-      .select('id, company_name')
-      .eq('id', customerId)
-      .single();
+    // Verify Customer exists and generate quotation sequence number concurrently
+    const [{ data: customer, error: custErr }, initialQuoteNumber] = await Promise.all([
+      adminClient
+        .from('customers')
+        .select('id, company_name')
+        .eq('id', customerId)
+        .single(),
+      generateServerQuotationNumber(adminClient),
+    ]);
 
     if (custErr || !customer) {
       return { error: 'Selected customer record could not be found in the database.' };
@@ -106,7 +109,7 @@ export async function createQuotationAction(
 
     // Generate Sequential Quotation Number: QT-YYYY-YY-NNN (Indian FY format)
     let newQuotation: any = null;
-    let quoteNumberToUse = await generateServerQuotationNumber(adminClient);
+    let quoteNumberToUse = initialQuoteNumber;
     let versionCode = `${quoteNumberToUse}-R0`;
     const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 

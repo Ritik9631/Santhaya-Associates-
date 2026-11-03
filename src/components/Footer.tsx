@@ -4,7 +4,10 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Mail, Phone, MapPin, FileText, ArrowUpRight } from 'lucide-react';
+import { Mail, Phone, MapPin, ArrowUpRight, MessageSquare } from 'lucide-react';
+
+const WHATSAPP_URL =
+  'https://wa.me/919608950748?text=Hello%20Santhaya%20Associates%2C%20I%20would%20like%20to%20enquire%20about%20your%20construction%20tender%20or%20machinery%20supply%20services.';
 
 export default function Footer() {
   const pathname = usePathname();
@@ -17,7 +20,7 @@ export default function Footer() {
     <footer className="bg-navy-950 text-slate-300 border-t border-navy-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
-          {/* Section 1: Company Identity (BUG-006, BUG-007, BUG-008) */}
+          {/* Column 1: Company Identity */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="relative h-12 w-auto aspect-[480/550] flex-shrink-0 bg-white p-1 rounded-md">
@@ -34,18 +37,23 @@ export default function Footer() {
                 <p className="text-base font-bold text-white tracking-wide">
                   SANTHAYA ASSOCIATES
                 </p>
-                <p className="text-xs text-gold-400 font-medium">PVT. LTD.</p>
+                <p className="text-xs text-gold-400 font-semibold tracking-wider">
+                  PVT. LTD.
+                </p>
               </div>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Industrial infrastructure enterprise specializing exclusively in government and private construction tenders, heavy construction machinery supply, and high-precision manufacturing equipment.
+            <p className="text-xs text-gold-400/90 font-medium tracking-wide">
+              Building Today • Powering Tomorrow
             </p>
-            <p className="text-[11px] text-slate-400">
-              Corporate Office: Gopalpur, Motihari, Bihar – 845401
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Specialized industrial enterprise partner for government and private construction tenders, heavy machinery fleet supply, and precision manufacturing equipment.
+            </p>
+            <p className="text-[11px] text-slate-400 pt-1">
+              Registered Entity • Bihar, India
             </p>
           </div>
 
-          {/* Section 2: Our Services (BUG-006) */}
+          {/* Column 2: Services */}
           <div>
             <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-4 border-b border-navy-800 pb-2">
               Our Services
@@ -78,19 +86,10 @@ export default function Footer() {
                   <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-gold-400" />
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/request-quotation"
-                  className="text-gold-400 hover:text-gold-300 font-medium transition-colors flex items-center gap-1 mt-2"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Request Official Quotation</span>
-                </Link>
-              </li>
             </ul>
           </div>
 
-          {/* Section 3: Quick Links (BUG-006) */}
+          {/* Column 3: Quick Links */}
           <div>
             <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-4 border-b border-navy-800 pb-2">
               Quick Links
@@ -134,16 +133,18 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Section 4: Contact Information (BUG-004, BUG-005, BUG-006) */}
+          {/* Column 4: Contact */}
           <div>
             <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-4 border-b border-navy-800 pb-2">
-              Contact Information
+              Contact
             </h3>
             <ul className="space-y-3.5 text-xs text-slate-300">
               <li className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-gold-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <span className="text-slate-400 block text-[11px] uppercase tracking-wider">Registered Address:</span>
+                  <span className="text-slate-400 block text-[11px] uppercase tracking-wider">
+                    Office Address:
+                  </span>
                   <p className="text-xs text-slate-200 leading-relaxed mt-0.5">
                     Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India
                   </p>
@@ -152,32 +153,44 @@ export default function Footer() {
               <li className="flex items-start gap-2.5">
                 <Phone className="w-4 h-4 text-gold-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <span className="text-slate-400 block text-[11px] uppercase tracking-wider">Direct Helplines:</span>
-                  <div className="space-y-0.5 mt-0.5">
-                    <a
-                      href="tel:+919430986713"
-                      className="hover:text-gold-400 transition-colors text-slate-200 font-medium block"
-                    >
-                      +91 9430986713
-                    </a>
-                    <a
-                      href="tel:+919608950748"
-                      className="hover:text-gold-400 transition-colors text-slate-300 block"
-                    >
-                      +91 9608950748
-                    </a>
-                  </div>
+                  <span className="text-slate-400 block text-[11px] uppercase tracking-wider">
+                    Call:
+                  </span>
+                  <a
+                    href="tel:+919430986713"
+                    className="hover:text-gold-400 transition-colors text-slate-200 font-semibold block mt-0.5"
+                  >
+                    +91 9430986713
+                  </a>
+                </div>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <MessageSquare className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-slate-400 block text-[11px] uppercase tracking-wider">
+                    WhatsApp:
+                  </span>
+                  <a
+                    href={WHATSAPP_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-gold-400 transition-colors text-emerald-300 font-semibold block mt-0.5"
+                  >
+                    +91 9608950748
+                  </a>
                 </div>
               </li>
               <li className="flex items-start gap-2.5">
                 <Mail className="w-4 h-4 text-gold-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <span className="text-slate-400 block text-[11px] uppercase tracking-wider">Commercial Email:</span>
+                  <span className="text-slate-400 block text-[11px] uppercase tracking-wider">
+                    Email:
+                  </span>
                   <a
-                    href="mailto:heistofeverything@gmail.com"
+                    href="mailto:santhayapvt.ltd@gmail.com"
                     className="hover:text-gold-400 transition-colors text-slate-200 block break-all mt-0.5"
                   >
-                    heistofeverything@gmail.com
+                    santhayapvt.ltd@gmail.com
                   </a>
                 </div>
               </li>
@@ -185,7 +198,7 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom copyright & disclaimer (BUG-005, BUG-006) */}
+        {/* Bottom copyright notice */}
         <div className="mt-12 pt-8 border-t border-navy-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
           <p>
             © {new Date().getFullYear()} Santhaya Associates Pvt. Ltd. All rights reserved.

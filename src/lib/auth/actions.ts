@@ -84,29 +84,21 @@ export async function loginAction(
     try {
       const adminClient = createAdminClient();
 
-      // Check IP rate limit (max 5 attempts per 5 minutes)
-      const { data: rlIp } = await adminClient.rpc('check_rate_limit', {
-        p_key: `login_ip:${ipHash}`,
-        p_max_tokens: 5,
-        p_refill_seconds: 300,
-        p_cost: 1,
-      });
-
-      if (rlIp && rlIp.length > 0 && !rlIp[0].allowed) {
-        const retryAfter = Math.ceil(rlIp[0].retry_after / 60) || 5;
-        return {
-          success: false,
-          error: `Too many login attempts. Please wait ${retryAfter} minute(s) before trying again.`,
-        };
-      }
-
-      // Check Account rate limit (max 5 attempts per 5 minutes)
-      const { data: rlAcct } = await adminClient.rpc('check_rate_limit', {
-        p_key: `login_acct:${emailHash}`,
-        p_max_tokens: 5,
-        p_refill_seconds: 300,
-        p_cost: 1,
-      });
+      // Check IP and Account rate limits concurrently in parallel
+      const [{ data: rlIp }, { data: rlAcct }] = await Promise.all([
+        adminClient.rpc('check_rate_limit', {
+          p_key: `login_ip:${ipHash}`,
+          p_max_tokens: 5,
+          p_refill_seconds: 300,
+          p_cost: 1,
+        }),
+        adminClient.rpc('check_rate_limit', {
+          p_key: `login_acct:${emailHash}`,
+          p_max_tokens: 5,
+          p_refill_seconds: 300,
+          p_cost: 1,
+        }),
+      ]);
 
       if (rlAcct && rlAcct.length > 0 && !rlAcct[0].allowed) {
         const retryAfter = Math.ceil(rlAcct[0].retry_after / 60) || 5;

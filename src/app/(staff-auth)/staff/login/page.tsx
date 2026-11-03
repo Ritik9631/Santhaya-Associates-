@@ -2,7 +2,11 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ShieldCheck, AlertCircle, ArrowLeft } from 'lucide-react';
+import type { Metadata, Viewport } from 'next';
 import LoginForm from './LoginForm';
+
+export const viewport: Viewport = {
+};
 
 interface StaffLoginPageProps {
   searchParams: {
@@ -13,6 +17,12 @@ interface StaffLoginPageProps {
 
 export const metadata = {
   title: 'Staff Portal Sign In | Santhaya Associates Pvt. Ltd.',
+  manifest: '/staff-manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Santhaya Staff',
+  },
   robots: {
     index: false,
     follow: false,

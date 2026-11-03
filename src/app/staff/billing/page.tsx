@@ -285,7 +285,7 @@ export default async function BillingDirectoryPage({ searchParams }: PageProps) 
         </div>
 
         {/* Invoices Table */}
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 w-full max-w-full min-w-0">
           <table className="min-w-[850px] w-full text-left text-xs text-slate-600">
             <thead className="bg-slate-50 text-[11px] uppercase font-semibold text-slate-700 border-b border-slate-200">
               <tr>

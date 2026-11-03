@@ -4,7 +4,10 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Menu, X, ArrowRight } from 'lucide-react';
+import { Menu, X, ArrowRight, Phone, MessageSquare } from 'lucide-react';
+
+const WHATSAPP_URL =
+  'https://wa.me/919608950748?text=Hello%20Santhaya%20Associates%2C%20I%20would%20like%20to%20enquire%20about%20your%20construction%20tender%20or%20machinery%20supply%20services.';
 
 export default function Header() {
   const pathname = usePathname();
@@ -102,7 +105,27 @@ export default function Header() {
           </nav>
 
           {/* CTA & Actions */}
-          <div className="hidden lg:flex items-center gap-4">
+          <div className="hidden lg:flex items-center gap-3 xl:gap-4">
+            <a
+              href="tel:+919430986713"
+              className="hidden xl:inline-flex items-center gap-1.5 text-xs font-bold text-navy-900 hover:text-gold-600 transition-colors py-2 px-3 rounded-lg hover:bg-slate-100"
+              title="Call Helpline: +91 9430986713"
+            >
+              <Phone className="w-3.5 h-3.5 text-gold-600" />
+              <span>+91 9430986713</span>
+            </a>
+
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden xl:inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 transition-colors py-2 px-3 rounded-lg hover:bg-emerald-50"
+              title="Chat on WhatsApp"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+              <span>WhatsApp</span>
+            </a>
+
             <Link
               href="/request-quotation"
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-navy-900 text-white hover:bg-navy-950 border border-navy-800 shadow-sm transition-all duration-200 hover:shadow-md hover:border-gold-500 group"
@@ -152,7 +175,7 @@ export default function Header() {
             </div>
             <div>
               <p className="text-xs font-bold text-navy-900 tracking-wider">SANTHAYA ASSOCIATES PVT. LTD.</p>
-              <p className="text-[10px] text-slate-500">Construction Tenders & Machinery Supply</p>
+              <p className="text-[10px] text-slate-500">Building Today • Powering Tomorrow</p>
             </div>
           </div>
           <nav aria-label="Mobile Navigation" className="flex flex-col space-y-1.5">
@@ -207,7 +230,28 @@ export default function Header() {
               Contact
             </Link>
           </nav>
-          <div className="pt-2">
+
+          {/* Quick Direct Actions in Mobile Menu */}
+          <div className="pt-2 grid grid-cols-2 gap-2">
+            <a
+              href="tel:+919430986713"
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-bold bg-slate-100 text-navy-900 hover:bg-slate-200 transition-colors"
+            >
+              <Phone className="w-3.5 h-3.5 text-gold-600" />
+              <span>Call Us</span>
+            </a>
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/60 hover:bg-emerald-100 transition-colors"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+              <span>WhatsApp</span>
+            </a>
+          </div>
+
+          <div className="pt-1">
             <Link
               href="/request-quotation"
               onClick={() => setMobileMenuOpen(false)}

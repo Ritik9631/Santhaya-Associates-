@@ -527,23 +527,23 @@ export default async function QuotationPdfPage({ params }: PageProps) {
               </p>
             </div>
 
-            <div className="space-y-0.5">
+            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
               <span className="text-[8.5pt] font-bold text-[#10243B] uppercase tracking-wider block">
-                COMMERCIAL NOTES:
+                BANK DETAILS
               </span>
-              <div className="text-[8.5pt] text-slate-700 leading-tight space-y-0.5 pl-0.5">
-                <div className="flex items-start gap-1.5">
-                  <span className="text-[#FDAE04] font-black text-sm shrink-0 leading-none mt-0.5 select-none">•</span>
-                  <span className="flex-1">Commercial pricing is firm for the quotation validity period stated above.</span>
-                </div>
-                <div className="flex items-start gap-1.5">
-                  <span className="text-[#FDAE04] font-black text-sm shrink-0 leading-none mt-0.5 select-none">•</span>
-                  <span className="flex-1">Equipment deployment, mobilization, fuel and site logistics per agreed scope.</span>
-                </div>
-                <div className="flex items-start gap-1.5">
-                  <span className="text-[#FDAE04] font-black text-sm shrink-0 leading-none mt-0.5 select-none">•</span>
-                  <span className="flex-1">Statutory GST invoiced per Indian Goods and Services Tax legislation.</span>
-                </div>
+              <div className="text-[8.5pt] text-slate-800 leading-tight space-y-0.5 mt-0.5">
+                <p>
+                  <strong className="font-semibold text-slate-700">Bank Name:</strong>{' '}
+                  <span className="text-slate-900 font-medium">State Bank of India</span>
+                </p>
+                <p>
+                  <strong className="font-semibold text-slate-700">Account No.:</strong>{' '}
+                  <span className="text-slate-900 font-mono font-bold tracking-wide">45696995612</span>
+                </p>
+                <p>
+                  <strong className="font-semibold text-slate-700">IFSC Code:</strong>{' '}
+                  <span className="text-slate-900 font-mono font-bold tracking-wide">SBIN0001763</span>
+                </p>
               </div>
             </div>
           </div>
@@ -710,7 +710,7 @@ export default async function QuotationPdfPage({ params }: PageProps) {
               {isAuthorized ? (
                 <div className="stamp-image-wrapper relative flex items-center justify-end ml-auto">
                   <Image
-                    src="/branding/santhaya-round-stamp.png"
+                    src="/santhaya-round-stamp.png"
                     alt="Santhaya Associates Official Company Stamp"
                     width={1254}
                     height={1254}
@@ -739,9 +739,11 @@ export default async function QuotationPdfPage({ params }: PageProps) {
             Santhaya Associates Pvt. Ltd. <span className="text-slate-400 mx-1">•</span> Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India
           </p>
           <p className="text-slate-700 mt-0.5 font-medium text-[8.5pt]">
-            <span><strong>Tel:</strong> +91 9430986713 / +91 9608950748</span>
+            <span><strong>Call:</strong> +91 9430986713</span>
             <span className="text-slate-400 mx-1.5">|</span>
-            <span><strong>Email:</strong> heistofeverything@gmail.com</span>
+            <span><strong>WhatsApp:</strong> +91 9608950748</span>
+            <span className="text-slate-400 mx-1.5">|</span>
+            <span><strong>Email:</strong> santhayapvt.ltd@gmail.com</span>
             <span className="text-slate-400 mx-1.5">|</span>
             <span className="font-mono"><strong>GSTIN:</strong> 10ABVCS4277J1ZU</span>
           </p>

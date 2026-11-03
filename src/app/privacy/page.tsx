@@ -41,8 +41,8 @@ export default function PrivacyPage() {
             <h2 className="text-base font-bold text-navy-900">4. Contacting the Compliance Desk</h2>
             <p>
               For commercial data inquiries or formal compliance requests, please contact our administrative desk at:{' '}
-              <a href="mailto:heistofeverything@gmail.com" className="font-semibold text-gold-600 hover:text-gold-700 underline">
-                heistofeverything@gmail.com
+              <a href="mailto:santhayapvt.ltd@gmail.com" className="font-semibold text-gold-600 hover:text-gold-700 underline">
+                santhayapvt.ltd@gmail.com
               </a>
               .
             </p>

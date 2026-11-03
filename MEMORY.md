@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-11-03 | Phase: Post-Phase 6 Acceptance Testing & Batch 5 Implementation (BUG-050 to BUG-059) | Implementation status: Batch 5 Document Sharing, WhatsApp/Email Modals, Indian Phone Validation, Draft Invoice Safeguards, Date Column Formatting, and Outbox Mock Transparency Complete & Verified (All 17 Test Suites Passing, Production Build 26/26 Routes Clean); Phase 7 Deployment on Hold
+Updated: 2026-11-03 | Phase: Staff Login & Quotation Performance Optimization | Implementation status: Complete Request-Scoped Session Memoization (React.cache), Concurrent Rate-Limiting & Query Parallelism (Promise.all in loginAction, NewQuotationPage, createQuotationAction, NewInvoicePage), Network-Only PWA Verification, 100% Zero-Regression Verification Across All Suites (TypeScript, ESLint, PWA 31/31, Responsive 48/48, Regressions 70/70, 27/27 Routes Built Cleanly); Phase 7 Cutover on Hold
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -805,6 +805,138 @@ Updated: 2026-11-03 | Phase: Post-Phase 6 Acceptance Testing & Batch 5 Implement
         * Created scripts/test-batch5-regressions.mjs (17/17 tests passing).
         * Full test suite npm test passing (17 test batteries, 100% pass rate).
         * Zero TypeScript errors (tsc --noEmit), zero ESLint errors (next lint), clean production build (next build, 26/26 routes). Phase 7 deployment remains on hold.
+
+  - 2026-11-03: Tax Invoice Template Refinements & Statutory GST Compliance Parity:
+      - Document Title & Heading:
+        * Primary document heading renders as TAX INVOICE for issued taxable invoices.
+        * BILL OF SUPPLY strictly isolated to exempt/composition supplies (invoice.invoice_type === 'bill_of_supply') with citation to Section 31(3)(c) and Rule 49.
+        * Unissued draft invoices protected by 'DRAFT — NOT A TAX INVOICE' badge, statutory top alert, and diagonal repeating watermark.
+      - Header & Typography Parity:
+        * Upgraded company logo to 480x550 aspect ratio (w-12 sm:w-13 h-auto print:w-11.5 priority unoptimized).
+        * Enhanced typography hierarchy matching corporate quotation layout.
+        * Removed redundant 'State: Bihar (10)' from supplier header (retained in Place of Supply & customer coordinates).
+      - Bank Details Card:
+        * Added dedicated BANK DETAILS box matching quotation template: State Bank of India, Account No. 45696995612, IFSC Code SBIN0001763.
+      - Clean 6-Clause Statutory Terms:
+        * Created getSimplifiedInvoiceTerms in src/lib/billing/default-terms.ts: 1. Payment, 2. GST & Taxes, 3. Delivery & Acceptance, 4. Warranty, 5. Returns & Adjustments, 6. Dispute Resolution (Motihari, Bihar).
+        * Rendered in 2-column print-optimized grid with bold titles, ~10pt text, and statutory certification statement.
+      - Dual Signatory & Corporate Stamp:
+        * Integrated authentic 30mm circular seal (/branding/santhaya-round-stamp.png) on the RIGHT side of the authorization card for issued invoices.
+        * Strictly withheld stamp on draft invoices ((Official seal affixed upon formal issuance)).
+        * Retained Customer Acknowledgment card on the left for physical/statutory goods receipt proof.
+      - Automated Verification:
+        * Verified all 3 scenarios via Puppeteer Headless Chrome (scripts/verify-invoice-template-update.mjs): Issued Tax Invoice (1 A4 page), Draft Tax Invoice (1 page with watermark & suppressed seal), and Bill of Supply.
+        * Verified all 119 tests pass across test suites: test:batch4 (17/17), test:batch5 (17/17), test:refinements (26/26), test:stamp (24/24), typecheck (0 errors), lint (0 errors).
+
+  - 2026-11-03: Pre-Phase 7 Performance Cleanup, Company Email Update & Super Admin Status:
+      - Phase 1 (Asset Optimization):
+        * Audited all static assets. Identified and pruned 3 confirmed redundant assets: public/branding/santhaya-round-stamp.png (1.40 MB duplicate), public/santhaya-round-stamp-original.png (1.44 MB unreferenced master), public/full-brand-reference.png (0.99 MB unreferenced legacy reference), and public/PLACE-ORIGINAL-LOGO-HERE.txt.
+        * Reduced public/ directory from 5.855 MB to 2.110 MB (64.0% payload reduction).
+        * Retained canonical assets: public/santhaya-round-stamp.png (1.40 MB), public/santhaya-logo-header.png (549.6 KB), public/santhaya-symbol.png (207.8 KB).
+        * Added .vercelignore excluding non-runtime artifacts (scripts/, docs/, sample_quotations/, actual_route_tests/, supabase/, *.md, *.log) from serverless deployment archives while preserving them in Git.
+      - Phase 2 (Company Email Centralization):
+        * Set official company contact email to santhayapvt.ltd@gmail.com across src/lib/billing/company-config.ts, calculations.ts, default-terms.ts, page.tsx, Footer.tsx, FAQAccordion.tsx, privacy/page.tsx, quotation PDF template, and Tax Invoice PDF template.
+        * Zero occurrences of legacy test email remain in application source code (src/).
+        * Updated associated test suites (test-batch3, test-batch4, test-homepage-redesign, test-live-homepage, test-quotation-refinements, test-quotation-round-stamp).
+        * Preserved existing internal notification recipient (INTERNAL_NOTIFICATION_EMAIL=heistofeverything@gmail.com) and existing Resend configuration without credential changes.
+      - Phase 3 (Super Admin Onboarding — DEFERRED):
+        * Decision: Do not create a new Super Admin account at this time; owner currently lacks access to the inbox santhayapvt.ltd@gmail.com.
+        * Task status in roadmap: DEFERRED until mailbox activation.
+        * Confirmed heistofeverything@gmail.com remains the active Super Admin in dev Supabase for all development and testing.
+        * Zero changes made to auth.users, staff_profiles, or audit_logs. Zero invite tokens or passwords generated.
+        * Pre-Phase 7 Launch Requirement Flagged: santhayapvt.ltd@gmail.com requires mailbox activation and an email-receipt test before production cutover.
+      - Phase 4 (Database Hygiene — Option A Selected):
+        * Preserved development database (bkqneudnnhvvwmtggorz) 100% intact: 13 quotations, 3 invoices, 1 payment, 6 customers, 57 enquiries, sequence counters unchanged.
+        * Prepared clean production database provisioning roadmap using 12 ordered SQL migrations and Mumbai (ap-south-1) region.
+      - Verification Status:
+        * TypeScript checks (tsc --noEmit): 0 errors.
+        * ESLint checks (next lint): 0 warnings, 0 errors.
+        * Production build (next build): 26/26 routes compiled cleanly, shared First Load JS 87.3 kB.
+        * Regression batteries: 100% passing across test:batch2 (17/17), test:batch3 (18/18), test:batch4 (17/17), test:batch5 (17/17), test:refinements (26/26), test:stamp (24/24), test:super-admin (passed).
+        * Live server routes (http://localhost:3000): /, /services, /about, /request-quotation, /privacy, /staff/login all HTTP 200 OK.
+
+  - 2026-11-03: Complete Staff Progressive Web App (PWA) Implementation & Multi-Device Verification (Phases PWA-1 through PWA-12):
+      - App Identity & Manifest (public/staff-manifest.json):
+        * Name: "Santhaya Staff", Short Name: "Santhaya Staff", Description: "Secure staff management portal for Santhaya Associates Pvt. Ltd."
+        * Scope: /staff, Start URL: /staff, Display: standalone, Orientation: any.
+        * Theme Color & Background Color: #0F172A (corporate navy).
+        * Categories: ["business", "productivity"].
+      - Icon Geometry & Maskable Assets (public/icons/):
+        * Generated pixel-perfect authentic PNG icons from public/santhaya-symbol.png using Sharp:
+          - icon-192x192.png (192x192 standard icon, 29 KB)
+          - icon-512x512.png (512x512 high-DPI standard icon, 164 KB)
+          - icon-maskable-192x192.png (192x192 maskable with 80% safe zone margin for Android adaptive icons, 20 KB)
+          - icon-maskable-512x512.png (512x512 maskable with 80% safe zone margin, 112.4 KB)
+          - apple-touch-icon.png (180x180 iOS home screen bookmark, 25.2 KB)
+      - Security-First Online-Only Service Worker (public/staff-sw.js):
+        * Strict Network-Only policy: Zero caching of private staff HTML (/staff/*), Supabase sessions, API routes (/api/*), customers, quotations, invoices, payments, audit logs, or PDFs.
+        * Pre-caches only 5 static public application shell files (/staff-offline.html, icons, symbol, manifest).
+        * Offline Fallback: public/staff-offline.html rendered only when network is disconnected during navigation, featuring branded connection-required UI and retry trigger with zero confidential data leaks.
+        * CLEAR_CACHES message listener for complete cache eviction upon sign-out.
+      - Public Website Isolation:
+        * Public website (src/app/layout.tsx) contains NO manifest link or service worker registration. Public visitors on / are never prompted to install the staff portal.
+        * Manifest linked strictly via Next.js metadata in src/app/staff/layout.tsx and src/app/(staff-auth)/staff/login/page.tsx.
+      - In-App PWA Install & Help Center:
+        * src/components/pwa/StaffPwaManager.tsx: Registers /staff-sw.js under /staff scope, monitors live connection status, provides online/offline banner.
+        * src/components/pwa/PwaInstallCard.tsx: Detects beforeinstallprompt, triggers 1-click native prompt on Windows & Android, renders "Installed / Standalone Active" badge when running in PWA mode, and provides step-by-step installation instructions for Edge, Chrome, and Android.
+        * src/app/staff/help/pwa/page.tsx: Dedicated staff PWA help center at /staff/help/pwa.
+        * Added "Install App" navigation item to StaffSidebar.tsx.
+      - Responsive Layout & Zero Horizontal Overflow:
+        * Refactored StaffLayout to flex-col lg:flex-row min-w-0 so mobile menu button flows cleanly above main content.
+        * Constrained all wide ERP tables in quotations, billing, customers, and catalog with overflow-x-auto w-full max-w-full min-w-0.
+        * Verified zero horizontal overflow across 6 viewports (320px, 360px, 390px, 412px, 768px, 1280px) and 8 routes: 48/48 passed.
+      - Subdomain Architecture Readiness:
+        * Documented DNS CNAME, Supabase redirect URLs, and cookie domain requirements for future cutover to staff.santhayaassociates.com.
+      - Automated Test Battery & Production Build:
+        * test:pwa (31/31 tests passing)
+        * test:pwa-responsive (48/48 tests passing)
+        * typecheck (0 errors)
+        * lint (0 errors)
+        * test:super-admin, test:refinements, test:stamp (100% passing)
+        * next build: 27/27 routes compiled cleanly, shared First Load JS 87.3 kB.
+
+  - 2026-11-03: Production File Isolation & Deployment Size Audit:
+      - Complete Repository File Classification (397 tracked files, 55.45 MB):
+        * Category A (Production Runtime Required): 11 public static assets (2.46 MB total) deployed to Vercel Edge CDN.
+        * Category B (Production Build-Time Required): 112 files in src/ and root config (1.27 MB total) compiled into .next.
+        * Category C (Development & Testing Only): 164 files in scripts/, supabase/, sample_quotations/, .qa_screenshots/ (45.41 MB total) strictly excluded from production deployment.
+        * Category D (Documentation & Handover Only): 63 markdown files in docs/ and root (2.84 MB total) excluded from deployment.
+        * Category E (Unused / Redundant): 51 files in out/ (3.12 MB total) from legacy Phase 1 static export; excluded from deployment and proposed for local cleanup upon approval.
+      - Deployment Exclusion Verification (.vercelignore):
+        * Configured .vercelignore to exclude scripts/, docs/, *.md, sample_quotations/, actual_route_tests/, supabase/, *.log, coverage/, .qa_screenshots/, and out/.
+        * Confirmed Vercel Node File Trace (NFT) bundles only compiled .next/server (4.73 MB) and serves .next/static (1.39 MB) via Edge CDN.
+      - PWA Scope & Service-Worker-Allowed Header Hardening:
+        * Configured explicit Service-Worker-Allowed: /staff and Cache-Control: no-cache, no-store, must-revalidate headers in next.config.mjs for /staff-sw.js.
+        * Configured Content-Type: application/manifest+json; charset=utf-8 for /staff-manifest.json.
+        * Verified in live Chrome via Puppeteer: Service Worker registers cleanly with legal scope http://localhost:3000/staff, controlling /staff routes with zero private ERP data in CacheStorage.
+      - Performance & Latency Benchmarks:
+        * Production build size: .next/static is 1.39 MB, .next/server is 4.73 MB, shared First Load JS is 87.3 kB.
+        * Public page transfers: 47 kB to 283 kB; staff pages transfer under 79 kB.
+        * Supabase queries: Quotations (1,025 ms), Invoices (608 ms), Customers (535 ms), Catalog (559 ms), Enquiries (371 ms) measured against remote dev DB; recommended Mumbai (ap-south-1) for sub-50ms production latency.
+      - Full Verification:
+        * test:pwa (31/31 passed)
+        * test:pwa-responsive (48/48 passed)
+        * typecheck (0 errors), lint (0 errors), next build (27/27 routes clean)
+        * Regression batteries: test:super-admin, test:refinements, test:stamp, test:batch2 through test:batch5 (100% passing).
+
+  - 2026-11-03: Staff Login & Quotation Performance Optimization (Phases 1 through 5):
+      - Performance Profiling & Root Cause Analysis:
+        * Profiled login lifecycle: identified sequential IP & account rate-limiting RPCs (8,283 ms sequential overhead) and redundant getUser() / staff_profiles lookups between layout.tsx and page.tsx (~2,000 ms overhead).
+        * Profiled quotation workflow: identified sequential customer validation and sequence generation in createQuotationAction (2,045 ms) and sequential customer/catalog fetching in /staff/quotations/new.
+      - Safe Code Optimizations Implemented:
+        * Request-Scoped Session Memoization (src/lib/auth/session.ts): Wrapped getStaffAuth() in React.cache() to deduplicate session & profile lookups within the same HTTP request cycle (0.0 ms from memory on subsequent calls), eliminating redundant round trips between layout and page.
+        * Concurrent Rate-Limiting (src/lib/auth/actions.ts): Converted IP and account check_rate_limit RPCs into concurrent Promise.all (reduced from 8,283.4 ms to 1,040.4 ms, 87.4% faster, saving 7,243 ms).
+        * Parallel Pre-Creation Actions (src/lib/quotation/actions.ts): Converted customer existence check and generateServerQuotationNumber() to concurrent Promise.all (reduced from 2,045.8 ms to 1,068.0 ms, 47.8% faster).
+        * Parallel Form Queries: Converted customer and catalog queries in src/app/staff/quotations/new/page.tsx and billing data in src/app/staff/billing/new/page.tsx to concurrent Promise.all.
+        * PWA Security & Caching Verification: Confirmed public/staff-sw.js strictly enforces Network-Only policy for all /staff/*, /api/*, and dynamic requests with zero private ERP data stored in CacheStorage.
+      - Full Automated Verification & Quality Gates (100% Passing):
+        * TypeScript checks (tsc --noEmit): 0 errors.
+        * ESLint validation (next lint): 0 warnings, 0 errors.
+        * Complete PWA suite (test:pwa): 31/31 passed.
+        * Multi-viewport responsive suite (test:pwa-responsive): 48/48 passed across 6 viewports (320px–1280px) and 8 staff routes with zero horizontal overflow.
+        * Regression batteries: test:super-admin, test:refinements (26/26), test:stamp (24/24), test:batch2 through test:batch5 (70/70) all passing.
+        * Production build (next build): 27/27 routes compiled cleanly, shared First Load JS 87.3 kB.
+        * Temporary measurement scripts safely cleaned up; legacy out/ folder, source code, and database records preserved intact.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

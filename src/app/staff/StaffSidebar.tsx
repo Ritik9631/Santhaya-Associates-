@@ -16,6 +16,7 @@ import {
   X,
   ShieldAlert,
   UserPlus,
+  Smartphone,
 } from 'lucide-react';
 import type { StaffRole } from '@/types/database';
 
@@ -97,6 +98,14 @@ export function StaffSidebar({ userRole }: StaffSidebarProps) {
       icon: Mail,
       active: pathname.startsWith('/staff/communications'),
       available: true,
+    },
+    {
+      name: 'Install App',
+      href: '/staff/help/pwa',
+      icon: Smartphone,
+      active: pathname.startsWith('/staff/help/pwa'),
+      available: true,
+      badge: 'PWA',
     },
   ];
 

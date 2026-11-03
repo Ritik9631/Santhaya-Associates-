@@ -29,9 +29,14 @@ export async function triggerOutboxWorkerAction(): Promise<ActionResponse<{
       return { error: 'Your staff account is inactive.' };
     }
 
+    if (!['super_admin', 'admin', 'billing_manager'].includes(profile.role)) {
+      return { error: 'UNAUTHORIZED: Insufficient permissions to execute outbox worker.' };
+    }
+
     const adminClient = createAdminClient();
     const batchResult = await processOutboxBatch(adminClient, {
       batchSize: 20,
+      workerSecret: process.env.OUTBOX_WORKER_SECRET || process.env.CRON_SECRET,
     });
 
     revalidatePath('/staff/communications');

@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import MobileQuickContactBar from '@/components/MobileQuickContactBar';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://santhaya.local'),
   title: 'Santhaya Associates Pvt. Ltd. | Construction Tenders & Machinery Supply',
   description:
-    'Santhaya Associates Pvt. Ltd. — Specialized partner for government and private construction tenders, heavy construction machinery supply, and manufacturing machinery equipment. Building Today. Powering Tomorrow.',
+    'Santhaya Associates Pvt. Ltd. — Specialized partner for government and private construction tenders, heavy construction machinery supply, and manufacturing machinery equipment. Building Today • Powering Tomorrow.',
   keywords: [
     'Santhaya Associates',
     'Santhaya Associates Pvt. Ltd.',
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Santhaya Associates Pvt. Ltd.',
     description:
-      'Building Today. Powering Tomorrow. Government & Private Construction Tenders, Construction Machinery Supply, and Manufacturing Machinery Supply.',
+      'Building Today • Powering Tomorrow. Government & Private Construction Tenders, Construction Machinery Supply, and Manufacturing Machinery Supply.',
     images: [
       {
         url: '/santhaya-logo-header.png',
@@ -52,10 +53,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="flex flex-col min-h-screen font-sans bg-slate-50 text-slate-800 antialiased selection:bg-gold-500 selection:text-navy-950">
+      <body className="flex flex-col min-h-screen font-sans bg-slate-50 text-slate-800 antialiased selection:bg-gold-500 selection:text-navy-950 pb-16 md:pb-0">
         <Header />
         <main className="flex-grow">{children}</main>
         <Footer />
+        <MobileQuickContactBar />
       </body>
     </html>
   );

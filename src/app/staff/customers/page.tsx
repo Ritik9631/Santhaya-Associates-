@@ -137,7 +137,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
 
       {/* Customers Table */}
       <div className="rounded-xl border border-slate-800 bg-slate-900/80 overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto w-full max-w-full min-w-0">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[11px] border-b border-slate-800">
               <tr>

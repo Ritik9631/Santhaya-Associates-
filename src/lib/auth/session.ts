@@ -1,3 +1,4 @@
+import { cache } from 'react';
 /**
  * Santhaya Associates — Server-Side Staff Authentication & Session Guards
  * File: src/lib/auth/session.ts
@@ -31,7 +32,7 @@ export interface StaffAuthResult {
  * Retrieves the current authenticated user and validates their active staff profile.
  * Non-throwing query for inspectable security checks.
  */
-export async function getStaffAuth(
+export const getStaffAuth = cache(async function getStaffAuth(
   supabaseClient?: SupabaseClient<Database>
 ): Promise<StaffAuthResult> {
   const supabase = supabaseClient || createServerSupabaseClient();
@@ -85,7 +86,7 @@ export async function getStaffAuth(
     profile,
     error: null,
   };
-}
+});
 
 /**
  * Server-side guard that enforces an active staff session.

@@ -44,7 +44,23 @@ export function getDefaultInvoiceTerms(dueDateText = 'as specified on this invoi
     '4. DISCREPANCIES: Any discrepancy in billing, item description, or tax attribution must be notified in writing to accounts within 7 calendar days of receipt.',
     '5. DELAYED PAYMENTS: Delayed payments are subject to commercial interest as agreed under contract or standard commercial credit terms.',
     '6. ADJUSTMENTS & CREDIT NOTES: Returns, rate adjustments, or credit notes shall be issued strictly in accordance with Section 34 of the CGST Act.',
-    '7. BILLING QUERIES: For payment reconciliation or billing assistance, contact accounts at heistofeverything@gmail.com or +91 9430986713 / +91 9608950748.',
+    '7. BILLING QUERIES: For payment reconciliation or billing assistance, contact accounts at santhayapvt.ltd@gmail.com or +91 9430986713 / +91 9608950748.',
   ].join('\n');
 }
+
+/**
+ * Revised 6-clause professional statutory invoice terms (Consolidated for readability, bold headings, and print aesthetics).
+ * Clauses: Payment, GST & Taxes, Delivery & Acceptance, Warranty, Returns & Adjustments, Dispute Resolution.
+ */
+export function getSimplifiedInvoiceTerms(dueDateText = 'as specified on this invoice'): string {
+  return [
+    `1. PAYMENT: Payment must be credited in full on or before the due date (${dueDateText}) via RTGS, NEFT, Cheque, or verified bank transfer in favour of Santhaya Associates Pvt. Ltd. Delayed payments are subject to commercial interest as agreed under contract.`,
+    '2. GST & TAXES: This invoice is issued in statutory compliance with Section 31 of the CGST Act, 2017 and Rule 46 of the CGST Rules, 2017. All statutory taxes are levied per prevailing GST slabs.',
+    '3. DELIVERY & ACCEPTANCE: Supplies or completed services are deemed accepted upon handover at site. Any discrepancy in billing, item description, or quantity must be notified in writing to accounts within 7 calendar days of receipt.',
+    '4. WARRANTY: Standard original equipment manufacturer (OEM) warranty applies for machinery and materials against manufacturing defects. Wear items and consumables are excluded unless explicitly contracted.',
+    '5. RETURNS & ADJUSTMENTS: Goods once supplied are non-returnable except for verified transit damage or manufacturing defects. Statutory credit/debit notes shall be issued strictly in accordance with Section 34 of the CGST Act.',
+    '6. DISPUTE RESOLUTION: All contractual disputes or claims arising out of this invoice are subject to the exclusive jurisdiction of the competent courts at Motihari, Purbi Champaran, Bihar, India.',
+  ].join('\n');
+}
+
 

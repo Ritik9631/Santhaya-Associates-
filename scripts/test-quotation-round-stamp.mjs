@@ -135,8 +135,8 @@ await test('Footer displays verified NAP, phone, email, and GSTIN in high-contra
   assert(pdfContent.includes('text-[9pt] text-slate-800'), 'Footer uses 9pt dark slate text');
   assert(pdfContent.includes('border-t-2 border-slate-300'), 'Footer uses clear divider');
   assert(pdfContent.includes('10ABVCS4277J1ZU'), 'Footer contains company GSTIN');
-  assert(pdfContent.includes('heistofeverything@gmail.com'), 'Footer contains verified email');
-  assert(pdfContent.includes('+91 9430986713 / +91 9608950748'), 'Footer contains verified phone');
+  assert(pdfContent.includes('santhayapvt.ltd@gmail.com'), 'Footer contains verified email');
+  assert(pdfContent.includes('+91 9430986713') && pdfContent.includes('+91 9608950748'), 'Footer contains verified phone');
 });
 
 // SECTION 3: Invoice Separation
@@ -145,8 +145,10 @@ console.log('\n--- Section 3: Invoice Separation ---');
 const invoiceTemplatePath = path.join(rootDir, 'src/app/staff/billing/[id]/pdf/page.tsx');
 const invoiceContent = fs.readFileSync(invoiceTemplatePath, 'utf8');
 
-await test('Invoice PDF generator does NOT contain the round quotation stamp', () => {
-  assert(!invoiceContent.includes('santhaya-round-stamp.png'), 'Invoices do not use santhaya-round-stamp.png');
+await test('Invoice PDF generator incorporates authentic round stamp with statutory draft safeguards', () => {
+  assert(invoiceContent.includes('santhaya-round-stamp.png'), 'Invoices use santhaya-round-stamp.png');
+  assert(invoiceContent.includes('!isDraft'), 'Stamp is guarded so it only renders when invoice is not draft');
+  assert(invoiceContent.includes('(Affixed upon issuance)'), 'Draft invoices withhold signature and seal');
 });
 
 // SECTION 4: Generated PDF Pagination and Single-Page Verification

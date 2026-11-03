@@ -176,32 +176,52 @@ export async function POST(req: NextRequest) {
       const record = atomicResult[0];
       const isReplayed = record.result_status === 'replayed';
 
+      // Collect trusted outbox job IDs created specifically by this submission (prevents mutating historical queue)
+      const targetJobIds: string[] = [];
+      if (record.outbox_id && typeof record.outbox_id === 'string') {
+        targetJobIds.push(record.outbox_id);
+      }
+
       // Phase 4: Enqueue client confirmation email if email is provided and not a replayed submission
       if (!isReplayed && data.email && data.email.trim() !== '') {
         const customerEmail = data.email.trim().toLowerCase();
         try {
-          await adminClient.from('email_outbox').insert({
-            recipient_email: customerEmail,
-            subject: `Quotation Request Received — Santhaya Associates [Ref: ${record.reference_number}]`,
-            email_type: 'enquiry_confirmation_customer',
-            related_entity_type: 'quotation_request',
-            payload: {
-              referenceNumber: record.reference_number,
-              businessName: data.businessName.trim(),
-              contactPerson: data.contactPerson.trim(),
-              serviceCategory: data.serviceCategory,
-              submittedAt: new Date(record.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-            },
-          });
+          const { data: customerOutboxRow, error: custOutboxErr } = await adminClient
+            .from('email_outbox')
+            .insert({
+              recipient_email: customerEmail,
+              subject: `Quotation Request Received — Santhaya Associates [Ref: ${record.reference_number}]`,
+              email_type: 'enquiry_confirmation_customer',
+              related_entity_type: 'quotation_request',
+              payload: {
+                referenceNumber: record.reference_number,
+                businessName: data.businessName.trim(),
+                contactPerson: data.contactPerson.trim(),
+                serviceCategory: data.serviceCategory,
+                submittedAt: new Date(record.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+              },
+            })
+            .select('id')
+            .single();
+
+          if (!custOutboxErr && customerOutboxRow?.id) {
+            targetJobIds.push(customerOutboxRow.id);
+          }
         } catch (enqueueErr) {
           console.warn('[Quotation API] Non-fatal customer confirmation enqueue error:', enqueueErr);
         }
       }
 
-      // Trigger non-blocking outbox worker execution to process pending notification jobs immediately
-      processOutboxBatch(adminClient, { batchSize: 5 }).catch((workerErr) => {
-        console.warn('[Quotation API] Non-fatal background outbox dispatch trigger error:', workerErr?.message || workerErr);
-      });
+      // Trigger targeted non-blocking outbox worker execution strictly for the current submission's jobs
+      if (targetJobIds.length > 0) {
+        processOutboxBatch(adminClient, {
+          batchSize: targetJobIds.length,
+          jobIds: targetJobIds,
+          workerSecret: process.env.OUTBOX_WORKER_SECRET || process.env.CRON_SECRET,
+        }).catch((workerErr) => {
+          console.warn('[Quotation API] Non-fatal background outbox dispatch trigger error:', workerErr?.message || workerErr);
+        });
+      }
 
       return NextResponse.json(
         {

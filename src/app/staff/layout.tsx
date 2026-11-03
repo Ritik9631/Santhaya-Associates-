@@ -1,15 +1,27 @@
 import React from 'react';
+import type { Metadata, Viewport } from 'next';
 import Image from 'next/image';
 import { requireStaffSession } from '@/lib/auth/session';
 import { logoutAction } from '@/lib/auth/actions';
 import { ShieldCheck, LogOut } from 'lucide-react';
 import { StaffSidebar } from './StaffSidebar';
+import { StaffPwaManager } from '@/components/pwa/StaffPwaManager';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+export const viewport: Viewport = {
+  themeColor: '#0F172A',
+};
+
 export const metadata = {
   title: 'Staff Management ERP | Santhaya Associates Pvt. Ltd.',
+  manifest: '/staff-manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Santhaya Staff',
+  },
   robots: {
     index: false,
     follow: false,
@@ -36,6 +48,7 @@ export default async function StaffLayout({
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans print:bg-white print:text-black print:min-h-0 print:block">
+      <StaffPwaManager />
       {/* Top Staff Header Bar (Hidden in Print) */}
       <header className="border-b border-slate-800 bg-slate-900/95 sticky top-0 z-40 backdrop-blur-md print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -100,12 +113,12 @@ export default async function StaffLayout({
       </header>
 
       {/* Main Container with Sidebar + Content */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto print:max-w-none print:w-full print:block">
-        <div className="print:hidden">
+      <div className="flex-1 flex flex-col lg:flex-row max-w-7xl w-full mx-auto min-w-0 print:max-w-none print:w-full print:block">
+        <div className="print:hidden w-full lg:w-auto shrink-0">
           <StaffSidebar userRole={profile.role} userName={profile.full_name} />
         </div>
 
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8 overflow-x-hidden print:p-0 print:m-0 print:overflow-visible print:w-full">
+        <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-8 overflow-x-hidden print:p-0 print:m-0 print:overflow-visible print:w-full">
           {children}
         </main>
       </div>

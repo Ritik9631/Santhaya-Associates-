@@ -1,0 +1,21 @@
+# Santhaya Associates - Vercel Deployment Exclusions
+# Excludes internal QA scripts, documentation, and local test artifacts from the production deployment archive.
+
+# Development and testing scripts
+scripts/
+actual_route_tests/
+sample_quotations/
+
+# Internal documentation and audit reports
+docs/
+*.md
+
+# Database migration source (managed via Supabase CLI / dashboard directly)
+supabase/
+
+# Local logs and test outputs
+*.log
+coverage/
+.qa_screenshots/
+out/
+

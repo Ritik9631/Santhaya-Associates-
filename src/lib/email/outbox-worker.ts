@@ -12,9 +12,11 @@
  * 7. PII scrubbing in logs.
  */
 
+import crypto from 'node:crypto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import type { IEmailProvider, OutboxJob, EmailMessage, AdminEnquiryPayload } from './types';
 import { getEmailProvider } from './factory';
+import { verifyWorkerSecret } from './worker-auth';
 import { renderAdminEnquiryAlert } from './templates/admin-enquiry-alert';
 import { renderCustomerEnquiryConfirmation, type CustomerEnquiryConfirmationPayload } from './templates/customer-enquiry-confirmation';
 import { renderQuotationDeliveryEmail, type QuotationDeliveryPayload } from './templates/quotation-delivery';
@@ -26,6 +28,7 @@ export interface ProcessBatchOptions {
   provider?: IEmailProvider;
   dailyLimit?: number;
   monthlyLimit?: number;
+  jobIds?: string[];
 }
 
 export interface ProcessBatchResult {
@@ -163,10 +166,23 @@ export async function processOutboxBatch(
 ): Promise<ProcessBatchResult> {
   const { batchSize = 10, workerSecret, provider = getEmailProvider() } = options;
 
-  // 1. Authenticate worker execution if secret is configured
-  const expectedSecret = process.env.CRON_SECRET || process.env.OUTBOX_WORKER_SECRET;
-  if (expectedSecret && workerSecret !== expectedSecret) {
+  // 1. Authenticate worker execution if secrets are configured
+  if (!verifyWorkerSecret(workerSecret)) {
     throw new Error('UNAUTHORIZED_WORKER: Invalid or missing worker secret.');
+  }
+
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  // 2. Validate targeted jobIds if explicitly provided (reject invalid/empty rather than falling back to FIFO)
+  if (options.jobIds !== undefined) {
+    if (!Array.isArray(options.jobIds) || options.jobIds.length === 0) {
+      throw new Error('INVALID_TARGETED_JOB_IDS: jobIds filter must be a non-empty array of valid UUIDs.');
+    }
+    for (const id of options.jobIds) {
+      if (typeof id !== 'string' || !UUID_REGEX.test(id.trim())) {
+        throw new Error(`INVALID_TARGETED_JOB_IDS: Invalid UUID provided: "${id}".`);
+      }
+    }
   }
 
   const result: ProcessBatchResult = {
@@ -249,13 +265,21 @@ export async function processOutboxBatch(
   }
 
   // 4. Fetch eligible jobs: status in ('pending', 'failed') AND next_retry_at <= now()
-  const { data: eligibleJobs, error: fetchError } = await adminClient
+  let query = adminClient
     .from('email_outbox')
     .select('*')
     .in('status', ['pending', 'failed'])
-    .lte('next_retry_at', now.toISOString())
-    .order('created_at', { ascending: true })
-    .limit(batchSize);
+    .lte('next_retry_at', now.toISOString());
+
+  if (options.jobIds !== undefined) {
+    const cleanJobIds = options.jobIds.map((id) => id.trim().toLowerCase());
+    query = query.in('id', cleanJobIds);
+  } else {
+    // General FIFO queue processing for cron and authorized manual batch triggers
+    query = query.order('created_at', { ascending: true }).limit(batchSize);
+  }
+
+  const { data: eligibleJobs, error: fetchError } = await query;
 
   if (fetchError) {
     console.error('[Outbox Worker] Error fetching outbox queue:', fetchError.message);

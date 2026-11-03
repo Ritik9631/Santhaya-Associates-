@@ -234,7 +234,7 @@ export function getCompanyBillingProfile(): CompanyBillingProfile {
       'Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India',
     phone: process.env.COMPANY_PHONE || '+91 9430986713',
     phoneSecondary: process.env.COMPANY_PHONE_SECONDARY || '+91 9608950748',
-    email: process.env.COMPANY_EMAIL || 'heistofeverything@gmail.com',
+    email: process.env.COMPANY_EMAIL || 'santhayapvt.ltd@gmail.com',
     website: process.env.NEXT_PUBLIC_SITE_URL || 'https://santhaya.com',
     bankDetails: {
       isConfigured: hasConfiguredBank,

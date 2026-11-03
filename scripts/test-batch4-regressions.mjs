@@ -295,7 +295,7 @@ test('BUG-038: getDefaultInvoiceTerms provides comprehensive 7-clause statutory 
   assert(terms.includes('2. PAYMENT METHOD:'));
   assert(terms.includes('3. STATUTORY INVOICE:'));
   assert(terms.includes('4. DISCREPANCIES:'));
-  assert(terms.includes('heistofeverything@gmail.com'));
+  assert(terms.includes('santhayapvt.ltd@gmail.com'));
 });
 
 // -------------------------------------------------------------

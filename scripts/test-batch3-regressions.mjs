@@ -110,7 +110,7 @@ it('Safe payment instructions do not invent or fabricate bank account numbers', 
   assert.strictEqual(profile.bankDetails.isConfigured, false, 'Default payment instructions marked as unconfigured');
   const instructions = getPaymentInstructions(profile);
   assert.ok(!instructions.includes('398472910482'), 'No fabricated bank account numbers');
-  assert.ok(instructions.includes('contact accounts at heistofeverything@gmail.com'), 'Safe guidance message returned');
+  assert.ok(instructions.includes('contact accounts at santhayapvt.ltd@gmail.com'), 'Safe guidance message returned');
 });
 
 it('Quotation and Invoice PDF views enforce A4 portrait print geometry', () => {

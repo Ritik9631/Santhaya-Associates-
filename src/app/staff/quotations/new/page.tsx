@@ -23,18 +23,18 @@ export default async function NewQuotationPage({ searchParams }: PageProps) {
   await requireStaffSession();
   const adminClient = createAdminClient();
 
-  // Load Customers
-  const { data: customers } = await adminClient
-    .from('customers')
-    .select('id, company_name, primary_contact_person, gstin, state, state_code')
-    .order('company_name', { ascending: true });
-
-  // Load Catalog Items
-  const { data: catalogItems } = await adminClient
-    .from('products_services')
-    .select('id, sku, name, default_unit_price, applicable_gst_rate, hsn_sac_code, unit_of_measurement, item_type')
-    .eq('is_active', true)
-    .order('name', { ascending: true });
+  // Load Customers and Catalog Items concurrently in parallel
+  const [{ data: customers }, { data: catalogItems }] = await Promise.all([
+    adminClient
+      .from('customers')
+      .select('id, company_name, primary_contact_person, gstin, state, state_code')
+      .order('company_name', { ascending: true }),
+    adminClient
+      .from('products_services')
+      .select('id, sku, name, default_unit_price, applicable_gst_rate, hsn_sac_code, unit_of_measurement, item_type')
+      .eq('is_active', true)
+      .order('name', { ascending: true }),
+  ]);
 
   return (
     <div className="space-y-6 max-w-5xl">

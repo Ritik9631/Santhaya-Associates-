@@ -169,10 +169,14 @@ test('Replaces bold/italics with clean normal typography for Amount in Words', (
   assert(!pdfContent.includes('italic bg-slate-50 p-2.5 rounded'), 'Removed awkward heavy italic styling');
 });
 
-test('Features dedicated Commercial Notes section with hanging bullet indentation', () => {
-  assert(pdfContent.includes('COMMERCIAL NOTES:'), 'Has COMMERCIAL NOTES heading');
-  assert(pdfContent.includes('Commercial pricing is firm for the quotation validity period stated above.'), 'First note present');
-  assert(pdfContent.includes('flex items-start'), 'Uses hanging bullet indent');
+test('Features dedicated Bank Details section replacing Commercial Notes', () => {
+  assert(!pdfContent.includes('COMMERCIAL NOTES:'), 'Commercial Notes completely removed');
+  assert(pdfContent.includes('BANK DETAILS'), 'Has BANK DETAILS heading');
+  assert(pdfContent.includes('State Bank of India'), 'Bank Name present');
+  assert(pdfContent.includes('45696995612'), 'Account No. present');
+  assert(pdfContent.includes('SBIN0001763'), 'IFSC Code present');
+  assert(pdfContent.includes('Call:'), 'Call label present in footer');
+  assert(pdfContent.includes('WhatsApp:'), 'WhatsApp label present in footer');
 });
 
 test('Terms and Conditions allows natural multi-page pagination with break-inside-avoid per clause', () => {
@@ -188,8 +192,8 @@ test('Widens Company Authorization Block to 76-80 width', () => {
 
 test('Renders verified subtle company footer at bottom of document', () => {
   assert(pdfContent.includes('Gopalpur, Motihari, Purbi Champaran, Bihar – 845401'), 'Office location in footer');
-  assert(pdfContent.includes('heistofeverything@gmail.com'), 'Verified email in footer');
-  assert(pdfContent.includes('+91 9430986713 / +91 9608950748'), 'Verified phone numbers in footer');
+  assert(pdfContent.includes('santhayapvt.ltd@gmail.com'), 'Verified email in footer');
+  assert(pdfContent.includes('+91 9430986713') && pdfContent.includes('+91 9608950748'), 'Verified phone numbers in footer');
 });
 
 test('Payment terms are cleaned to prevent contradictory advance/credit phrasing', () => {

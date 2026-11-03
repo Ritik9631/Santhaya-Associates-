@@ -24,41 +24,39 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
   await requireStaffSession();
   const adminClient = createAdminClient();
 
-  // Load Customers
-  const { data: customers } = await adminClient
-    .from('customers')
-    .select('id, company_name, primary_contact_person, gstin, pan, billing_address, state, state_code')
-    .order('company_name', { ascending: true });
-
-  // Load Catalog Items
-  const { data: catalogItems } = await adminClient
-    .from('products_services')
-    .select('id, sku, name, default_unit_price, applicable_gst_rate, hsn_sac_code, unit_of_measurement, item_type')
-    .eq('is_active', true)
-    .order('name', { ascending: true });
-
-  // Load Accepted Quotations for Quotation-to-Invoice conversion
-  const { data: rawQuotations } = await adminClient
-    .from('quotations')
-    .select(`
-      id,
-      quotation_number,
-      customer_id,
-      status,
-      place_of_supply_state_code,
-      is_gst_applicable,
-      created_at,
-      customers (
-        company_name
-      ),
-      quotation_versions (
+  // Load Customers, Catalog Items, and Accepted Quotations concurrently in parallel
+  const [{ data: customers }, { data: catalogItems }, { data: rawQuotations }] = await Promise.all([
+    adminClient
+      .from('customers')
+      .select('id, company_name, primary_contact_person, gstin, pan, billing_address, state, state_code')
+      .order('company_name', { ascending: true }),
+    adminClient
+      .from('products_services')
+      .select('id, sku, name, default_unit_price, applicable_gst_rate, hsn_sac_code, unit_of_measurement, item_type')
+      .eq('is_active', true)
+      .order('name', { ascending: true }),
+    adminClient
+      .from('quotations')
+      .select(`
         id,
-        version_number,
-        grand_total_amount
-      )
-    `)
-    .in('status', ['accepted', 'issued'])
-    .order('created_at', { ascending: false });
+        quotation_number,
+        customer_id,
+        status,
+        place_of_supply_state_code,
+        is_gst_applicable,
+        created_at,
+        customers (
+          company_name
+        ),
+        quotation_versions (
+          id,
+          version_number,
+          grand_total_amount
+        )
+      `)
+      .in('status', ['accepted', 'issued'])
+    .order('created_at', { ascending: false }),
+  ]);
 
   const acceptedQuotations = (rawQuotations as any[]) || [];
   const companyProfile = getCompanyBillingProfile();

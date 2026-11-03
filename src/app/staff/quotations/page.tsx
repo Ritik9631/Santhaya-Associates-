@@ -223,7 +223,7 @@ export default async function QuotationsDirectoryPage({ searchParams }: PageProp
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto w-full max-w-full min-w-0">
             <table className="min-w-[850px] w-full text-left text-xs">
               <thead className="bg-slate-50 text-[11px] uppercase font-semibold text-slate-700 border-b border-slate-200">
                 <tr>
