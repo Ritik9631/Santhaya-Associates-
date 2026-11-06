@@ -1,0 +1,88 @@
+{
+  "projectRef": "flxhwgevmqvuqdjaejwa",
+  "region": "ap-southeast-1",
+  "authenticatedUser": "heistofeverything@gmail.com",
+  "executedAt": "2026-11-06T23:40:00.594Z",
+  "migrations": [
+    {
+      "step": 1,
+      "file": "20261026120000_phase2_schema_and_security.sql",
+      "status": "SUCCESS",
+      "durationMs": 3900,
+      "appliedAt": "2026-11-06T23:39:05.135Z"
+    },
+    {
+      "step": 2,
+      "file": "20261028120000_phase2d_email_outbox.sql",
+      "status": "SUCCESS",
+      "durationMs": 3373,
+      "appliedAt": "2026-11-06T23:39:08.509Z"
+    },
+    {
+      "step": 3,
+      "file": "20261029120000_stage3a_step_a_add_super_admin_enum.sql",
+      "status": "SUCCESS",
+      "durationMs": 3154,
+      "appliedAt": "2026-11-06T23:39:11.663Z"
+    },
+    {
+      "step": 4,
+      "file": "20261029120001_stage3a_step_b_rbac_enhancements.sql",
+      "status": "SUCCESS",
+      "durationMs": 3597,
+      "appliedAt": "2026-11-06T23:39:15.260Z"
+    },
+    {
+      "step": 5,
+      "file": "20261029140000_phase3b_catalog_and_customer_enhancements.sql",
+      "status": "SUCCESS",
+      "durationMs": 3126,
+      "appliedAt": "2026-11-06T23:39:18.387Z"
+    },
+    {
+      "step": 6,
+      "file": "20261029160000_phase3c_quotations.sql",
+      "status": "SUCCESS",
+      "durationMs": 3529,
+      "appliedAt": "2026-11-06T23:39:21.916Z"
+    },
+    {
+      "step": 7,
+      "file": "20261029180000_phase3d_billing_and_payments.sql",
+      "status": "SUCCESS",
+      "durationMs": 3761,
+      "appliedAt": "2026-11-06T23:39:25.677Z"
+    },
+    {
+      "step": 8,
+      "file": "20261031120000_phase4_communications.sql",
+      "status": "SUCCESS",
+      "durationMs": 3722,
+      "appliedAt": "2026-11-06T23:39:29.400Z"
+    },
+    {
+      "step": 9,
+      "file": "20261031230000_make_customer_billing_state_nullable.sql",
+      "status": "SUCCESS",
+      "durationMs": 4038,
+      "appliedAt": "2026-11-06T23:39:33.438Z"
+    },
+    {
+      "step": 10,
+      "file": "20261102100000_add_quotation_soft_delete.sql",
+      "status": "SUCCESS",
+      "durationMs": 4084,
+      "appliedAt": "2026-11-06T23:39:37.522Z"
+    },
+    {
+      "step": 11,
+      "file": "20261102120000_financial_year_quotation_numbering.sql",
+      "status": "SUCCESS",
+      "durationMs": 3839,
+      "appliedAt": "2026-11-06T23:39:41.361Z"
+    }
+  ],
+  "tableCount": 18,
+  "rlsCoverage": "100%",
+  "businessTransactionsCount": 0
+}
