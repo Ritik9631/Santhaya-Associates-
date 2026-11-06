@@ -201,3 +201,4 @@ To achieve full operational go-live:
    - In Hostinger hPanel, paste the variables listed in Section 5 and restart/rebuild the Node.js application.
 3. **Verify Staff Login:**
    - Navigate to `https://gold-fish-834874.hostingersite.com/staff/login` and log in with your Super Admin credentials.
+
