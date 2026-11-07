@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { loginAction, type LoginActionResult } from '@/lib/auth/actions';
 import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 
@@ -102,12 +103,20 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
 
       {/* Password Input with Visibility Toggle */}
       <div>
-        <label
-          htmlFor="staff-password"
-          className="block text-xs font-semibold text-slate-200 mb-1.5"
-        >
-          Password
-        </label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label
+            htmlFor="staff-password"
+            className="block text-xs font-semibold text-slate-200"
+          >
+            Password
+          </label>
+          <Link
+            href="/staff/forgot-password"
+            className="text-xs text-gold-400 hover:text-gold-300 transition-colors"
+          >
+            Forgot Password?
+          </Link>
+        </div>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
             <Lock className="w-4 h-4" />

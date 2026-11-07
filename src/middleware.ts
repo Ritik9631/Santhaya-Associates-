@@ -23,8 +23,14 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Allow unauthenticated access to staff login to prevent redirect loops
-  if (pathname === '/staff/login') {
+  // Allow unauthenticated / auth lifecycle routes to prevent redirect loops
+  const publicStaffAuthRoutes = [
+    '/staff/login',
+    '/staff/forgot-password',
+    '/staff/auth/callback',
+    '/staff/reset-password',
+  ];
+  if (pathname === '/staff/login' || publicStaffAuthRoutes.some((route) => pathname === route || pathname.startsWith(route + '/'))) {
     response.headers.set('X-Robots-Tag', 'noindex, nofollow');
     return response;
   }

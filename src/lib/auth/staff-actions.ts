@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireStaffSession } from './session';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getAppUrl } from '@/lib/utils/app-url';
 import type { StaffRole } from '@/types/database';
 import crypto from 'node:crypto';
 
@@ -85,11 +86,12 @@ export async function inviteStaffAction(
     // Generate single-use secure invite link if supported by auth server
     let inviteLink: string | null = null;
     try {
+      const appUrl = getAppUrl();
       const { data: linkData } = await adminClient.auth.admin.generateLink({
         type: 'invite',
         email,
         options: {
-          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/staff/login`,
+          redirectTo: `${appUrl}/staff/auth/callback?next=/staff/reset-password`,
         },
       });
       if (linkData?.properties?.action_link) {
@@ -282,6 +284,202 @@ export async function updateOwnProfileNameAction(
     return { success: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to update profile name.';
+    return { error: message };
+  }
+}
+
+/**
+ * Server Action: Dispatch Password Reset Email to Staff Member
+ * Super Admins can reset anyone. Admins can reset estimator, billing_manager, viewer.
+ * Dispatches a password recovery link using Supabase Auth targeting /staff/auth/callback.
+ */
+export async function sendStaffPasswordResetAction(
+  _prevState: ActionResponse | null,
+  formData: FormData
+): Promise<ActionResponse> {
+  try {
+    const { profile } = await requireStaffSession();
+
+    if (profile.role !== 'super_admin' && profile.role !== 'admin') {
+      return { error: 'Access denied: Only administrators can dispatch password reset links.' };
+    }
+
+    const targetUserId = formData.get('targetUserId') as string;
+    if (!targetUserId) {
+      return { error: 'Target staff user ID is required.' };
+    }
+
+    const adminClient = createAdminClient();
+    const { data: targetProfile, error: profileErr } = await adminClient
+      .from('staff_profiles')
+      .select('id, email, role, full_name, is_active')
+      .eq('id', targetUserId)
+      .maybeSingle();
+
+    if (profileErr || !targetProfile) {
+      return { error: 'Target staff profile not found.' };
+    }
+
+    // Role ceiling: ordinary admin cannot reset super_admin or admin
+    if (profile.role === 'admin') {
+      if (targetProfile.role === 'admin' || targetProfile.role === 'super_admin') {
+        return {
+          error:
+            'Privilege ceiling: Ordinary Administrators cannot reset passwords for Administrator or Super Administrator accounts.',
+        };
+      }
+    }
+
+    if (!targetProfile.is_active) {
+      return {
+        error: 'Cannot reset password for a deactivated staff account. Please activate the account first.',
+      };
+    }
+
+    const appUrl = getAppUrl();
+    const redirectTo = `${appUrl}/staff/auth/callback?next=/staff/reset-password`;
+
+    // Attempt direct email dispatch via Supabase Auth
+    const { error: resetError } = await adminClient.auth.resetPasswordForEmail(targetProfile.email, {
+      redirectTo,
+    });
+
+    if (resetError) {
+      console.error('[Staff Actions] resetPasswordForEmail error:', resetError.message);
+      return { error: `Failed to dispatch recovery email: ${resetError.message}` };
+    }
+
+    // Also generate single-use recovery link as a secure fallback
+    let actionLink: string | null = null;
+    try {
+      const { data: linkData } = await adminClient.auth.admin.generateLink({
+        type: 'recovery',
+        email: targetProfile.email,
+        options: { redirectTo },
+      });
+      if (linkData?.properties?.action_link) {
+        actionLink = linkData.properties.action_link;
+      }
+    } catch {
+      // Non-fatal
+    }
+
+    // Record audit event
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'staff_profiles',
+      entity_id: targetUserId,
+      action: 'staff_password_reset_dispatched',
+      actor_type: 'staff',
+      actor_id: profile.id,
+      new_state: {
+        target_email: targetProfile.email,
+        target_role: targetProfile.role,
+        dispatched_by: profile.id,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        message: `Password reset email dispatched successfully to ${targetProfile.email}.`,
+        link: actionLink,
+      },
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to dispatch password reset.';
+    return { error: message };
+  }
+}
+
+/**
+ * Server Action: Re-dispatch Staff Setup Invitation
+ */
+export async function resendStaffInviteAction(
+  _prevState: ActionResponse | null,
+  formData: FormData
+): Promise<ActionResponse> {
+  try {
+    const { profile } = await requireStaffSession();
+
+    if (profile.role !== 'super_admin' && profile.role !== 'admin') {
+      return { error: 'Access denied: Only administrators can reinvite staff members.' };
+    }
+
+    const targetUserId = formData.get('targetUserId') as string;
+    if (!targetUserId) {
+      return { error: 'Target staff user ID is required.' };
+    }
+
+    const adminClient = createAdminClient();
+    const { data: targetProfile, error: profileErr } = await adminClient
+      .from('staff_profiles')
+      .select('id, email, role, full_name, is_active')
+      .eq('id', targetUserId)
+      .maybeSingle();
+
+    if (profileErr || !targetProfile) {
+      return { error: 'Target staff profile not found.' };
+    }
+
+    if (profile.role === 'admin') {
+      if (targetProfile.role === 'admin' || targetProfile.role === 'super_admin') {
+        return {
+          error:
+            'Privilege ceiling: Ordinary Administrators cannot reinvite Administrator or Super Administrator accounts.',
+        };
+      }
+    }
+
+    const appUrl = getAppUrl();
+    const redirectTo = `${appUrl}/staff/auth/callback?next=/staff/reset-password`;
+
+    const { error: inviteErr } = await adminClient.auth.resetPasswordForEmail(targetProfile.email, {
+      redirectTo,
+    });
+
+    if (inviteErr) {
+      return { error: `Failed to re-dispatch invitation: ${inviteErr.message}` };
+    }
+
+    // Also generate single-use invite link as a secure fallback
+    let actionLink: string | null = null;
+    try {
+      const { data: linkData } = await adminClient.auth.admin.generateLink({
+        type: 'invite',
+        email: targetProfile.email,
+        options: { redirectTo },
+      });
+      if (linkData?.properties?.action_link) {
+        actionLink = linkData.properties.action_link;
+      }
+    } catch {
+      // Non-fatal fallback
+    }
+
+    await adminClient.from('audit_logs').insert({
+      entity_type: 'staff_profiles',
+      entity_id: targetUserId,
+      action: 'staff_invite_redispatched',
+      actor_type: 'staff',
+      actor_id: profile.id,
+      new_state: {
+        target_email: targetProfile.email,
+        target_role: targetProfile.role,
+        dispatched_by: profile.id,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        message: `Invitation setup email re-dispatched successfully to ${targetProfile.email}.`,
+        link: actionLink,
+      },
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to re-dispatch invitation.';
     return { error: message };
   }
 }
