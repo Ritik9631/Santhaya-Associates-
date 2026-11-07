@@ -31,156 +31,182 @@ export async function loginAction(
   prevState: LoginActionResult | null,
   formData: FormData
 ): Promise<LoginActionResult> {
-  const emailRaw = formData.get('email');
-  const passwordRaw = formData.get('password');
-  const redirectToRaw = formData.get('redirectTo');
+  try {
+    const emailRaw = formData.get('email');
+    const passwordRaw = formData.get('password');
+    const redirectToRaw = formData.get('redirectTo');
 
-  const email = typeof emailRaw === 'string' ? emailRaw.trim().toLowerCase() : '';
-  const password = typeof passwordRaw === 'string' ? passwordRaw : '';
-  const targetDestination = sanitizeStaffRedirect(
-    typeof redirectToRaw === 'string' ? redirectToRaw : null
-  );
+    const email = typeof emailRaw === 'string' ? emailRaw.trim().toLowerCase() : '';
+    const password = typeof passwordRaw === 'string' ? passwordRaw : '';
+    const targetDestination = sanitizeStaffRedirect(
+      typeof redirectToRaw === 'string' ? redirectToRaw : null
+    );
 
-  const fieldErrors: { email?: string; password?: string } = {};
+    const fieldErrors: { email?: string; password?: string } = {};
 
-  if (!email) {
-    fieldErrors.email = 'Email address is required.';
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    fieldErrors.email = 'Please enter a valid email address.';
-  }
-
-  if (!password) {
-    fieldErrors.password = 'Password is required.';
-  } else if (password.length < 6) {
-    fieldErrors.password = 'Password must be at least 6 characters.';
-  }
-
-  if (Object.keys(fieldErrors).length > 0) {
-    return { success: false, fieldErrors };
-  }
-
-  // Rate Limiting — Abuse & Brute-Force Throttling
-  const headerStore = headers();
-  const rawIp =
-    headerStore.get('x-real-ip') ||
-    headerStore.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    '127.0.0.1';
-
-  const { rateLimitSalt, isServerConfigured } = getSupabaseEnv();
-
-  const ipHash = crypto
-    .createHmac('sha256', rateLimitSalt)
-    .update(rawIp)
-    .digest('hex')
-    .slice(0, 32);
-
-  const emailHash = crypto
-    .createHmac('sha256', rateLimitSalt)
-    .update(email)
-    .digest('hex')
-    .slice(0, 32);
-
-  if (isServerConfigured) {
-    try {
-      const adminClient = createAdminClient();
-
-      // Check IP and Account rate limits concurrently in parallel
-      const [{ data: rlIp }, { data: rlAcct }] = await Promise.all([
-        adminClient.rpc('check_rate_limit', {
-          p_key: `login_ip:${ipHash}`,
-          p_max_tokens: 5,
-          p_refill_seconds: 300,
-          p_cost: 1,
-        }),
-        adminClient.rpc('check_rate_limit', {
-          p_key: `login_acct:${emailHash}`,
-          p_max_tokens: 5,
-          p_refill_seconds: 300,
-          p_cost: 1,
-        }),
-      ]);
-
-      if (rlAcct && rlAcct.length > 0 && !rlAcct[0].allowed) {
-        const retryAfter = Math.ceil(rlAcct[0].retry_after / 60) || 5;
-        return {
-          success: false,
-          error: `Too many failed login attempts for this account. Please wait ${retryAfter} minute(s) before trying again.`,
-        };
-      }
-    } catch {
-      // Non-blocking fallback if rate-limiting table is momentarily unavailable
+    if (!email) {
+      fieldErrors.email = 'Email address is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      fieldErrors.email = 'Please enter a valid email address.';
     }
-  }
 
-  // Supabase Auth Credential Authentication
-  const supabase = createServerSupabaseClient();
-  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+    if (!password) {
+      fieldErrors.password = 'Password is required.';
+    } else if (password.length < 6) {
+      fieldErrors.password = 'Password must be at least 6 characters.';
+    }
 
-  if (authError || !authData.user) {
-    console.error('[Staff Auth] Supabase signInWithPassword failed:', {
+    if (Object.keys(fieldErrors).length > 0) {
+      return { success: false, fieldErrors };
+    }
+
+    // Rate Limiting — Abuse & Brute-Force Throttling
+    let rawIp = '127.0.0.1';
+    try {
+      const headerStore = headers();
+      rawIp =
+        headerStore.get('x-real-ip') ||
+        headerStore.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+        '127.0.0.1';
+    } catch {
+      // Non-blocking fallback if headers() unavailable
+    }
+
+    const { rateLimitSalt, isServerConfigured } = getSupabaseEnv();
+
+    const ipHash = crypto
+      .createHmac('sha256', rateLimitSalt)
+      .update(rawIp)
+      .digest('hex')
+      .slice(0, 32);
+
+    const emailHash = crypto
+      .createHmac('sha256', rateLimitSalt)
+      .update(email)
+      .digest('hex')
+      .slice(0, 32);
+
+    if (isServerConfigured) {
+      try {
+        const adminClient = createAdminClient();
+
+        // Check IP and Account rate limits concurrently in parallel
+        const [{ data: rlIp }, { data: rlAcct }] = await Promise.all([
+          adminClient.rpc('check_rate_limit', {
+            p_key: `login_ip:${ipHash}`,
+            p_max_tokens: 5,
+            p_refill_seconds: 300,
+            p_cost: 1,
+          }),
+          adminClient.rpc('check_rate_limit', {
+            p_key: `login_acct:${emailHash}`,
+            p_max_tokens: 5,
+            p_refill_seconds: 300,
+            p_cost: 1,
+          }),
+        ]);
+
+        if (rlAcct && rlAcct.length > 0 && !rlAcct[0].allowed) {
+          const retryAfter = Math.ceil(rlAcct[0].retry_after / 60) || 5;
+          return {
+            success: false,
+            error: `Too many failed login attempts for this account. Please wait ${retryAfter} minute(s) before trying again.`,
+          };
+        }
+      } catch {
+        // Non-blocking fallback if rate-limiting table is momentarily unavailable
+      }
+    }
+
+    // Supabase Auth Credential Authentication
+    const supabase = createServerSupabaseClient();
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
-      errorMessage: authError?.message,
-      errorStatus: authError?.status,
+      password,
     });
 
-    // Provide actionable feedback if the failure is infrastructure / API config vs credentials
-    if (
-      authError?.message &&
-      !authError.message.toLowerCase().includes('invalid login credentials') &&
-      !authError.message.toLowerCase().includes('invalid credentials')
-    ) {
+    if (authError || !authData.user) {
+      console.error('[Staff Auth] Supabase signInWithPassword failed:', {
+        email,
+        errorMessage: authError?.message,
+        errorStatus: authError?.status,
+      });
+
+      // Provide actionable feedback if the failure is infrastructure / API config vs credentials
+      if (
+        authError?.message &&
+        !authError.message.toLowerCase().includes('invalid login credentials') &&
+        !authError.message.toLowerCase().includes('invalid credentials')
+      ) {
+        return {
+          success: false,
+          error: `Authentication service returned: ${authError.message}`,
+        };
+      }
+
       return {
         success: false,
-        error: `Authentication service returned: ${authError.message}`,
+        error: 'Invalid email or password. Please verify the credentials set in your Supabase Dashboard.',
       };
     }
 
-    return {
-      success: false,
-      error: 'Invalid email or password. Please verify the credentials set in your Supabase Dashboard.',
-    };
-  }
+    // Dual-Barrier Authorization Verification
+    console.log('[Staff Auth] Credentials verified for user UID:', authData.user.id);
+    const { data: profile, error: profileError } = await supabase
+      .from('staff_profiles')
+      .select('*')
+      .eq('id', authData.user.id)
+      .maybeSingle();
 
-  // Dual-Barrier Authorization Verification
-  console.log('[Staff Auth] Credentials verified for user UID:', authData.user.id);
-  const { data: profile, error: profileError } = await supabase
-    .from('staff_profiles')
-    .select('*')
-    .eq('id', authData.user.id)
-    .maybeSingle();
+    if (profileError) {
+      console.error('[Staff Auth] staff_profiles lookup query error:', profileError);
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: `Staff authorization lookup failed: ${profileError.message}`,
+      };
+    }
 
-  if (profileError) {
-    console.error('[Staff Auth] staff_profiles lookup query error:', profileError);
-    await supabase.auth.signOut();
-    return {
-      success: false,
-      error: `Staff authorization lookup failed: ${profileError.message}`,
-    };
-  }
+    if (!profile) {
+      console.error('[Staff Auth] No matching staff_profile found for UID:', authData.user.id);
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: 'Access denied: Your account is not authorized as a Santhaya Associates staff member.',
+      };
+    }
 
-  if (!profile) {
-    console.error('[Staff Auth] No matching staff_profile found for UID:', authData.user.id);
-    await supabase.auth.signOut();
-    return {
-      success: false,
-      error: 'Access denied: Your account is not authorized as a Santhaya Associates staff member.',
-    };
-  }
+    if (!profile.is_active) {
+      console.error('[Staff Auth] Staff profile is marked inactive for UID:', authData.user.id);
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: 'Account inactive: Your staff access has been deactivated. Please contact the administrator.',
+      };
+    }
 
-  if (!profile.is_active) {
-    console.error('[Staff Auth] Staff profile is marked inactive for UID:', authData.user.id);
-    await supabase.auth.signOut();
-    return {
-      success: false,
-      error: 'Account inactive: Your staff access has been deactivated. Please contact the administrator.',
-    };
-  }
-
-  console.log('[Staff Auth] Authorization passed. Role:', profile.role, 'Navigating to:', targetDestination);
+    console.log('[Staff Auth] Authorization passed. Role:', profile.role, 'Navigating to:', targetDestination);
     redirect(targetDestination);
+  } catch (err: unknown) {
+    // Next.js redirect() throws a NEXT_REDIRECT digest error which MUST bubble up
+    if (
+      err &&
+      typeof err === 'object' &&
+      (('message' in err && (err as { message: string }).message === 'NEXT_REDIRECT') ||
+       ('digest' in err && typeof (err as { digest: string }).digest === 'string' && (err as { digest: string }).digest.startsWith('NEXT_REDIRECT')))
+    ) {
+      throw err;
+    }
+
+    const message = err instanceof Error ? err.message : 'Unknown server error';
+    console.error('[Staff Auth] Unhandled loginAction exception:', message);
+    return {
+      success: false,
+      error: message.startsWith('CRITICAL CONFIGURATION')
+        ? message
+        : 'Authentication service encountered a server-side error. Please contact the administrator.',
+    };
+  }
 }
 
 /**
@@ -192,4 +218,3 @@ export async function logoutAction() {
   await supabase.auth.signOut();
   redirect('/staff/login');
 }
-
