@@ -120,21 +120,49 @@ export async function loginAction(
   });
 
   if (authError || !authData.user) {
+    console.error('[Staff Auth] Supabase signInWithPassword failed:', {
+      email,
+      errorMessage: authError?.message,
+      errorStatus: authError?.status,
+    });
+
+    // Provide actionable feedback if the failure is infrastructure / API config vs credentials
+    if (
+      authError?.message &&
+      !authError.message.toLowerCase().includes('invalid login credentials') &&
+      !authError.message.toLowerCase().includes('invalid credentials')
+    ) {
+      return {
+        success: false,
+        error: `Authentication service returned: ${authError.message}`,
+      };
+    }
+
     return {
       success: false,
-      error: 'Invalid email or password.',
+      error: 'Invalid email or password. Please verify the credentials set in your Supabase Dashboard.',
     };
   }
 
   // Dual-Barrier Authorization Verification
+  console.log('[Staff Auth] Credentials verified for user UID:', authData.user.id);
   const { data: profile, error: profileError } = await supabase
     .from('staff_profiles')
     .select('*')
     .eq('id', authData.user.id)
     .maybeSingle();
 
-  if (profileError || !profile) {
-    // Revoke established session immediately
+  if (profileError) {
+    console.error('[Staff Auth] staff_profiles lookup query error:', profileError);
+    await supabase.auth.signOut();
+    return {
+      success: false,
+      error: `Staff authorization lookup failed: ${profileError.message}`,
+    };
+  }
+
+  if (!profile) {
+    console.error('[Staff Auth] No matching staff_profile found for UID:', authData.user.id);
     await supabase.auth.signOut();
     return {
       success: false,
@@ -143,7 +171,7 @@ export async function loginAction(
   }
 
   if (!profile.is_active) {
-    // Revoke established session immediately
+    console.error('[Staff Auth] Staff profile is marked inactive for UID:', authData.user.id);
     await supabase.auth.signOut();
     return {
       success: false,
@@ -151,8 +179,8 @@ export async function loginAction(
     };
   }
 
-  // Redirect to validated destination (outside any try/catch)
-  redirect(targetDestination);
+  console.log('[Staff Auth] Authorization passed. Role:', profile.role, 'Navigating to:', targetDestination);
+    redirect(targetDestination);
 }
 
 /**

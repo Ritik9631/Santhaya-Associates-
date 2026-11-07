@@ -28,11 +28,12 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
         if (
           err &&
           typeof err === 'object' &&
-          'message' in err &&
-          (err as { message: string }).message === 'NEXT_REDIRECT'
+          (('message' in err && (err as { message: string }).message === 'NEXT_REDIRECT') ||
+           ('digest' in err && typeof (err as { digest: string }).digest === 'string' && (err as { digest: string }).digest.startsWith('NEXT_REDIRECT')))
         ) {
           throw err;
         }
+        console.error('[LoginForm] Unhandled submission exception:', err);
         setState({
           success: false,
           error: 'An unexpected authentication error occurred. Please try again.',
