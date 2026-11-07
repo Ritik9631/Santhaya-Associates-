@@ -247,6 +247,26 @@ async function run() {
     console.warn('  ⚠ Could not generate action link:', err.message);
   }
 
+  // Also trigger direct recovery email dispatch if SMTP is active
+  try {
+    await supabaseAdmin.auth.resetPasswordForEmail(COMPANY_SUPER_ADMIN_EMAIL, {
+      redirectTo: `${CANONICAL_APP_URL}/staff/auth/callback?next=/staff/reset-password`,
+    });
+    console.log(`  ✓ Dispatched recovery email to ${COMPANY_SUPER_ADMIN_EMAIL}.`);
+  } catch (err) {
+    // Non-fatal if SMTP is not configured yet
+  }
+
+  // Securely persist the single-use setup link to a private local gitignored file
+  if (setupLink) {
+    const localLinkFile = path.join(ROOT_DIR, '.setup-link.local.txt');
+    fs.writeFileSync(
+      localLinkFile,
+      `SANTHAYA ASSOCIATES — COMPANY SUPER ADMIN SETUP LINK\nAccount: ${COMPANY_SUPER_ADMIN_EMAIL}\nGenerated At: ${new Date().toISOString()}\nExpires: 1 hour from generation\n\nLink: ${setupLink}\n`,
+      { mode: 0o600 }
+    );
+  }
+
   // Insert Immutable Audit Log Record
   console.log(`  4. Recording immutable PostgreSQL audit log...`);
   const { error: auditErr } = await supabaseAdmin.from('audit_logs').insert({
@@ -303,9 +323,9 @@ async function run() {
   console.log(`Company Super Admin:     ${COMPANY_SUPER_ADMIN_EMAIL}`);
   console.log(`Backup Super Admin:      ${BACKUP_SUPER_ADMIN_EMAIL} (PRESERVED)`);
   if (setupLink) {
-    console.log(`\nSingle-Use Password Setup Link (Valid for 1 hour):`);
-    console.log(setupLink);
-    console.log(`\nDeliver this link privately to the owner to set their personal password.`);
+    console.log(`Single-Use Setup Link:   SAVED SECURELY to .setup-link.local.txt (gitignored)`);
+    console.log(`Zero Exposure Policy:    The link/token was NOT printed to console or logs.`);
+    console.log(`Instructions:            Access the local file to provide the setup link directly to the owner.`);
   }
   console.log('='.repeat(78));
 }
@@ -314,3 +334,4 @@ run().catch((err) => {
   console.error('\nEXECUTION FAILED:', err.message);
   process.exit(1);
 });
+
