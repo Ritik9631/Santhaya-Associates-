@@ -123,34 +123,50 @@ export async function softDeleteEnquiryAction(
       ? reason.trim()
       : null;
 
-    const { error: updateErr } = await admin
-      .from('quotation_requests')
-      .update({
-        deleted_at: now,
-        deleted_by_staff_id: profile.id,
-        deletion_reason: cleanReason,
-        updated_at: now,
-      } as any)
-      .eq('id', enquiryId);
+    // Execute atomic stored procedure: guarantees soft-delete and immutable audit log commit in a single database transaction
+    const { error: rpcErr } = await (admin.rpc as any)(
+      'soft_delete_quotation_request',
+      {
+        p_enquiry_id: enquiryId,
+        p_reason: cleanReason,
+        p_acting_user_id: user.id,
+      }
+    );
 
-    if (updateErr) {
-      return { error: `Failed to soft-delete enquiry: ${updateErr.message}` };
+    if (rpcErr) {
+      // If RPC is missing during rolling deployment before migration runs, fallback gracefully
+      if (rpcErr.message?.includes('does not exist') || rpcErr.code === '42883') {
+        const { error: updateErr } = await admin
+          .from('quotation_requests')
+          .update({
+            deleted_at: now,
+            deleted_by_staff_id: profile.id,
+            deletion_reason: cleanReason,
+            updated_at: now,
+          } as any)
+          .eq('id', enquiryId);
+
+        if (updateErr) {
+          return { error: `Failed to soft-delete enquiry: ${updateErr.message}` };
+        }
+
+        await admin.from('audit_logs').insert({
+          entity_type: 'quotation_requests',
+          entity_id: enquiryId,
+          action: 'enquiry_soft_deleted',
+          actor_type: 'staff',
+          actor_id: user.id,
+          previous_state: { deleted_at: null, status: existing.status },
+          new_state: {
+            deleted_at: now,
+            deleted_by_staff_id: profile.id,
+            deletion_reason: cleanReason,
+          },
+        });
+      } else {
+        return { error: `Failed to soft-delete enquiry: ${rpcErr.message}` };
+      }
     }
-
-    // Insert immutable audit log
-    await admin.from('audit_logs').insert({
-      entity_type: 'quotation_requests',
-      entity_id: enquiryId,
-      action: 'enquiry_soft_deleted',
-      actor_type: 'staff',
-      actor_id: user.id,
-      previous_state: { deleted_at: null, status: existing.status },
-      new_state: {
-        deleted_at: now,
-        deleted_by_staff_id: profile.id,
-        deletion_reason: cleanReason,
-      },
-    });
 
     revalidatePath('/staff/enquiries');
     revalidatePath('/staff');
@@ -198,37 +214,51 @@ export async function restoreEnquiryAction(enquiryId: string): Promise<ActionRes
 
     const now = new Date().toISOString();
 
-    const { error: updateErr } = await admin
-      .from('quotation_requests')
-      .update({
-        deleted_at: null,
-        deleted_by_staff_id: null,
-        deletion_reason: null,
-        updated_at: now,
-      } as any)
-      .eq('id', enquiryId);
+    // Execute atomic stored procedure: guarantees restore and immutable audit log commit in a single database transaction
+    const { error: rpcErr } = await (admin.rpc as any)(
+      'restore_quotation_request',
+      {
+        p_enquiry_id: enquiryId,
+        p_acting_user_id: user.id,
+      }
+    );
 
-    if (updateErr) {
-      return { error: `Failed to restore enquiry: ${updateErr.message}` };
+    if (rpcErr) {
+      if (rpcErr.message?.includes('does not exist') || rpcErr.code === '42883') {
+        const { error: updateErr } = await admin
+          .from('quotation_requests')
+          .update({
+            deleted_at: null,
+            deleted_by_staff_id: null,
+            deletion_reason: null,
+            updated_at: now,
+          } as any)
+          .eq('id', enquiryId);
+
+        if (updateErr) {
+          return { error: `Failed to restore enquiry: ${updateErr.message}` };
+        }
+
+        await admin.from('audit_logs').insert({
+          entity_type: 'quotation_requests',
+          entity_id: enquiryId,
+          action: 'enquiry_restored',
+          actor_type: 'staff',
+          actor_id: user.id,
+          previous_state: {
+            deleted_at: existing.deleted_at,
+            deletion_reason: existing.deletion_reason,
+          },
+          new_state: {
+            deleted_at: null,
+            restored_by: profile.id,
+            restored_at: now,
+          },
+        });
+      } else {
+        return { error: `Failed to restore enquiry: ${rpcErr.message}` };
+      }
     }
-
-    // Insert immutable audit log
-    await admin.from('audit_logs').insert({
-      entity_type: 'quotation_requests',
-      entity_id: enquiryId,
-      action: 'enquiry_restored',
-      actor_type: 'staff',
-      actor_id: user.id,
-      previous_state: {
-        deleted_at: existing.deleted_at,
-        deletion_reason: existing.deletion_reason,
-      },
-      new_state: {
-        deleted_at: null,
-        restored_by: profile.id,
-        restored_at: now,
-      },
-    });
 
     revalidatePath('/staff/enquiries');
     revalidatePath('/staff');
