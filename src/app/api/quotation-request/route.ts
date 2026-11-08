@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
 
     // 8. Atomic Database Persistence
     const adminNotificationEmail =
-      process.env.INTERNAL_NOTIFICATION_EMAIL || 'inquiries@santhaya.local';
+      process.env.INTERNAL_NOTIFICATION_EMAIL || 'santhayapvt.ltd@gmail.com';
 
     // Attempt Phase 2D atomic RPC first
     const { data: atomicResult, error: atomicError } = await adminClient.rpc(

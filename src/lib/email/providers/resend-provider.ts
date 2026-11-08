@@ -23,8 +23,9 @@ export class ResendEmailProvider implements IEmailProvider {
     this.apiKey = options?.apiKey || process.env.RESEND_API_KEY || '';
     this.defaultFrom =
       options?.defaultFrom ||
+      process.env.EMAIL_FROM ||
       process.env.EMAIL_FROM_ADDRESS ||
-      'Santhaya Associates <onboarding@resend.dev>';
+      'Santhaya Associates <notifications@santhayaassociates.com>';
   }
 
   async sendEmail(message: EmailMessage): Promise<EmailDispatchResult> {

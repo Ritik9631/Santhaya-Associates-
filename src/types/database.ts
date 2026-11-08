@@ -191,6 +191,9 @@ export interface Database {
           risk_flag: string | null;
           created_at: string;
           updated_at: string;
+          deleted_at: string | null;
+          deleted_by_staff_id: string | null;
+          deletion_reason: string | null;
         };
         Insert: {
           id?: string;
@@ -205,6 +208,7 @@ export interface Database {
           requirement_details: string;
           quantity?: string | null;
           technicalSpecs?: string | null;
+          technical_specs?: string | null;
           delivery_location: string;
           notes?: string | null;
           privacy_consent: boolean;
@@ -217,6 +221,9 @@ export interface Database {
           risk_flag?: string | null;
           created_at?: string;
           updated_at?: string;
+          deleted_at?: string | null;
+          deleted_by_staff_id?: string | null;
+          deletion_reason?: string | null;
         };
         Update: {
           reference_number?: string;
@@ -230,6 +237,7 @@ export interface Database {
           requirement_details?: string;
           quantity?: string | null;
           technicalSpecs?: string | null;
+          technical_specs?: string | null;
           delivery_location?: string;
           notes?: string | null;
           privacy_consent?: boolean;
@@ -241,6 +249,9 @@ export interface Database {
           request_payload_hash?: string;
           risk_flag?: string | null;
           updated_at?: string;
+          deleted_at?: string | null;
+          deleted_by_staff_id?: string | null;
+          deletion_reason?: string | null;
         };
         Relationships: [];
       };

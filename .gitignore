@@ -42,3 +42,8 @@ supabase/.temp/
 
 # Sample PDFs
 /sample_quotations/
+
+# Database Backups
+/backups/
+*.dump
+
