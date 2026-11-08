@@ -168,8 +168,8 @@ END;
 $$;
 
 ALTER FUNCTION public.soft_delete_quotation_request(UUID, TEXT, UUID) OWNER TO postgres;
-REVOKE ALL ON FUNCTION public.soft_delete_quotation_request(UUID, TEXT, UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.soft_delete_quotation_request(UUID, TEXT, UUID) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.soft_delete_quotation_request(UUID, TEXT, UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.soft_delete_quotation_request(UUID, TEXT, UUID) TO service_role;
 
 -- 8. Atomic Stored Procedure: Restore with Audit Log in a single transaction
 CREATE OR REPLACE FUNCTION public.restore_quotation_request(
@@ -240,8 +240,8 @@ END;
 $$;
 
 ALTER FUNCTION public.restore_quotation_request(UUID, UUID) OWNER TO postgres;
-REVOKE ALL ON FUNCTION public.restore_quotation_request(UUID, UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.restore_quotation_request(UUID, UUID) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.restore_quotation_request(UUID, UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.restore_quotation_request(UUID, UUID) TO service_role;
 
 
 
