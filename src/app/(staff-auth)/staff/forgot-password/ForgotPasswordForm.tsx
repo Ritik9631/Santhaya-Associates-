@@ -169,3 +169,4 @@ export function ForgotPasswordForm({ initialError }: ForgotPasswordFormProps) {
     </div>
   );
 }
+

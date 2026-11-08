@@ -6,6 +6,7 @@ import { getSupabaseEnv } from '@/lib/supabase/env';
 import { getAppUrl } from '@/lib/utils/app-url';
 import { headers } from 'next/headers';
 import crypto from 'node:crypto';
+import type { EmailOtpType } from '@supabase/supabase-js';
 
 export interface RecoveryActionResult {
   success: boolean;
@@ -153,6 +154,8 @@ export async function resetStaffPasswordAction(
   try {
     const password = (formData.get('password') as string) || '';
     const confirmPassword = (formData.get('confirmPassword') as string) || '';
+    const tokenHash = (formData.get('tokenHash') as string)?.trim() || '';
+    const tokenType = ((formData.get('tokenType') as string)?.trim() || 'recovery') as EmailOtpType;
 
     const fieldErrors: { password?: string; confirmPassword?: string } = {};
 
@@ -172,19 +175,40 @@ export async function resetStaffPasswordAction(
       return { success: false, fieldErrors };
     }
 
-    // Verify recovery session is active
     const supabase = createServerSupabaseClient();
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    let targetUser = null;
 
-    if (userError || !user) {
-      return {
-        success: false,
-        error:
-          'Your password recovery session has expired or is invalid. Please request a new recovery link.',
-      };
+    if (tokenHash) {
+      // 1. Single-use token hash provided directly from human form submission (immune to prefetchers)
+      const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: tokenType,
+      });
+
+      if (verifyError || !verifyData?.user) {
+        console.warn('[Staff Recovery] verifyOtp error on submit:', verifyError?.message);
+        return {
+          success: false,
+          error:
+            'This password recovery link is invalid, has expired, or has already been used. Please request a new recovery link.',
+        };
+      }
+      targetUser = verifyData.user;
+    } else {
+      // 2. Pre-established session (e.g. from PKCE code exchange or active session cookie)
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        return {
+          success: false,
+          error:
+            'Your password recovery session has expired or is invalid. Please request a new recovery link.',
+        };
+      }
+      targetUser = user;
     }
 
     // Update password via official Supabase Auth updateUser API
@@ -205,12 +229,12 @@ export async function resetStaffPasswordAction(
       const adminClient = createAdminClient();
       await adminClient.from('audit_logs').insert({
         entity_type: 'staff_profiles',
-        entity_id: user.id,
+        entity_id: targetUser.id,
         action: 'staff_password_recovered',
         actor_type: 'staff',
-        actor_id: user.id,
+        actor_id: targetUser.id,
         new_state: {
-          email: user.email,
+          email: targetUser.email,
           timestamp: new Date().toISOString(),
         },
       });
@@ -234,3 +258,4 @@ export async function resetStaffPasswordAction(
     };
   }
 }
+

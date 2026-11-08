@@ -24,3 +24,4 @@ export function getAppUrl(): string {
   // Development fallback
   return configured || 'http://localhost:3000';
 }
+

@@ -94,7 +94,9 @@ export async function inviteStaffAction(
           redirectTo: `${appUrl}/staff/auth/callback?next=/staff/reset-password`,
         },
       });
-      if (linkData?.properties?.action_link) {
+      if (linkData?.properties?.hashed_token) {
+        inviteLink = `${appUrl}/staff/reset-password?token_hash=${encodeURIComponent(linkData.properties.hashed_token)}&type=invite`;
+      } else if (linkData?.properties?.action_link) {
         inviteLink = linkData.properties.action_link;
       }
     } catch {
@@ -357,7 +359,9 @@ export async function sendStaffPasswordResetAction(
         email: targetProfile.email,
         options: { redirectTo },
       });
-      if (linkData?.properties?.action_link) {
+      if (linkData?.properties?.hashed_token) {
+        actionLink = `${appUrl}/staff/reset-password?token_hash=${encodeURIComponent(linkData.properties.hashed_token)}&type=recovery`;
+      } else if (linkData?.properties?.action_link) {
         actionLink = linkData.properties.action_link;
       }
     } catch {
@@ -450,7 +454,9 @@ export async function resendStaffInviteAction(
         email: targetProfile.email,
         options: { redirectTo },
       });
-      if (linkData?.properties?.action_link) {
+      if (linkData?.properties?.hashed_token) {
+        actionLink = `${appUrl}/staff/reset-password?token_hash=${encodeURIComponent(linkData.properties.hashed_token)}&type=recovery`;
+      } else if (linkData?.properties?.action_link) {
         actionLink = linkData.properties.action_link;
       }
     } catch {
