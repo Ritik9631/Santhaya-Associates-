@@ -53,6 +53,9 @@ it('Migration 20261108100000_add_enquiry_soft_delete.sql defines non-destructive
   assert.ok(content.includes('ADD COLUMN deleted_by_staff_id UUID REFERENCES public.staff_profiles(id)'), 'Adds deleted_by_staff_id FK');
   assert.ok(content.includes('ADD COLUMN deletion_reason TEXT DEFAULT NULL'), 'Adds deletion_reason with NULL default');
   assert.ok(content.includes('CREATE INDEX IF NOT EXISTS idx_quotation_requests_deleted_at'), 'Creates index on deleted_at');
+  assert.ok(content.includes('CREATE OR REPLACE FUNCTION public.guard_quotation_requests_soft_delete()'), 'Creates defense-in-depth trigger function');
+  assert.ok(content.includes('CREATE TRIGGER trg_guard_quotation_requests_soft_delete'), 'Binds trigger to quotation_requests');
+  assert.ok(content.includes('NOT public.is_super_admin(auth.uid())'), 'Checks is_super_admin in database trigger');
 });
 
 it('TypeScript database definitions in src/types/database.ts include soft-delete fields', () => {
@@ -67,19 +70,19 @@ it('TypeScript database definitions in src/types/database.ts include soft-delete
 // -----------------------------------------------------------------------------
 console.log('\n--- 2. Server Action Role Authorization Guards ---');
 
-it('softDeleteEnquiryAction restricts deletion to Administrators and Super Administrators', () => {
+it('softDeleteEnquiryAction strictly restricts deletion to Super Administrators only', () => {
   const content = fs.readFileSync('src/lib/enquiries/actions.ts', 'utf8');
   assert.ok(
-    content.includes("const AUTHORIZED_DELETE_ROLES = ['super_admin', 'admin']"),
-    'Authorized delete roles defined as super_admin and admin'
+    content.includes("const AUTHORIZED_DELETE_ROLES = ['super_admin']"),
+    'Authorized delete roles defined as super_admin only'
   );
   assert.ok(
-    content.includes('!AUTHORIZED_DELETE_ROLES.includes(profile.role)'),
-    'Checks profile.role against AUTHORIZED_DELETE_ROLES'
+    content.includes("profile.role !== 'super_admin'"),
+    'Checks profile.role strictly against super_admin'
   );
   assert.ok(
-    content.includes('Only Administrators and Super Administrators can delete'),
-    'Returns clear authorization error message'
+    content.includes('Only Super Administrators have authorization to delete quotation enquiries'),
+    'Returns clear super_admin authorization error message'
   );
 });
 
@@ -149,11 +152,11 @@ it('src/app/staff/enquiries/page.tsx partitions active enquiries (.is(deleted_at
 // -----------------------------------------------------------------------------
 console.log('\n--- 4. Client View Details & Confirmation Dialog UI ---');
 
-it('EnquiryListClient renders Delete Enquiry button inside View Details for authorized roles', () => {
+it('EnquiryListClient renders Delete Enquiry button inside View Details strictly for Super Administrators', () => {
   const content = fs.readFileSync('src/app/staff/enquiries/EnquiryListClient.tsx', 'utf8');
   assert.ok(
-    content.includes("const canDelete = ['super_admin', 'admin'].includes(currentUserRole)"),
-    'Defines canDelete based on role'
+    content.includes("const canDelete = currentUserRole === 'super_admin'"),
+    'Defines canDelete strictly for super_admin'
   );
   assert.ok(
     content.includes('Delete Enquiry'),

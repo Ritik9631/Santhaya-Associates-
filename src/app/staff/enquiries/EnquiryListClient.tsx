@@ -97,7 +97,7 @@ export function EnquiryListClient({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
 
-  const canDelete = ['super_admin', 'admin'].includes(currentUserRole);
+  const canDelete = currentUserRole === 'super_admin';
   const canRestore = currentUserRole === 'super_admin';
 
   const handleCopy = (ref: string) => {

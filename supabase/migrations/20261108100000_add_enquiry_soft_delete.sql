@@ -52,3 +52,33 @@ END $$;
 -- 4. Index for fast active list and trash filtering
 CREATE INDEX IF NOT EXISTS idx_quotation_requests_deleted_at ON public.quotation_requests(deleted_at);
 
+-- 5. Trigger to strictly enforce Super Admin authorization on soft deletion and restoration
+CREATE OR REPLACE FUNCTION public.guard_quotation_requests_soft_delete()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  -- Detect modifications to soft-delete tracking columns
+  IF (OLD.deleted_at IS DISTINCT FROM NEW.deleted_at) OR
+     (OLD.deleted_by_staff_id IS DISTINCT FROM NEW.deleted_by_staff_id) OR
+     (OLD.deletion_reason IS DISTINCT FROM NEW.deletion_reason) THEN
+
+    -- When executed in an authenticated Supabase user context, enforce Super Admin check
+    IF auth.uid() IS NOT NULL AND NOT public.is_super_admin(auth.uid()) THEN
+      RAISE EXCEPTION 'Access denied: Only active Super Administrators can soft-delete or restore quotation enquiries.';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_guard_quotation_requests_soft_delete ON public.quotation_requests;
+CREATE TRIGGER trg_guard_quotation_requests_soft_delete
+  BEFORE UPDATE ON public.quotation_requests
+  FOR EACH ROW
+  EXECUTE FUNCTION public.guard_quotation_requests_soft_delete();
+
+

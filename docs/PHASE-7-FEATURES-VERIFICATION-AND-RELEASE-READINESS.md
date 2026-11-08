@@ -197,3 +197,4 @@ If any issue arises post-release:
    Before setting `EMAIL_FROM=notifications@santhayaassociates.com` in production, ensure `santhayaassociates.com` has active DKIM, SPF, and MX verification in the Resend Dashboard. If domain verification is pending, Resend will reject sending from `@santhayaassociates.com` (though enquiry ingestion will remain non-blocking and safe).
 2. **Owner Explicit Signoff:**
    Development and local testing are 100% complete. Per instructions, **no production deployment or git push has occurred.** We are STOPPED and awaiting your review.
+

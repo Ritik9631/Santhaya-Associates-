@@ -80,11 +80,11 @@ export async function updateEnquiryStatusAction(
   }
 }
 
-const AUTHORIZED_DELETE_ROLES = ['super_admin', 'admin'];
+const AUTHORIZED_DELETE_ROLES = ['super_admin'];
 
 /**
  * Reversibly soft-deletes a quotation enquiry.
- * Restricted to Administrators and Super Administrators.
+ * Strictly restricted to Super Administrators.
  */
 export async function softDeleteEnquiryAction(
   enquiryId: string,
@@ -93,8 +93,8 @@ export async function softDeleteEnquiryAction(
   try {
     const { user, profile } = await requireStaffSession();
 
-    if (!AUTHORIZED_DELETE_ROLES.includes(profile.role)) {
-      return { error: 'Access denied: Only Administrators and Super Administrators can delete quotation enquiries.' };
+    if (profile.role !== 'super_admin') {
+      return { error: 'Access denied: Only Super Administrators have authorization to delete quotation enquiries.' };
     }
 
     if (!enquiryId || typeof enquiryId !== 'string') {
