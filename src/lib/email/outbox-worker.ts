@@ -29,6 +29,8 @@ export interface ProcessBatchOptions {
   dailyLimit?: number;
   monthlyLimit?: number;
   jobIds?: string[];
+  backlogCutoffDate?: Date | string;
+  maxQueueAgeHours?: number;
 }
 
 export interface ProcessBatchResult {
@@ -42,6 +44,7 @@ export interface ProcessBatchResult {
   limitType?: 'daily' | 'monthly';
   dailySent: number;
   monthlySent: number;
+  backlogSkipped?: number;
   jobResults: Array<{
     jobId: string;
     status: 'sent' | 'failed' | 'dead_letter';
@@ -75,11 +78,17 @@ function maskEmail(email: string): string {
  * Builds email message payload from outbox job data.
  */
 export function compileEmailMessageFromJob(job: OutboxJob): EmailMessage {
+  const defaultFrom =
+    process.env.EMAIL_FROM ||
+    process.env.EMAIL_FROM_ADDRESS ||
+    'Santhaya Associates <notifications@santhayaassociates.com>';
+
   if (job.email_type === 'enquiry_alert_admin') {
     const payload = job.payload as unknown as AdminEnquiryPayload;
     const { subject, html, text } = renderAdminEnquiryAlert(payload);
     return {
       to: job.recipient_email,
+      from: defaultFrom,
       subject,
       html,
       text,
@@ -97,6 +106,7 @@ export function compileEmailMessageFromJob(job: OutboxJob): EmailMessage {
     const { subject, html, text } = renderCustomerEnquiryConfirmation(payload);
     return {
       to: job.recipient_email,
+      from: defaultFrom,
       subject,
       html,
       text,
@@ -114,6 +124,7 @@ export function compileEmailMessageFromJob(job: OutboxJob): EmailMessage {
     const { subject, html, text } = renderQuotationDeliveryEmail(payload);
     return {
       to: job.recipient_email,
+      from: defaultFrom,
       subject,
       html,
       text,
@@ -131,6 +142,7 @@ export function compileEmailMessageFromJob(job: OutboxJob): EmailMessage {
     const { subject, html, text } = renderInvoiceDeliveryEmail(payload);
     return {
       to: job.recipient_email,
+      from: defaultFrom,
       subject,
       html,
       text,
@@ -146,6 +158,7 @@ export function compileEmailMessageFromJob(job: OutboxJob): EmailMessage {
   // Fallback for custom or direct notifications
   return {
     to: job.recipient_email,
+    from: defaultFrom,
     subject: job.subject,
     html: typeof job.payload.html === 'string' ? job.payload.html : `<p>${job.subject}</p>`,
     text: typeof job.payload.text === 'string' ? job.payload.text : job.subject,
@@ -321,6 +334,60 @@ export async function processOutboxBatch(
     }
 
     const newAttempts = job.attempts + 1;
+
+    // Backlog Protection: If running in FIFO queue mode (non-targeted) and the job is historical/older than cutoff,
+    // transition directly to 'dead_letter' to avoid flooding recipient upon activating real email provider.
+    const cutoffTime = options.backlogCutoffDate
+      ? new Date(options.backlogCutoffDate).getTime()
+      : process.env.OUTBOX_BACKLOG_CUTOFF_TIME
+      ? new Date(process.env.OUTBOX_BACKLOG_CUTOFF_TIME).getTime()
+      : null;
+
+    const maxQueueAgeHours = options.maxQueueAgeHours ?? (process.env.OUTBOX_MAX_QUEUE_AGE_HOURS ? parseInt(process.env.OUTBOX_MAX_QUEUE_AGE_HOURS, 10) : 24);
+    const maxAgeMs = maxQueueAgeHours * 3600 * 1000;
+    const jobCreatedTime = new Date(job.created_at).getTime();
+
+    const isHistoricalBacklog = options.jobIds === undefined && (
+      (cutoffTime !== null && !isNaN(cutoffTime) && jobCreatedTime < cutoffTime) ||
+      (!isNaN(jobCreatedTime) && (now.getTime() - jobCreatedTime) > maxAgeMs)
+    );
+
+    if (isHistoricalBacklog) {
+      const backlogReason = 'BACKLOG_PROTECTION: Historical job skipped to protect recipient from backlog flood.';
+      await adminClient
+        .from('email_outbox')
+        .update({
+          status: 'dead_letter',
+          attempts: newAttempts,
+          error_message: backlogReason,
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+
+      result.deadLettered++;
+      result.backlogSkipped = (result.backlogSkipped || 0) + 1;
+      result.jobResults.push({ jobId: job.id, status: 'dead_letter', error: backlogReason });
+
+      try {
+        await adminClient.from('audit_logs').insert({
+          entity_type: 'email_outbox',
+          entity_id: job.id,
+          action: 'email_dead_lettered',
+          actor_type: 'system',
+          actor_id: null,
+          previous_state: { status: job.status, attempts: job.attempts },
+          new_state: { status: 'dead_letter', reason: backlogReason },
+        });
+      } catch {
+        // Non-fatal audit log insertion
+      }
+
+      console.warn(
+        `[Outbox Worker] Job ${job.id} [${job.email_type}] DEAD_LETTER (Backlog Protection): Created at ${job.created_at} exceeds age limit or cutoff.`
+      );
+      continue;
+    }
+
     let dispatchSuccess = false;
     let providerMsgId: string | undefined;
     let dispatchErrorMessage: string | undefined;
@@ -381,6 +448,21 @@ export async function processOutboxBatch(
       if (isDeadLetter) {
         result.deadLettered++;
         result.jobResults.push({ jobId: job.id, status: 'dead_letter', error: dispatchErrorMessage });
+
+        try {
+          await adminClient.from('audit_logs').insert({
+            entity_type: 'email_outbox',
+            entity_id: job.id,
+            action: 'email_dead_lettered',
+            actor_type: 'system',
+            actor_id: null,
+            previous_state: { status: job.status, attempts: newAttempts },
+            new_state: { status: 'dead_letter', error: dispatchErrorMessage },
+          });
+        } catch {
+          // Non-fatal audit log insertion
+        }
+
         console.error(
           `[Outbox Worker] Job ${job.id} [${job.email_type}] DEAD_LETTER (Attempts: ${newAttempts}): ${dispatchErrorMessage}`
         );

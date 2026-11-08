@@ -19,8 +19,15 @@ import {
   FileText,
   Shield,
   Loader2,
+  Trash2,
+  RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
-import { updateEnquiryStatusAction } from '@/lib/enquiries/actions';
+import {
+  updateEnquiryStatusAction,
+  softDeleteEnquiryAction,
+  restoreEnquiryAction,
+} from '@/lib/enquiries/actions';
 import type { QuotationRequestStatus, ServiceCategory } from '@/types/database';
 
 export interface EnquiryItem {
@@ -41,11 +48,16 @@ export interface EnquiryItem {
   status: QuotationRequestStatus;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+  deleted_by_staff_id?: string | null;
+  deletion_reason?: string | null;
 }
 
 interface EnquiryListClientProps {
   enquiries: EnquiryItem[];
   canManage: boolean;
+  currentUserRole?: string;
+  isTrashTab?: boolean;
 }
 
 const statusConfig: Record<
@@ -68,11 +80,25 @@ const categoryLabels: Record<string, string> = {
   'manufacturing-machinery': 'Manufacturing Machinery',
 };
 
-export function EnquiryListClient({ enquiries, canManage }: EnquiryListClientProps) {
+export function EnquiryListClient({
+  enquiries,
+  canManage,
+  currentUserRole = 'viewer',
+  isTrashTab = false,
+}: EnquiryListClientProps) {
   const [selectedEnquiry, setSelectedEnquiry] = useState<EnquiryItem | null>(null);
   const [updating, setUpdating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Soft-Delete & Restore Modal States
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  const canDelete = ['super_admin', 'admin'].includes(currentUserRole);
+  const canRestore = currentUserRole === 'super_admin';
 
   const handleCopy = (ref: string) => {
     navigator.clipboard?.writeText(ref);
@@ -92,6 +118,35 @@ export function EnquiryListClient({ enquiries, canManage }: EnquiryListClientPro
       if (selectedEnquiry && selectedEnquiry.id === enquiryId) {
         setSelectedEnquiry({ ...selectedEnquiry, status: newStatus });
       }
+    }
+  };
+
+  const handleSoftDelete = async () => {
+    if (!selectedEnquiry) return;
+    setIsDeleting(true);
+    setActionError(null);
+    const res = await softDeleteEnquiryAction(selectedEnquiry.id, deleteReason);
+    setIsDeleting(false);
+
+    if (res.error) {
+      setActionError(res.error);
+    } else {
+      setShowDeleteModal(false);
+      setSelectedEnquiry(null);
+      setDeleteReason('');
+    }
+  };
+
+  const handleRestore = async (enquiryId: string) => {
+    setIsRestoring(true);
+    setActionError(null);
+    const res = await restoreEnquiryAction(enquiryId);
+    setIsRestoring(false);
+
+    if (res.error) {
+      setActionError(res.error);
+    } else {
+      setSelectedEnquiry(null);
     }
   };
 
@@ -128,11 +183,18 @@ export function EnquiryListClient({ enquiries, canManage }: EnquiryListClientPro
                       <span className="font-mono text-xs font-bold text-gold-400 bg-gold-950/40 border border-gold-500/20 px-2 py-0.5 rounded">
                         {item.reference_number}
                       </span>
-                      <span
-                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${status.bg} ${status.text} ${status.border}`}
-                      >
-                        {status.label}
-                      </span>
+                      {item.deleted_at ? (
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-rose-950/40 text-rose-400 border-rose-500/30 flex items-center gap-1">
+                          <Trash2 className="w-3 h-3" />
+                          <span>Trash / Deleted</span>
+                        </span>
+                      ) : (
+                        <span
+                          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${status.bg} ${status.text} ${status.border}`}
+                        >
+                          {status.label}
+                        </span>
+                      )}
                       <span className="text-[11px] font-medium text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
                         {categoryLabels[item.service_category] || item.service_category}
                       </span>
@@ -223,11 +285,9 @@ export function EnquiryListClient({ enquiries, canManage }: EnquiryListClientPro
                     {selectedEnquiry.reference_number}
                   </span>
                   <span
-                    className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
-                      statusConfig[selectedEnquiry.status].bg
-                    } ${statusConfig[selectedEnquiry.status].text} ${
-                      statusConfig[selectedEnquiry.status].border
-                    }`}
+                    className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${statusConfig[selectedEnquiry.status].bg
+                      } ${statusConfig[selectedEnquiry.status].text} ${statusConfig[selectedEnquiry.status].border
+                      }`}
                   >
                     {statusConfig[selectedEnquiry.status].label}
                   </span>
@@ -247,6 +307,27 @@ export function EnquiryListClient({ enquiries, canManage }: EnquiryListClientPro
               <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
                 <span>{actionError}</span>
+              </div>
+            )}
+
+            {/* Soft-Delete Status Banner */}
+            {selectedEnquiry.deleted_at && (
+              <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-300 space-y-1.5 animate-in fade-in duration-150">
+                <div className="flex items-center gap-2 font-bold text-rose-200">
+                  <Trash2 className="w-4 h-4 text-rose-400" />
+                  <span>This quotation enquiry is currently in the Trash (Soft-Deleted)</span>
+                </div>
+                <p className="text-slate-400 text-[11px]">
+                  Soft-deleted on:{' '}
+                  <span className="text-slate-200 font-mono">
+                    {new Date(selectedEnquiry.deleted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
+                  </span>
+                </p>
+                {selectedEnquiry.deletion_reason && (
+                  <p className="text-slate-300 text-xs bg-slate-900/80 p-2.5 rounded-lg border border-rose-500/20">
+                    <strong className="text-rose-300">Recorded Reason:</strong> {selectedEnquiry.deletion_reason}
+                  </p>
+                )}
               </div>
             )}
 
@@ -334,35 +415,76 @@ export function EnquiryListClient({ enquiries, canManage }: EnquiryListClientPro
               </div>
             )}
 
-            {/* Triage Status Management */}
-            {canManage && (
-              <div className="border-t border-slate-800 pt-4 space-y-2">
-                <span className="text-xs font-semibold text-slate-300 block">Triage Status Action:</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  {(['new', 'under_review', 'quotation_drafted', 'rejected', 'archived'] as QuotationRequestStatus[]).map(
-                    (st) => {
-                      const isActive = selectedEnquiry.status === st;
-                      const cfg = statusConfig[st];
-                      return (
-                        <button
-                          key={st}
-                          type="button"
-                          disabled={updating || isActive}
-                          onClick={() => handleStatusChange(selectedEnquiry.id, st)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                            isActive
-                              ? `${cfg.bg} ${cfg.text} border ${cfg.border} ring-1 ring-gold-500/40`
-                              : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700'
-                          } disabled:opacity-50`}
-                        >
-                          {cfg.label}
-                        </button>
-                      );
-                    }
+            {/* Triage / Management Actions */}
+            {selectedEnquiry.deleted_at ? (
+              <div className="border-t border-slate-800 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="text-xs text-slate-400">
+                  {canRestore ? (
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Super Administrator Action Available:
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 italic flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5" />
+                      Restoration is restricted to Super Administrators.
+                    </span>
                   )}
-                  {updating && <Loader2 className="w-4 h-4 text-gold-400 animate-spin ml-2" />}
                 </div>
+                {canRestore && (
+                  <button
+                    type="button"
+                    disabled={isRestoring}
+                    onClick={() => handleRestore(selectedEnquiry.id)}
+                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold inline-flex items-center gap-2 transition-colors disabled:opacity-50 min-h-[44px]"
+                  >
+                    {isRestoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                    <span>Restore Enquiry</span>
+                  </button>
+                )}
               </div>
+            ) : (
+              canManage && (
+                <div className="border-t border-slate-800 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1.5 flex-1">
+                    <span className="text-xs font-semibold text-slate-300 block">Triage Status Action:</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(['new', 'under_review', 'quotation_drafted', 'rejected', 'archived'] as QuotationRequestStatus[]).map(
+                        (st) => {
+                          const isActive = selectedEnquiry.status === st;
+                          const cfg = statusConfig[st];
+                          return (
+                            <button
+                              key={st}
+                              type="button"
+                              disabled={updating || isActive}
+                              onClick={() => handleStatusChange(selectedEnquiry.id, st)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isActive
+                                  ? `${cfg.bg} ${cfg.text} border ${cfg.border} ring-1 ring-gold-500/40`
+                                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700'
+                                } disabled:opacity-50`}
+                            >
+                              {cfg.label}
+                            </button>
+                          );
+                        }
+                      )}
+                      {updating && <Loader2 className="w-4 h-4 text-gold-400 animate-spin ml-2" />}
+                    </div>
+                  </div>
+
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteModal(true)}
+                      className="px-3.5 py-2 rounded-lg border border-rose-500/40 bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors self-start sm:self-auto min-h-[40px]"
+                    >
+                      <Trash2 className="w-4 h-4 text-rose-400" />
+                      <span>Delete Enquiry</span>
+                    </button>
+                  )}
+                </div>
+              )
             )}
 
             {/* Modal Footer */}
@@ -391,6 +513,85 @@ export function EnquiryListClient({ enquiries, canManage }: EnquiryListClientPro
                 className="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-900 bg-gold-400 hover:bg-gold-300 transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedEnquiry && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-5">
+            <div className="flex items-start justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-rose-950/60 border border-rose-500/30 text-rose-400">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Move Enquiry to Trash?</h3>
+                  <p className="text-xs text-slate-400">Reversible soft-delete confirmation</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Enquiry Reference:</span>
+                <span className="font-mono font-bold text-gold-400 bg-gold-950/60 border border-gold-500/30 px-2.5 py-0.5 rounded">
+                  {selectedEnquiry.reference_number}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Company Name:</span>
+                <span className="font-semibold text-white truncate max-w-[240px]">
+                  {selectedEnquiry.business_name}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              This enquiry will be moved to the <span className="text-slate-200 font-semibold">Trash</span> section and excluded from active lists and metrics. The original enquiry reference, submission data, and customer association are safely preserved in audit records and can be restored by a Super Administrator.
+            </p>
+
+            <div className="space-y-1.5">
+              <label htmlFor="enquiry-delete-reason" className="text-xs font-semibold text-slate-300 block">
+                Deletion Reason <span className="text-slate-500 font-normal">(Optional for Audit Compliance)</span>:
+              </label>
+              <textarea
+                id="enquiry-delete-reason"
+                rows={2}
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="e.g. Duplicate test enquiry, Spam submission, or Client requested cancellation..."
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 rounded-lg border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700 transition-colors min-h-[44px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleSoftDelete}
+                className="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 min-h-[44px]"
+              >
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                <span>Confirm Soft Delete</span>
               </button>
             </div>
           </div>

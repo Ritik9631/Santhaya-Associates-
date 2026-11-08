@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   ArrowRight,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react';
 import { EnquiryListClient, type EnquiryItem } from './EnquiryListClient';
 import type { QuotationRequestStatus } from '@/types/database';
@@ -39,20 +40,29 @@ export default async function StaffEnquiriesPage({ searchParams }: PageProps) {
 
   const searchQuery = searchParams?.q?.toLowerCase().trim() || '';
   const statusFilter = (searchParams?.status || 'all').trim();
+  const isTrashTab = statusFilter === 'trash';
 
   const canManage = ['super_admin', 'admin', 'estimator', 'billing_manager'].includes(profile.role);
 
   const admin = createAdminClient();
 
-  // Query quotation_requests
+  // Query quotation_requests with soft-delete partitioning
   let query = admin
     .from('quotation_requests')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(100);
 
-  if (statusFilter !== 'all') {
-    query = query.eq('status', statusFilter as QuotationRequestStatus);
+  if (isTrashTab) {
+    // Only soft-deleted records in Trash
+    query = query.not('deleted_at', 'is', null);
+  } else {
+    // Active enquiries exclude soft-deleted records
+    query = query.is('deleted_at', null);
+
+    if (statusFilter !== 'all') {
+      query = query.eq('status', statusFilter as QuotationRequestStatus);
+    }
   }
 
   const { data: rawList, error } = await query;
@@ -71,24 +81,29 @@ export default async function StaffEnquiriesPage({ searchParams }: PageProps) {
     );
   });
 
-  // Calculate metrics
+  // Calculate metrics (partitioning active vs trash)
   const { data: allStatusData } = await admin
     .from('quotation_requests')
-    .select('id, status');
+    .select('id, status, deleted_at');
 
-  const statusRows = (allStatusData as any[]) || [];
-  const totalCount = statusRows.length;
-  const newCount = statusRows.filter((r) => r.status === 'new').length;
-  const underReviewCount = statusRows.filter((r) => r.status === 'under_review').length;
-  const draftedCount = statusRows.filter((r) => r.status === 'quotation_drafted').length;
+  const allRecords = (allStatusData as any[]) || [];
+  const activeRows = allRecords.filter((r) => !r.deleted_at);
+  const trashRows = allRecords.filter((r) => !!r.deleted_at);
 
-  const tabs: { label: string; value: string; count?: number }[] = [
+  const totalCount = activeRows.length;
+  const newCount = activeRows.filter((r) => r.status === 'new').length;
+  const underReviewCount = activeRows.filter((r) => r.status === 'under_review').length;
+  const draftedCount = activeRows.filter((r) => r.status === 'quotation_drafted').length;
+  const trashCount = trashRows.length;
+
+  const tabs: { label: string; value: string; count?: number; isTrash?: boolean }[] = [
     { label: 'All Enquiries', value: 'all', count: totalCount },
     { label: 'New Intake', value: 'new', count: newCount },
     { label: 'Under Review', value: 'under_review', count: underReviewCount },
     { label: 'Quotation Drafted', value: 'quotation_drafted', count: draftedCount },
     { label: 'Rejected', value: 'rejected' },
     { label: 'Archived', value: 'archived' },
+    { label: 'Trash', value: 'trash', count: trashCount, isTrash: true },
   ];
 
   return (
@@ -167,15 +182,26 @@ export default async function StaffEnquiriesPage({ searchParams }: PageProps) {
                 href={href}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
                   isActive
-                    ? 'bg-gold-400 text-slate-900 shadow-sm'
+                    ? tab.isTrash
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'bg-gold-400 text-slate-900 shadow-sm'
+                    : tab.isTrash
+                    ? 'bg-rose-950/30 border border-rose-500/30 text-rose-400 hover:text-white hover:bg-rose-900/40'
                     : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
                 }`}
               >
+                {tab.isTrash && <Trash2 className="w-3 h-3 text-current" />}
                 <span>{tab.label}</span>
                 {typeof tab.count === 'number' && (
                   <span
                     className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                      isActive ? 'bg-slate-900 text-gold-400' : 'bg-slate-700 text-slate-300'
+                      isActive
+                        ? tab.isTrash
+                          ? 'bg-rose-900 text-white'
+                          : 'bg-slate-900 text-gold-400'
+                        : tab.isTrash
+                        ? 'bg-rose-900/60 text-rose-300'
+                        : 'bg-slate-700 text-slate-300'
                     }`}
                   >
                     {tab.count}
@@ -188,7 +214,12 @@ export default async function StaffEnquiriesPage({ searchParams }: PageProps) {
       </div>
 
       {/* Main List */}
-      <EnquiryListClient enquiries={filteredList} canManage={canManage} />
+      <EnquiryListClient
+        enquiries={filteredList}
+        canManage={canManage}
+        currentUserRole={profile.role}
+        isTrashTab={isTrashTab}
+      />
     </div>
   );
 }
