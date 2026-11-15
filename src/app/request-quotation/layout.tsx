@@ -4,6 +4,9 @@ export const metadata: Metadata = {
   title: 'Request a Quotation | Santhaya Associates Pvt. Ltd.',
   description:
     'Submit technical requirements and equipment specifications for government/private construction tenders and industrial machinery supply.',
+  alternates: {
+    canonical: '/request-quotation',
+  },
 };
 
 export default function QuotationLayout({

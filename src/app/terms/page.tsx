@@ -6,6 +6,9 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Terms of Service | Santhaya Associates Pvt. Ltd.',
   description: 'Commercial Terms and Conditions for Santhaya Associates Pvt. Ltd.',
+  alternates: {
+    canonical: '/terms',
+  },
 };
 
 export default function TermsPage() {

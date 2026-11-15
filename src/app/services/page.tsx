@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   title: 'Services | Santhaya Associates Pvt. Ltd.',
   description:
     'Core industrial capabilities: Government & Private Construction Tenders, Construction Machinery Supply, and Manufacturing Machinery Supply.',
+  alternates: {
+    canonical: '/services',
+  },
 };
 
 export default function ServicesPage() {

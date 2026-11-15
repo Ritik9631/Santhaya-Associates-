@@ -1,7 +1,12 @@
 import { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://santhaya.local';
+  const baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL &&
+    !process.env.NEXT_PUBLIC_SITE_URL.includes('hostingersite.com') &&
+    !process.env.NEXT_PUBLIC_SITE_URL.includes('localhost')
+      ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '')
+      : 'https://santhayaassociates.com';
   const currentDate = new Date();
 
   return [

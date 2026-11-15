@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: 'About Us | Santhaya Associates Pvt. Ltd.',
   description:
     'About Santhaya Associates Pvt. Ltd. — Specializing in government and private construction tenders, construction machinery supply, and manufacturing machinery.',
+  alternates: {
+    canonical: '/about',
+  },
 };
 
 export default function AboutPage() {

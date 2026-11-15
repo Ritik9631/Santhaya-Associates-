@@ -11,11 +11,21 @@ const inter = Inter({
   variable: '--font-inter',
 });
 
+const canonicalBase =
+  process.env.NEXT_PUBLIC_SITE_URL &&
+  !process.env.NEXT_PUBLIC_SITE_URL.includes('hostingersite.com') &&
+  !process.env.NEXT_PUBLIC_SITE_URL.includes('localhost')
+    ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '')
+    : 'https://santhayaassociates.com';
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://santhaya.local'),
+  metadataBase: new URL(canonicalBase),
   title: 'Santhaya Associates Pvt. Ltd. | Construction Tenders & Machinery Supply',
   description:
     'Santhaya Associates Pvt. Ltd. — Specialized partner for government and private construction tenders, heavy construction machinery supply, and manufacturing machinery equipment. Building Today • Powering Tomorrow.',
+  alternates: {
+    canonical: '/',
+  },
   keywords: [
     'Santhaya Associates',
     'Santhaya Associates Pvt. Ltd.',
@@ -35,6 +45,10 @@ export const metadata: Metadata = {
     title: 'Santhaya Associates Pvt. Ltd.',
     description:
       'Building Today • Powering Tomorrow. Government & Private Construction Tenders, Construction Machinery Supply, and Manufacturing Machinery Supply.',
+    url: 'https://santhayaassociates.com',
+    siteName: 'Santhaya Associates',
+    locale: 'en_IN',
+    type: 'website',
     images: [
       {
         url: '/santhaya-logo-header.png',

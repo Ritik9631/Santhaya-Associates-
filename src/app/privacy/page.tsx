@@ -4,6 +4,9 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Privacy Policy | Santhaya Associates Pvt. Ltd.',
   description: 'Privacy Policy for Santhaya Associates Pvt. Ltd. — Commercial inquiry data handling and compliance.',
+  alternates: {
+    canonical: '/privacy',
+  },
 };
 
 export default function PrivacyPage() {

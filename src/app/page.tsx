@@ -36,8 +36,8 @@ const jsonLdData = {
   slogan: 'Building Today • Powering Tomorrow',
   description:
     'Santhaya Associates Pvt. Ltd. — Specialized industrial enterprise partner for Government & Private Construction Tenders, Construction Machinery Supply, and Manufacturing Machinery Supply.',
-  url: 'https://santhaya.com',
-  logo: 'https://santhaya.com/santhaya-logo-header.png',
+  url: 'https://santhayaassociates.com',
+  logo: 'https://santhayaassociates.com/santhaya-logo-header.png',
   telephone: ['+919430986713', '+919608950748'],
   email: 'santhayapvt.ltd@gmail.com',
   address: {
