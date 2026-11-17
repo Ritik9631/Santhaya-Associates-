@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createQuotationAction, updateDraftQuotationAction } from '@/lib/quotation/actions';
 import {
@@ -10,7 +10,11 @@ import {
 } from '@/lib/quotation/calculations';
 import { INDIAN_STATES, resolveIndianState } from '@/lib/utils/indian-states';
 import { getDefaultQuotationTerms, getSimplifiedQuotationTerms } from '@/lib/billing/default-terms';
-import { Plus, Trash2, CheckCircle2, AlertCircle, ArrowLeft, FileCheck } from 'lucide-react';
+import {
+  classifyQuotationTerms,
+  estimateQuotationPageLayout,
+} from '@/lib/quotation/layout-estimator';
+import { Plus, Trash2, CheckCircle2, AlertCircle, ArrowLeft, FileCheck, FileText } from 'lucide-react';
 import Link from 'next/link';
 import {
   formInputClasses,
@@ -20,6 +24,7 @@ import {
   tableSelectClasses,
 } from '@/components/ui/form-styles';
 import { TaxBreakdownCard } from '@/components/ui/TaxBreakdownCard';
+import QuotationNumericInput from './QuotationNumericInput';
 
 interface CustomerOption {
   id: string;
@@ -97,6 +102,10 @@ export default function QuotationForm({
     initialData?.terms_conditions ?? getSimplifiedQuotationTerms(initialData?.validity_days ?? 30)
   );
   const [notes, setNotes] = useState(initialData?.notes || '');
+  const [dismissedMultiPageRec, setDismissedMultiPageRec] = useState(false);
+  const [pendingPresetConfirmation, setPendingPresetConfirmation] = useState<
+    'standard_6' | 'comprehensive_10' | null
+  >(null);
 
   // Line items state
   const [items, setItems] = useState<LineItemInput[]>(
@@ -116,6 +125,64 @@ export default function QuotationForm({
         ]
   );
 
+  // Stable client-only keys per line-item row so removing rows preserves exact input state
+  const nextRowKeyRef = useRef<number>(
+    initialData?.items && initialData.items.length > 0 ? initialData.items.length + 1 : 2
+  );
+  const [rowKeys, setRowKeys] = useState<string[]>(() =>
+    Array.from(
+      { length: initialData?.items && initialData.items.length > 0 ? initialData.items.length : 1 },
+      (_, idx) => `qrow-${idx + 1}`
+    )
+  );
+
+  // Validated A4 print-layout estimate (drives multi-page contractual coverage recommendation)
+  const layoutEstimate = useMemo(
+    () =>
+      estimateQuotationPageLayout({
+        items,
+        termsConditions,
+        deliveryLocation,
+        paymentTerms,
+        isGstApplicable,
+        isIntraState: placeOfSupplyStateCode === '10' || !placeOfSupplyStateCode,
+      }),
+    [items, termsConditions, deliveryLocation, paymentTerms, isGstApplicable, placeOfSupplyStateCode]
+  );
+
+  const termsClassification = useMemo(
+    () =>
+      classifyQuotationTerms(
+        termsConditions,
+        getSimplifiedQuotationTerms(validityDays),
+        getDefaultQuotationTerms(validityDays)
+      ),
+    [termsConditions, validityDays]
+  );
+
+  const requestPresetChange = (preset: 'standard_6' | 'comprehensive_10') => {
+    if (termsClassification === 'empty') {
+      setTermsConditions(
+        preset === 'comprehensive_10'
+          ? getDefaultQuotationTerms(validityDays)
+          : getSimplifiedQuotationTerms(validityDays)
+      );
+      setPendingPresetConfirmation(null);
+      return;
+    }
+    setPendingPresetConfirmation(preset);
+  };
+
+  const confirmPresetChange = () => {
+    if (!pendingPresetConfirmation) return;
+    setTermsConditions(
+      pendingPresetConfirmation === 'comprehensive_10'
+        ? getDefaultQuotationTerms(validityDays)
+        : getSimplifiedQuotationTerms(validityDays)
+    );
+    setPendingPresetConfirmation(null);
+  };
+
   // Update place of supply when customer changes
   const handleCustomerChange = (id: string) => {
     setCustomerId(id);
@@ -126,6 +193,8 @@ export default function QuotationForm({
 
   // Add line item
   const handleAddItem = () => {
+    const newKey = `qrow-${nextRowKeyRef.current++}`;
+    setRowKeys((prev) => [...prev, newKey]);
     setItems((prev) => [
       ...prev,
       {
@@ -144,6 +213,7 @@ export default function QuotationForm({
   // Remove line item
   const handleRemoveItem = (index: number) => {
     if (items.length <= 1) return;
+    setRowKeys((prev) => prev.filter((_, i) => i !== index));
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -171,12 +241,21 @@ export default function QuotationForm({
   const handleUpdateItem = (index: number, field: keyof LineItemInput, value: any) => {
     setItems((prev) => {
       const copy = [...prev];
+      const isNumericField =
+        field === 'quantity' ||
+        field === 'unit_rate' ||
+        field === 'discount_amount' ||
+        field === 'gst_rate';
+      const parsedVal = isNumericField
+        ? typeof value === 'number'
+          ? Number.isFinite(value)
+            ? value
+            : 0
+          : parseFloat(value) || 0
+        : value;
       copy[index] = {
         ...copy[index],
-        [field]:
-          field === 'quantity' || field === 'unit_rate' || field === 'discount_amount' || field === 'gst_rate'
-            ? parseFloat(value) || 0
-            : value,
+        [field]: parsedVal,
       };
       return copy;
     });
@@ -229,7 +308,14 @@ export default function QuotationForm({
     formData.append('paymentTerms', paymentTerms);
     if (termsConditions) formData.append('termsConditions', termsConditions);
     if (notes) formData.append('notes', notes);
-    formData.append('itemsJson', JSON.stringify(items));
+    const sanitizedItems = items.map((it) => ({
+      ...it,
+      quantity: Number.isFinite(Number(it.quantity)) ? Number(it.quantity) : 0,
+      unit_rate: Number.isFinite(Number(it.unit_rate)) ? Number(it.unit_rate) : 0,
+      discount_amount: Number.isFinite(Number(it.discount_amount)) ? Number(it.discount_amount) : 0,
+      gst_rate: Number.isFinite(Number(it.gst_rate)) ? Number(it.gst_rate) : 0,
+    }));
+    formData.append('itemsJson', JSON.stringify(sanitizedItems));
 
     startTransition(async () => {
       if (isEdit) {
@@ -339,12 +425,15 @@ export default function QuotationForm({
             <label className={formLabelClasses}>
               Validity Period (Days)
             </label>
-            <input
-              type="number"
-              min="1"
-              max="180"
+            <QuotationNumericInput
               value={validityDays}
-              onChange={(e) => setValidityDays(parseInt(e.target.value, 10) || 30)}
+              onValueChange={(nextVal) => setValidityDays(nextVal)}
+              allowDecimal={false}
+              allowEmpty={false}
+              defaultValue={30}
+              min={1}
+              max={180}
+              ariaLabel="Validity Period (Days)"
               className={formInputClasses}
             />
           </div>
@@ -389,7 +478,7 @@ export default function QuotationForm({
         <div className="space-y-4">
           {items.map((item, index) => (
             <div
-              key={index}
+              key={rowKeys[index] || `qrow-fallback-${index}`}
               className="p-4 border border-slate-200 rounded-lg bg-slate-50/70 space-y-3 relative"
             >
               <div className="flex items-center justify-between">
@@ -460,13 +549,16 @@ export default function QuotationForm({
                   <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                     Quantity <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
+                  <QuotationNumericInput
+                    value={Number(item.quantity) || 0}
+                    onValueChange={(nextVal) => handleUpdateItem(index, 'quantity', nextVal)}
+                    allowDecimal={true}
+                    allowEmpty={true}
+                    defaultValue={0}
+                    min={0}
                     required
-                    value={item.quantity}
-                    onChange={(e) => handleUpdateItem(index, 'quantity', e.target.value)}
+                    placeholder="1"
+                    ariaLabel={`Line Item ${index + 1} Quantity`}
                     className={tableInputClasses}
                   />
                 </div>
@@ -487,13 +579,16 @@ export default function QuotationForm({
                   <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                     Unit Rate (₹) <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <QuotationNumericInput
+                    value={Number(item.unit_rate) || 0}
+                    onValueChange={(nextVal) => handleUpdateItem(index, 'unit_rate', nextVal)}
+                    allowDecimal={true}
+                    allowEmpty={false}
+                    defaultValue={0}
+                    min={0}
                     required
-                    value={item.unit_rate}
-                    onChange={(e) => handleUpdateItem(index, 'unit_rate', e.target.value)}
+                    placeholder="0"
+                    ariaLabel={`Line Item ${index + 1} Unit Rate`}
                     className={tableInputClasses}
                   />
                 </div>
@@ -502,12 +597,15 @@ export default function QuotationForm({
                   <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                     Discount (₹)
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={item.discount_amount || 0}
-                    onChange={(e) => handleUpdateItem(index, 'discount_amount', e.target.value)}
+                  <QuotationNumericInput
+                    value={Number(item.discount_amount) || 0}
+                    onValueChange={(nextVal) => handleUpdateItem(index, 'discount_amount', nextVal)}
+                    allowDecimal={true}
+                    allowEmpty={true}
+                    defaultValue={0}
+                    min={0}
+                    placeholder="0"
+                    ariaLabel={`Line Item ${index + 1} Discount`}
                     className={tableInputClasses}
                   />
                 </div>
@@ -609,31 +707,121 @@ export default function QuotationForm({
             <label className={formLabelClasses}>
               Quotation Terms & Conditions (Visible to Client)
             </label>
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
               <span className="text-[11px] text-slate-500 font-medium">Presets:</span>
               <button
                 type="button"
-                onClick={() => setTermsConditions(getSimplifiedQuotationTerms(validityDays))}
-                className="text-[11px] px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-medium transition"
+                onClick={() => requestPresetChange('standard_6')}
+                className={`text-[11px] px-2 py-0.5 rounded border font-medium transition ${
+                  termsClassification === 'standard_6'
+                    ? 'bg-amber-100 text-amber-950 border-amber-400'
+                    : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                }`}
                 title="Apply approved 6-clause standard terms (default for standard quotations)"
               >
                 6-Clause Standard (Default)
               </button>
               <button
                 type="button"
-                onClick={() => setTermsConditions(getDefaultQuotationTerms(validityDays))}
-                className="text-[11px] px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium transition"
+                onClick={() => requestPresetChange('comprehensive_10')}
+                className={`text-[11px] px-2 py-0.5 rounded border font-medium transition ${
+                  termsClassification === 'comprehensive_10'
+                    ? 'bg-slate-200 text-slate-900 border-slate-400'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                }`}
                 title="Apply comprehensive 10 commercial clauses"
               >
                 10-Clause Comprehensive
               </button>
             </div>
           </div>
+
+          {/* Non-Intrusive Smart Two-Page Terms Recommendation (Validated Print-Layout Estimate; Never Shown on Exported PDF) */}
+          {layoutEstimate.isMultiPage &&
+            termsClassification !== 'comprehensive_10' &&
+            !dismissedMultiPageRec && (
+              <div
+                role="status"
+                className="mb-2 p-3 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+              >
+                <div className="flex items-start gap-2">
+                  <FileText className="w-4 h-4 text-[#10243B] shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="font-medium text-slate-900">
+                      This quotation may span multiple pages. Consider the 10-Clause Comprehensive Terms for additional contractual coverage.
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Estimated print length: ~{layoutEstimate.estimatedPages} A4 pages. Applying is optional — you may retain your current terms.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => requestPresetChange('comprehensive_10')}
+                    className="px-2.5 py-1.5 bg-[#10243B] hover:bg-slate-800 text-white rounded-md font-semibold text-[11px] transition"
+                  >
+                    Apply 10-Clause Terms
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDismissedMultiPageRec(true)}
+                    className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 rounded-md font-medium text-[11px] transition"
+                  >
+                    Keep Current Terms
+                  </button>
+                </div>
+              </div>
+            )}
+
+          {/* Explicit Staff Confirmation Guard Before Replacing Existing or Customized Terms */}
+          {pendingPresetConfirmation && (
+            <div
+              role="alertdialog"
+              aria-label="Confirm Terms Preset Replacement"
+              className="mb-2 p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+            >
+              <div className="space-y-0.5">
+                <p className="font-semibold">
+                  Confirm applying{' '}
+                  {pendingPresetConfirmation === 'comprehensive_10'
+                    ? '10-Clause Comprehensive Terms'
+                    : '6-Clause Standard Terms'}
+                  ?
+                </p>
+                <p className="text-[11px] text-amber-900">
+                  {termsClassification === 'custom'
+                    ? 'You have customized Terms & Conditions. Confirming will replace your custom text in this draft.'
+                    : 'This will replace the current draft Terms & Conditions text. Existing issued quotations and historical revisions are unaffected.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={confirmPresetChange}
+                  className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-md font-semibold text-[11px] transition"
+                >
+                  Confirm & Apply
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingPresetConfirmation(null)}
+                  className="px-2.5 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-md font-medium text-[11px] transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           <textarea
             rows={4}
             placeholder="Statutory warranties, delivery schedule, escalation clauses..."
             value={termsConditions}
-            onChange={(e) => setTermsConditions(e.target.value)}
+            onChange={(e) => {
+              setTermsConditions(e.target.value);
+              if (pendingPresetConfirmation) setPendingPresetConfirmation(null);
+            }}
             className={formInputClasses}
           />
         </div>

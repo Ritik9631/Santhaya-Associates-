@@ -59,6 +59,37 @@ export function formatSmartRupee(
 }
 
 /**
+ * Whole-Rupee display formatter for line-item TAX (₹) display clarity on Quotation PDFs:
+ * - Rounding rule: Standard half-up rounding to the nearest integer rupee (`Math.round(absNum + Number.EPSILON)`).
+ *   Examples: 37906.74 -> "37,907", 40728.78 -> "40,729", 10988.10 -> "10,988", 0.50 -> "1", 0.49 -> "0".
+ * - Strictly display-only: NEVER used to round intermediate or statutory GST calculations.
+ * - Preserves Indian numbering locale ('en-IN') and handles negative, zero, and multi-crore figures cleanly.
+ *
+ * @param amount - Number or string representation of the tax amount
+ * @param includeSymbol - Whether to prepend the '₹' currency symbol (defaults to true)
+ */
+export function formatWholeRupee(
+  amount: number | string | null | undefined,
+  includeSymbol = true
+): string {
+  const num = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
+  if (isNaN(num)) return includeSymbol ? '₹0' : '0';
+
+  const absNum = Math.abs(num);
+  // Standard half-up rounding with floating-point tolerance (e.g. 1.005 / 0.50 boundaries)
+  const roundedWhole = Math.floor(absNum + 0.5 + 1e-9);
+  const sign = num < 0 && roundedWhole > 0 ? '-' : '';
+
+  const formattedNumber = roundedWhole.toLocaleString('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+
+  const prefix = includeSymbol ? '₹' : '';
+  return `${sign}${prefix}${formattedNumber}`;
+}
+
+/**
  * Formats large amounts into human-readable compact Indian scales:
  * >= 1,00,00,000 (1 Crore): "₹622.56 Cr"
  * >= 1,00,000 (1 Lakh):    "₹45.75 L"

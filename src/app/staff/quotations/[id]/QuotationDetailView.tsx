@@ -1,10 +1,18 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { resolveIndianState, formatPlaceOfSupply } from '@/lib/utils/indian-states';
 import { determineTaxStatus } from '@/lib/quotation/calculations';
+import {
+  classifyQuotationTerms,
+  estimateQuotationPageLayout,
+} from '@/lib/quotation/layout-estimator';
+import {
+  getDefaultQuotationTerms,
+  getSimplifiedQuotationTerms,
+} from '@/lib/billing/default-terms';
 import { Trash2, Share2 } from 'lucide-react';
 import DocumentShareModal from '@/components/documents/DocumentShareModal';
 import {
@@ -60,6 +68,10 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [reopenReason, setReopenReason] = useState('');
   const [deleteReason, setDeleteReason] = useState('Commercial terms superseded / No longer required');
+  const [dismissedMultiPageRec, setDismissedMultiPageRec] = useState(false);
+  const [pendingPresetConfirmation, setPendingPresetConfirmation] = useState<
+    'compact_6_clause' | 'standard_10_clause' | null
+  >(null);
 
   // Acceptance Form State
   const [acceptContactName, setAcceptContactName] = useState(quotation.customers?.primary_contact_person || '');
@@ -79,7 +91,10 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
     versions[versions.length - 1] ||
     {};
 
-  const lineItems = activeVersion.quotation_items || [];
+  const lineItems = useMemo(
+    () => activeVersion.quotation_items || [],
+    [activeVersion.quotation_items]
+  );
   const customer = quotation.customers || {};
   const acceptances = quotation.quotation_acceptances || [];
   const deliveryLogs = quotation.quotation_delivery_logs || [];
@@ -91,6 +106,40 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
   const placeOfSupplyFormatted = formatPlaceOfSupply(quotation.place_of_supply_state_code);
   const canEdit = ['super_admin', 'admin', 'estimator', 'billing_manager'].includes(userRole);
   const isDraftEditable = quotation.status === 'draft' && isCurrentVersion && !activeVersion.is_locked;
+
+  // Validated A4 print-layout estimate for smart multi-page terms recommendation (draft-only)
+  const layoutEstimate = useMemo(
+    () =>
+      estimateQuotationPageLayout({
+        items: lineItems,
+        termsConditions: activeVersion.terms_conditions,
+        deliveryLocation: activeVersion.delivery_location,
+        customerAddress: customer.billing_address,
+        paymentTerms: activeVersion.payment_terms,
+        isGstApplicable: quotation.is_gst_applicable,
+        isIntraState,
+        hasDiscount: Number(activeVersion.discount_amount || 0) > 0,
+      }),
+    [
+      lineItems,
+      activeVersion.terms_conditions,
+      activeVersion.delivery_location,
+      activeVersion.payment_terms,
+      activeVersion.discount_amount,
+      customer.billing_address,
+      quotation.is_gst_applicable,
+      isIntraState,
+    ]
+  );
+
+  const termsClassification = useMemo(() => {
+    const vDays = activeVersion.validity_days || 30;
+    return classifyQuotationTerms(
+      activeVersion.terms_conditions,
+      getSimplifiedQuotationTerms(vDays),
+      getDefaultQuotationTerms(vDays)
+    );
+  }, [activeVersion.terms_conditions, activeVersion.validity_days]);
 
   // Status badge styling
   const statusColors: Record<string, string> = {
@@ -143,14 +192,20 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
   };
 
   const handleApplyTermsPreset = (preset: 'standard_10_clause' | 'compact_6_clause') => {
-    const label = preset === 'compact_6_clause' ? '6-Clause Standard' : '10-Clause Comprehensive';
-    if (!confirm(`Apply the ${label} terms to this draft quotation? Historical and issued quotations will not be affected.`)) return;
+    setError(null);
+    setPendingPresetConfirmation(preset);
+  };
+
+  const confirmApplyTermsPreset = () => {
+    if (!pendingPresetConfirmation) return;
+    const presetToApply = pendingPresetConfirmation;
     setError(null);
     startTransition(async () => {
-      const res = await applyTermsPresetAction(quotation.id, preset);
+      const res = await applyTermsPresetAction(quotation.id, presetToApply);
       if (res.error) {
         setError(res.error);
       } else {
+        setPendingPresetConfirmation(null);
         router.refresh();
       }
     });
@@ -619,11 +674,11 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
               Commercial Terms & Conditions
             </h3>
             <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-mono">
-              {(activeVersion.terms_conditions || '').split('\n').filter(Boolean).length === 6
-                ? '6 Clauses (Layout Testing)'
-                : (activeVersion.terms_conditions || '').split('\n').filter(Boolean).length === 10
-                ? '10 Clauses (Legal Default)'
-                : `${(activeVersion.terms_conditions || '').split('\n').filter(Boolean).length} Clauses`}
+              {termsClassification === 'standard_6'
+                ? '6 Clauses (Standard Default)'
+                : termsClassification === 'comprehensive_10'
+                ? '10 Clauses (Comprehensive)'
+                : `${(activeVersion.terms_conditions || '').split('\n').filter(Boolean).length} Clauses (Custom)`}
             </span>
           </div>
 
@@ -657,6 +712,90 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
             </span>
           )}
         </div>
+
+        {/* Non-Intrusive Smart Two-Page Terms Recommendation (Draft-Only; Validated Print-Layout Estimate; Never Shown on Exported PDF) */}
+        {isDraftEditable &&
+          canEdit &&
+          layoutEstimate.isMultiPage &&
+          termsClassification !== 'comprehensive_10' &&
+          !dismissedMultiPageRec && (
+            <div
+              role="status"
+              className="p-3 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+            >
+              <div className="flex items-start gap-2">
+                <FileText className="w-4 h-4 text-[#10243B] shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-medium text-slate-900">
+                    This quotation may span multiple pages. Consider the 10-Clause Comprehensive Terms for additional contractual coverage.
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Estimated print length: ~{layoutEstimate.estimatedPages} A4 pages. Applying is optional — existing terms remain unchanged unless you confirm.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleApplyTermsPreset('standard_10_clause')}
+                  disabled={isPending}
+                  className="px-2.5 py-1.5 bg-[#10243B] hover:bg-slate-800 text-white rounded-md font-semibold text-[11px] disabled:opacity-50 transition"
+                >
+                  Apply 10-Clause Terms
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDismissedMultiPageRec(true)}
+                  disabled={isPending}
+                  className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 rounded-md font-medium text-[11px] disabled:opacity-50 transition"
+                >
+                  Keep Current Terms
+                </button>
+              </div>
+            </div>
+          )}
+
+        {/* Explicit Staff Confirmation Panel Before Overwriting Existing/Custom Draft Terms */}
+        {isDraftEditable && canEdit && pendingPresetConfirmation && (
+          <div
+            role="alertdialog"
+            aria-label="Confirm Terms Preset Replacement"
+            className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+          >
+            <div className="space-y-0.5">
+              <p className="font-semibold">
+                Confirm applying{' '}
+                {pendingPresetConfirmation === 'standard_10_clause'
+                  ? '10-Clause Comprehensive Terms'
+                  : '6-Clause Standard Terms'}{' '}
+                to this draft?
+              </p>
+              <p className="text-[11px] text-amber-900">
+                {termsClassification === 'custom'
+                  ? 'This draft contains customized Terms & Conditions. Confirming will overwrite your custom text. Historical revisions and issued quotations are never altered.'
+                  : 'This updates only this editable draft. Issued quotations and historical revisions are never altered.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={confirmApplyTermsPreset}
+                disabled={isPending}
+                className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-md font-semibold text-[11px] disabled:opacity-50 transition"
+              >
+                {isPending ? 'Applying...' : 'Confirm & Apply'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingPresetConfirmation(null)}
+                disabled={isPending}
+                className="px-2.5 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-md font-medium text-[11px] disabled:opacity-50 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-700 text-[11px] leading-relaxed max-h-48 overflow-y-auto space-y-1">
           {(activeVersion.terms_conditions || 'No terms specified.')
