@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-11-17 | Phase: Final Quotation PDF Pagination Refinement | Implementation status: Complete Final PDF Pagination Refinement on fix/quotation-pdf-readability; Preserved 9-10pt Readable Typography, Subtle DRAFT Watermark, Clean QUOTATION Heading, 32mm Round Stamp, and Website Link; Ungrouped Closing Contract Block to Allow Natural Page Breaks Between Complete Clauses While Keeping Signatory Block Intact; Removed Multi-Page Recommendation Banner; Preserved 6 Clauses as Default and 10 Clauses as Optional Preset Requiring Staff Confirmation; 100% Passing Automated Tests (TypeScript, ESLint, Next.js Build 29/29 Routes, 24/24 Stamp, 26/26 Refinements, 47/47 Stress & Pagination, 70/70 Batches 2-5, Chrome A4 Verifier 0 Clipping Across 2, 5, 7, 10, 20, 30 Items); Stopped for Deployment Approval Gate
+Updated: 2026-11-17 | Phase: Production Release of Quotation PDF Readability & Pagination Refinement | Implementation status: Successfully Deployed Production Release Commit 16f16c9 to origin/master; Merged Approved Candidate 7c5c769 from fix/quotation-pdf-readability; Hostinger Pipeline Triggered & Verified Live; Public Homepage, Services, Request Quotation, and Staff Login All 200 OK; Quotation PDF Route Verified 307 Protected; Zero Database Mutations; Existing Production Records Untouched; Owner User-Acceptance Verification Ready
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -1058,6 +1058,32 @@ Updated: 2026-11-17 | Phase: Final Quotation PDF Pagination Refinement | Impleme
         * Existing quotation records, stored terms, and quotation numbers untouched.
         * Invoicing and GST calculations untouched.
         * Stopped after testing and requesting explicit owner approval before production deployment.
+
+  - 2026-11-17: Approved Production Deployment of Quotation PDF Readability & Pagination Refinements:
+      - Preflight Verification:
+        * Confirmed origin/master baseline at b7c4c07.
+        * Verified candidate 7c5c769 contains only approved presentation, pagination, and test changes across 7 files.
+        * Confirmed clean working tree with zero untracked files or exposed credentials.
+        * Verified all preflight gates passed: TypeScript (0 errors), ESLint (0 errors/warnings), Next.js production build (29/29 routes), Round stamp suite (24/24), Refinements suite (26/26), Phase 7 stress & pagination (47/47), Batches 2-5 (70/70), and Chrome A4 verifier (0 clipping across 2, 5, 7, 10, 20, 30 items).
+        * Verified live website health before release: Homepage (200), Services (200), Request Quotation (200), Staff Login (200), Staff Quotations (307 redirect).
+        * Prepared history-preserving rollback plan (git revert -m 1 16f16c9).
+      - Release Execution:
+        * Merged fix/quotation-pdf-readability into master with merge commit 16f16c9abf00ae0791f57aa8edd8c7624e2c7ab4.
+        * Pushed once to origin/master.
+        * Hostinger pipeline connected deployment activated.
+      - Post-Deployment Live Verification:
+        * Homepage (https://santhayaassociates.com/): HTTP 200 OK, Next.js runtime active.
+        * Services (https://santhayaassociates.com/services): HTTP 200 OK.
+        * Request Quotation (https://santhayaassociates.com/request-quotation): HTTP 200 OK.
+        * Staff Login (https://santhayaassociates.com/staff/login): HTTP 200 OK.
+        * Quotation PDF Route (/staff/quotations/[id]/pdf): HTTP 307 redirect to /staff/login (strict authentication enforced).
+      - Strict Production Safety Invariants Upheld:
+        * Zero production database migrations executed.
+        * Zero modifications to production quotations, invoices, customers, or payments.
+        * Zero changes to Hostinger environment variables or Resend email configurations.
+        * Zero test quotations created in production.
+        * Existing production quotation records (including QT-2026-27-008) and historical revisions preserved.
+        * Handed over to project owner for manual inspection via the live Staff ERP.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
