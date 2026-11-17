@@ -1121,6 +1121,23 @@ Updated: 2026-11-18 | Phase: Final Quotation PDF & ERP Refinements (fix/quotatio
       - Production Safety Gate:
         * Stopped after local verification and commit on `fix/quotation-final-pdf-polish`. Not merged to `master`, not pushed to `origin/master`, not deployed to Hostinger. Awaiting explicit owner approval.
 
+  - 2026-11-18: Quotation Numeric Input UX Fix (Same Branch: fix/quotation-final-pdf-polish, On Top of ed2358f):
+      - Problem Resolved:
+        * Replaced sticky-zero `<input type="number">` fields in `QuotationForm.tsx` (shared by both `/staff/quotations/new` and `/staff/quotations/[id]/edit`) with string-backed `QuotationNumericInput` (`type="text" inputMode="decimal" | "numeric"`).
+        * Eliminates `"02500"` and `"0200"` leading-zero concatenation when replacing default zero in Unit Rate, Discount, Quantity, and Validity Days.
+      - Implementation (`src/lib/utils/numeric-input.ts`, `src/app/staff/quotations/new/QuotationNumericInput.tsx`, `src/app/staff/quotations/new/QuotationForm.tsx`):
+        * Auto-selects default `"0"` on focus across mouse clicks (with `mouseup` guard), keyboard Tab navigation, and mobile touch taps (`requestAnimationFrame` fallback) without interfering with caret placement or selection when editing existing non-zero rates (e.g. `2500.75`).
+        * Immediately normalizes unintended leading zeros (`02500 -> 2500`, `0200 -> 200`, `00.75 -> 0.75`) and currency-formatted pastes (`₹2,500.75`, `Rs. 1,25,000.50`) while preserving valid decimals (`2500.75`, `0.75`), intentional `"0"`, and empty optional Discount (`""` interpreted as numeric `0` for live calculation & submission).
+        * Added stable row keys (`rowKeys`) so deleting a line item preserves exact numeric display state on remaining rows.
+        * Unrelated forms (`InvoiceForm`, `CustomerForm`) untouched; GST/discount calculation engine & server validations untouched.
+      - Verification (100% Passing):
+        * Numeric Input UX Suite (`scripts/test-quotation-numeric-input.mjs`): 17/17 passed (pure normalization/GST tests + real Chrome desktop mouse/Tab/paste/caret + mobile touch viewport).
+        * Final Polish Suite (`scripts/test-quotation-final-polish.mjs`): 13/13 passed.
+        * TypeScript (`tsc --noEmit`): 0 errors; ESLint (`next lint`): 0 warnings/errors; Next.js build: 29/29 routes compiled cleanly.
+        * Existing Regressions: `test:stamp` (24/24), `test:refinements` (26/26), Phase 7 stress/pagination (47/47), Batches 2–5 (70/70).
+      - Release Safety Gate:
+        * Committed on `fix/quotation-final-pdf-polish` preserving `ed2358f`. Not pushed to `master`, not deployed to Hostinger. Awaiting explicit production deployment approval.
+
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
 

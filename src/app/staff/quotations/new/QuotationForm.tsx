@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createQuotationAction, updateDraftQuotationAction } from '@/lib/quotation/actions';
 import {
@@ -24,6 +24,7 @@ import {
   tableSelectClasses,
 } from '@/components/ui/form-styles';
 import { TaxBreakdownCard } from '@/components/ui/TaxBreakdownCard';
+import QuotationNumericInput from './QuotationNumericInput';
 
 interface CustomerOption {
   id: string;
@@ -124,6 +125,17 @@ export default function QuotationForm({
         ]
   );
 
+  // Stable client-only keys per line-item row so removing rows preserves exact input state
+  const nextRowKeyRef = useRef<number>(
+    initialData?.items && initialData.items.length > 0 ? initialData.items.length + 1 : 2
+  );
+  const [rowKeys, setRowKeys] = useState<string[]>(() =>
+    Array.from(
+      { length: initialData?.items && initialData.items.length > 0 ? initialData.items.length : 1 },
+      (_, idx) => `qrow-${idx + 1}`
+    )
+  );
+
   // Validated A4 print-layout estimate (drives multi-page contractual coverage recommendation)
   const layoutEstimate = useMemo(
     () =>
@@ -181,6 +193,8 @@ export default function QuotationForm({
 
   // Add line item
   const handleAddItem = () => {
+    const newKey = `qrow-${nextRowKeyRef.current++}`;
+    setRowKeys((prev) => [...prev, newKey]);
     setItems((prev) => [
       ...prev,
       {
@@ -199,6 +213,7 @@ export default function QuotationForm({
   // Remove line item
   const handleRemoveItem = (index: number) => {
     if (items.length <= 1) return;
+    setRowKeys((prev) => prev.filter((_, i) => i !== index));
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -226,12 +241,21 @@ export default function QuotationForm({
   const handleUpdateItem = (index: number, field: keyof LineItemInput, value: any) => {
     setItems((prev) => {
       const copy = [...prev];
+      const isNumericField =
+        field === 'quantity' ||
+        field === 'unit_rate' ||
+        field === 'discount_amount' ||
+        field === 'gst_rate';
+      const parsedVal = isNumericField
+        ? typeof value === 'number'
+          ? Number.isFinite(value)
+            ? value
+            : 0
+          : parseFloat(value) || 0
+        : value;
       copy[index] = {
         ...copy[index],
-        [field]:
-          field === 'quantity' || field === 'unit_rate' || field === 'discount_amount' || field === 'gst_rate'
-            ? parseFloat(value) || 0
-            : value,
+        [field]: parsedVal,
       };
       return copy;
     });
@@ -284,7 +308,14 @@ export default function QuotationForm({
     formData.append('paymentTerms', paymentTerms);
     if (termsConditions) formData.append('termsConditions', termsConditions);
     if (notes) formData.append('notes', notes);
-    formData.append('itemsJson', JSON.stringify(items));
+    const sanitizedItems = items.map((it) => ({
+      ...it,
+      quantity: Number.isFinite(Number(it.quantity)) ? Number(it.quantity) : 0,
+      unit_rate: Number.isFinite(Number(it.unit_rate)) ? Number(it.unit_rate) : 0,
+      discount_amount: Number.isFinite(Number(it.discount_amount)) ? Number(it.discount_amount) : 0,
+      gst_rate: Number.isFinite(Number(it.gst_rate)) ? Number(it.gst_rate) : 0,
+    }));
+    formData.append('itemsJson', JSON.stringify(sanitizedItems));
 
     startTransition(async () => {
       if (isEdit) {
@@ -394,12 +425,15 @@ export default function QuotationForm({
             <label className={formLabelClasses}>
               Validity Period (Days)
             </label>
-            <input
-              type="number"
-              min="1"
-              max="180"
+            <QuotationNumericInput
               value={validityDays}
-              onChange={(e) => setValidityDays(parseInt(e.target.value, 10) || 30)}
+              onValueChange={(nextVal) => setValidityDays(nextVal)}
+              allowDecimal={false}
+              allowEmpty={false}
+              defaultValue={30}
+              min={1}
+              max={180}
+              ariaLabel="Validity Period (Days)"
               className={formInputClasses}
             />
           </div>
@@ -444,7 +478,7 @@ export default function QuotationForm({
         <div className="space-y-4">
           {items.map((item, index) => (
             <div
-              key={index}
+              key={rowKeys[index] || `qrow-fallback-${index}`}
               className="p-4 border border-slate-200 rounded-lg bg-slate-50/70 space-y-3 relative"
             >
               <div className="flex items-center justify-between">
@@ -515,13 +549,16 @@ export default function QuotationForm({
                   <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                     Quantity <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
+                  <QuotationNumericInput
+                    value={Number(item.quantity) || 0}
+                    onValueChange={(nextVal) => handleUpdateItem(index, 'quantity', nextVal)}
+                    allowDecimal={true}
+                    allowEmpty={true}
+                    defaultValue={0}
+                    min={0}
                     required
-                    value={item.quantity}
-                    onChange={(e) => handleUpdateItem(index, 'quantity', e.target.value)}
+                    placeholder="1"
+                    ariaLabel={`Line Item ${index + 1} Quantity`}
                     className={tableInputClasses}
                   />
                 </div>
@@ -542,13 +579,16 @@ export default function QuotationForm({
                   <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                     Unit Rate (₹) <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <QuotationNumericInput
+                    value={Number(item.unit_rate) || 0}
+                    onValueChange={(nextVal) => handleUpdateItem(index, 'unit_rate', nextVal)}
+                    allowDecimal={true}
+                    allowEmpty={false}
+                    defaultValue={0}
+                    min={0}
                     required
-                    value={item.unit_rate}
-                    onChange={(e) => handleUpdateItem(index, 'unit_rate', e.target.value)}
+                    placeholder="0"
+                    ariaLabel={`Line Item ${index + 1} Unit Rate`}
                     className={tableInputClasses}
                   />
                 </div>
@@ -557,12 +597,15 @@ export default function QuotationForm({
                   <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                     Discount (₹)
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={item.discount_amount || 0}
-                    onChange={(e) => handleUpdateItem(index, 'discount_amount', e.target.value)}
+                  <QuotationNumericInput
+                    value={Number(item.discount_amount) || 0}
+                    onValueChange={(nextVal) => handleUpdateItem(index, 'discount_amount', nextVal)}
+                    allowDecimal={true}
+                    allowEmpty={true}
+                    defaultValue={0}
+                    min={0}
+                    placeholder="0"
+                    ariaLabel={`Line Item ${index + 1} Discount`}
                     className={tableInputClasses}
                   />
                 </div>
