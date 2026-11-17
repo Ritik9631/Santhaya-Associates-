@@ -257,15 +257,15 @@ export default async function QuotationPdfPage({ params }: PageProps) {
         <PrintButton className="inline-flex items-center gap-2 px-4 py-2 bg-[#10243B] text-white rounded-lg text-xs font-semibold hover:bg-slate-800 shadow transition focus:ring-2 focus:ring-gold-500" />
       </div>
 
-      {/* Draft Status Notice Banner (Hidden in Print) */}
-      {!isAuthorized && (
+      {/* Status Notice Banner (Hidden in Print) */}
+      {quote.status === 'draft' && (
         <div className="max-w-4xl mx-auto mb-4 bg-amber-50 border border-amber-300 rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs text-amber-900 print:hidden shadow-sm">
           <div className="flex items-center gap-2.5">
             <span className="font-bold uppercase tracking-wider bg-amber-200 text-amber-950 px-2 py-0.5 rounded text-[10px]">
               DRAFT STATUS
             </span>
             <span>
-              This quotation is currently an unissued draft. The official company round seal and authorized signatory are affixed upon formal issuance.
+              This quotation is currently an unissued draft. You can review items and issue the quotation from the quotation details page.
             </span>
           </div>
           <Link
@@ -273,6 +273,24 @@ export default async function QuotationPdfPage({ params }: PageProps) {
             className="shrink-0 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg text-xs transition"
           >
             Review & Issue
+          </Link>
+        </div>
+      )}
+      {quote.status === 'rejected' && (
+        <div className="max-w-4xl mx-auto mb-4 bg-rose-50 border border-rose-300 rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs text-rose-900 print:hidden shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <span className="font-bold uppercase tracking-wider bg-rose-200 text-rose-950 px-2 py-0.5 rounded text-[10px]">
+              REJECTED
+            </span>
+            <span>
+              This quotation is currently in rejected status. Authorized Super Administrators can reopen it from the details view.
+            </span>
+          </div>
+          <Link
+            href={`/staff/quotations/${quote.id}`}
+            className="shrink-0 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg text-xs transition"
+          >
+            View Quotation
           </Link>
         </div>
       )}
@@ -705,25 +723,19 @@ export default async function QuotationPdfPage({ params }: PageProps) {
               For Santhaya Associates Pvt. Ltd.
             </p>
 
-            {/* Official Circular Stamp: Displayed only for officially authorized/issued quotations */}
-            <div className={`stamp-align-container py-0.5 flex items-center justify-end w-full ${isAuthorized ? 'min-h-[32mm]' : 'min-h-[20px]'}`}>
-              {isAuthorized ? (
-                <div className="stamp-image-wrapper relative flex items-center justify-end ml-auto">
-                  <Image
-                    src="/santhaya-round-stamp.png"
-                    alt="Santhaya Associates Official Company Stamp"
-                    width={1254}
-                    height={1254}
-                    className="w-[32mm] h-[32mm] max-w-[120px] max-h-[120px] object-contain select-none pointer-events-none ml-auto"
-                    priority
-                    unoptimized
-                  />
-                </div>
-              ) : (
-                <div className="py-0.5 flex items-center justify-end text-[8.5pt] text-slate-400 italic">
-                  (Official seal affixed upon formal issuance)
-                </div>
-              )}
+            {/* Official Circular Stamp: Approved company stamp displayed above signatory line */}
+            <div className="stamp-align-container py-0.5 flex items-center justify-end w-full min-h-[32mm]">
+              <div className="stamp-image-wrapper relative flex items-center justify-end ml-auto">
+                <Image
+                  src="/santhaya-round-stamp.png"
+                  alt="Santhaya Associates Official Company Stamp"
+                  width={1254}
+                  height={1254}
+                  className="w-[32mm] h-[32mm] max-w-[120px] max-h-[120px] object-contain select-none pointer-events-none ml-auto"
+                  priority
+                  unoptimized
+                />
+              </div>
             </div>
 
             <div className="border-t border-dashed border-slate-300 pt-0.5 flex justify-between text-[8.5pt] text-slate-600">

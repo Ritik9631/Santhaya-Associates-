@@ -25,6 +25,7 @@ import {
   FileEdit,
   ArrowLeft,
   Lock,
+  RotateCcw,
 } from 'lucide-react';
 import {
   issueQuotationAction,
@@ -35,6 +36,7 @@ import {
   discardDraftQuotationAction,
   deleteQuotationAction,
   applyTermsPresetAction,
+  reopenQuotationAction,
 } from '@/lib/quotation/actions';
 import { convertNumberToIndianWords } from '@/lib/quotation/calculations';
 import { formatIndianDate, formatIndianDateTime } from '@/lib/utils/date';
@@ -55,6 +57,8 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showReopenModal, setShowReopenModal] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
   const [deleteReason, setDeleteReason] = useState('Commercial terms superseded / No longer required');
 
   // Acceptance Form State
@@ -196,6 +200,27 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
       } else {
         setShowDeleteModal(false);
         router.push('/staff/quotations');
+      }
+    });
+  };
+
+  const isSuperAdmin = userRole === 'super_admin';
+
+  const handleReopenSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reopenReason.trim() || reopenReason.trim().length < 5) {
+      setError('A valid reason (minimum 5 characters) is required to reopen this quotation.');
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const res = await reopenQuotationAction(quotation.id, reopenReason);
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setShowReopenModal(false);
+        setReopenReason('');
+        router.refresh();
       }
     });
   };
@@ -373,6 +398,18 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
                 Reject
               </button>
             </>
+          )}
+
+          {quotation.status === 'rejected' && isSuperAdmin && (
+            <button
+              onClick={() => setShowReopenModal(true)}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50"
+              title="Reopen Rejected Quotation (Super Admin Only)"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reopen Quotation
+            </button>
           )}
 
           {quotation.status !== 'cancelled' && quotation.status !== 'accepted' && canEdit && (
@@ -773,6 +810,70 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
           });
         }}
       />
+
+      {/* Reopen Rejected Quotation Modal (Super Admin Only) */}
+      {showReopenModal && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-amber-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-amber-600">
+                <RotateCcw className="w-5 h-5 flex-shrink-0" />
+                <h3 className="text-base font-bold text-slate-900">Reopen Rejected Quotation</h3>
+              </div>
+              <button
+                onClick={() => setShowReopenModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-600">
+              <p>
+                Are you sure you want to reopen quotation{' '}
+                <strong className="text-slate-900 font-mono text-sm">{quotation.quotation_number}</strong>?
+              </p>
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg leading-relaxed">
+                <strong>Super Admin Recovery Notice:</strong> The original quotation number ({quotation.quotation_number}), customer details, line items, and historical versions will be preserved. The rejected version will be locked as an immutable historical record, and a new editable draft revision will be created for you to continue working on.
+              </div>
+
+              <form onSubmit={handleReopenSubmit} className="space-y-3 pt-1">
+                <div>
+                  <label className="block font-semibold text-slate-700 uppercase mb-1">
+                    Reason for Reopening <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={reopenReason}
+                    onChange={(e) => setReopenReason(e.target.value)}
+                    placeholder="e.g. Accidentally rejected / Client requested revised quotation proposal"
+                    className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-sm text-slate-900 focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowReopenModal(false)}
+                    className="px-4 py-2 border border-slate-300 rounded text-slate-700 hover:bg-slate-50 font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isPending || reopenReason.trim().length < 5}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded font-semibold transition disabled:opacity-50 inline-flex items-center gap-1.5"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    {isPending ? 'Reopening...' : 'Confirm Reopen'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal (Phase 4: Safe Soft-Delete with Audit Preservation) */}
       {showDeleteModal && (

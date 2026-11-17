@@ -435,7 +435,7 @@ export const ALLOWED_STATUS_TRANSITIONS: Record<QuotationStatus, QuotationStatus
   issued: ['revised', 'accepted', 'rejected', 'expired', 'cancelled'],
   revised: ['accepted', 'rejected', 'expired', 'cancelled'],
   accepted: ['converted_to_invoice', 'cancelled'],
-  rejected: ['revised'], // Allows re-quoting based on customer feedback
+  rejected: ['draft', 'revised'], // Allows Super Admin recovery to draft revision and re-quoting
   expired: ['revised'],  // Allows renewed quotation after expiry
   cancelled: [],         // Terminal state
   converted_to_invoice: [], // Terminal commercial state

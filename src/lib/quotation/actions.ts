@@ -926,6 +926,68 @@ export async function updateQuotationStatusAction(
 }
 
 /**
+ * Server Action: Reopen accidentally rejected quotation (Strictly Super Admin only)
+ *
+ * Implements a secure recovery workflow:
+ * 1. Strictly guards access to active Super Administrators.
+ * 2. Requires a mandatory business justification reason (>= 5 chars).
+ * 3. Preserves original quotation number, customer details, and tax calculations.
+ * 4. Freezes the rejected revision as an immutable historical snapshot.
+ * 5. Creates an editable draft revision (N+1) with cloned line items.
+ * 6. Records an immutable audit log entry in public.audit_logs.
+ */
+export async function reopenQuotationAction(
+  quotationId: string,
+  reason: string
+): Promise<ActionResponse<{ newVersionNumber: number; versionCode: string }>> {
+  try {
+    const { user, profile } = await requireStaffSession();
+
+    if (profile.role !== 'super_admin') {
+      return { error: 'Access denied: Only Super Administrators can reopen rejected quotations.' };
+    }
+
+    if (!quotationId || typeof quotationId !== 'string') {
+      return { error: 'Quotation ID is required.' };
+    }
+
+    const trimmedReason = (reason || '').trim();
+    if (!trimmedReason || trimmedReason.length < 5) {
+      return { error: 'A valid reason (minimum 5 characters) is required to reopen a quotation.' };
+    }
+
+    const adminClient = createAdminClient();
+
+    // Invoke atomic database stored procedure
+    const { data, error: rpcErr } = await adminClient.rpc('reopen_rejected_quotation', {
+      p_quotation_id: quotationId,
+      p_reason: trimmedReason,
+      p_actor_id: user.id,
+    });
+
+    if (rpcErr) {
+      return { error: rpcErr.message || 'Database error reopening quotation.' };
+    }
+
+    revalidatePath('/staff/quotations');
+    revalidatePath(`/staff/quotations/${quotationId}`);
+    revalidatePath(`/staff/quotations/${quotationId}/edit`);
+
+    const result = data as { newVersionNumber: number; versionCode: string } | null;
+    return {
+      success: true,
+      data: {
+        newVersionNumber: result?.newVersionNumber ?? 1,
+        versionCode: result?.versionCode ?? '',
+      },
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unexpected error reopening quotation.';
+    return { error: message };
+  }
+}
+
+/**
  * Server Action: Record quotation delivery (PDF download, email outbox queue, phone, whatsapp)
  */
 export async function recordQuotationDeliveryAction(

@@ -1015,6 +1015,22 @@ export interface Database {
         };
         Returns: string;
       };
+      reopen_rejected_quotation: {
+        Args: {
+          p_quotation_id: string;
+          p_reason: string;
+          p_actor_id: string;
+        };
+        Returns: {
+          success: boolean;
+          quotationId: string;
+          quotationNumber: string;
+          previousVersion: number;
+          newVersionNumber: number;
+          versionCode: string;
+          status: string;
+        };
+      };
     };
     Enums: {
       staff_role_enum: StaffRole;

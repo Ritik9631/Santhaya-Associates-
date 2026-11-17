@@ -106,11 +106,9 @@ await test('Stamp positioned inside Company Authorization Block between company 
   assert(stampIdx < signatoryIdx, 'Stamp positioned above Authorized Signatory label');
 });
 
-await test('Authorization status guards stamp so unfinalized drafts remain unstamped', () => {
-  assert(pdfContent.includes('const isAuthorized ='), 'Defines isAuthorized check');
-  assert(pdfContent.includes("['issued', 'accepted', 'converted_to_invoice'].includes(quote.status)"), 'Validates finalized quote statuses');
-  assert(pdfContent.includes('Boolean(activeVersion.issued_at)'), 'Validates formal issuance timestamp');
-  assert(pdfContent.includes('(Official seal affixed upon formal issuance)'), 'Renders placeholder note on draft quotes');
+await test('Approved round company stamp is displayed in Authorized Signatory section', () => {
+  assert(pdfContent.includes('src="/santhaya-round-stamp.png"'), 'Renders santhaya-round-stamp.png');
+  assert(pdfContent.includes('stamp-align-container py-0.5 flex items-center justify-end w-full min-h-[32mm]'), 'Ensures 32mm height container in signatory section');
 });
 
 await test('Authorization block enforces print-avoid-break and A4 print margins', () => {
