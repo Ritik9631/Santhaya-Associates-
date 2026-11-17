@@ -6,6 +6,10 @@
  * Configured specifically for Bihar jurisdiction (Motihari, Purbi Champaran).
  */
 
+/**
+ * Standard 10-clause comprehensive commercial quotation terms.
+ * Recommended for multi-page tenders, major equipment supplies, or turnkey contracts.
+ */
 export function getDefaultQuotationTerms(validityDays = 30): string {
   return [
     `1. VALIDITY: This commercial quotation is valid for ${validityDays} calendar days from the date of issuance.`,
@@ -22,8 +26,8 @@ export function getDefaultQuotationTerms(validityDays = 30): string {
 }
 
 /**
- * Revised 6-clause simplified quotation terms (Consolidated for readability & single-page fit).
- * Subject to project owner approval before making default.
+ * Approved 6-clause standard quotation terms (Consolidated for readability & professional layout).
+ * Default preset for newly created commercial quotations.
  */
 export function getSimplifiedQuotationTerms(validityDays = 30): string {
   return [
