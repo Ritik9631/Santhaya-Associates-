@@ -94,7 +94,7 @@ export default function QuotationForm({
       '100% advance against Proforma Invoice prior to dispatch'
   );
   const [termsConditions, setTermsConditions] = useState(
-    initialData?.terms_conditions ?? getDefaultQuotationTerms(initialData?.validity_days ?? 30)
+    initialData?.terms_conditions ?? getSimplifiedQuotationTerms(initialData?.validity_days ?? 30)
   );
   const [notes, setNotes] = useState(initialData?.notes || '');
 
@@ -613,19 +613,19 @@ export default function QuotationForm({
               <span className="text-[11px] text-slate-500 font-medium">Presets:</span>
               <button
                 type="button"
-                onClick={() => setTermsConditions(getDefaultQuotationTerms(validityDays))}
-                className="text-[11px] px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium transition"
-                title="Apply standard 10 commercial clauses (system legal default)"
+                onClick={() => setTermsConditions(getSimplifiedQuotationTerms(validityDays))}
+                className="text-[11px] px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-medium transition"
+                title="Apply approved 6-clause standard terms (default for standard quotations)"
               >
-                Standard 10-Clause Terms (Default)
+                6-Clause Standard (Default)
               </button>
               <button
                 type="button"
-                onClick={() => setTermsConditions(getSimplifiedQuotationTerms(validityDays))}
-                className="text-[11px] px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-medium transition"
-                title="Apply 6 consolidated clauses for layout testing"
+                onClick={() => setTermsConditions(getDefaultQuotationTerms(validityDays))}
+                className="text-[11px] px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium transition"
+                title="Apply comprehensive 10 commercial clauses"
               >
-                Compact 6-Clause Terms (Testing)
+                10-Clause Comprehensive
               </button>
             </div>
           </div>

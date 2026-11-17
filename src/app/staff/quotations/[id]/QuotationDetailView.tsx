@@ -143,7 +143,7 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
   };
 
   const handleApplyTermsPreset = (preset: 'standard_10_clause' | 'compact_6_clause') => {
-    const label = preset === 'compact_6_clause' ? '6-Clause Testing' : '10-Clause Standard';
+    const label = preset === 'compact_6_clause' ? '6-Clause Standard' : '10-Clause Comprehensive';
     if (!confirm(`Apply the ${label} terms to this draft quotation? Historical and issued quotations will not be affected.`)) return;
     setError(null);
     startTransition(async () => {
@@ -628,25 +628,25 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
           </div>
 
           {isDraftEditable && canEdit && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[11px] text-slate-500 font-medium">Apply Preset:</span>
               <button
                 type="button"
                 onClick={() => handleApplyTermsPreset('compact_6_clause')}
                 disabled={isPending}
                 className="text-[11px] px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-medium transition disabled:opacity-50"
-                title="Apply 6 consolidated clauses for layout testing"
+                title="Apply approved 6-clause standard terms (default for standard quotations)"
               >
-                Apply 6-Clause Testing Terms
+                6-Clause Standard (Default)
               </button>
               <button
                 type="button"
                 onClick={() => handleApplyTermsPreset('standard_10_clause')}
                 disabled={isPending}
                 className="text-[11px] px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium transition disabled:opacity-50"
-                title="Reset to 10 standard legal commercial clauses"
+                title="Apply 10 comprehensive commercial clauses"
               >
-                Reset to 10-Clause Standard
+                10-Clause Comprehensive
               </button>
             </div>
           )}

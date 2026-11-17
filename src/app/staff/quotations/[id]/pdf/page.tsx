@@ -311,7 +311,17 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
 
       {/* Official Quotation Document Container (A4 Printable) */}
       <div className="print-container relative overflow-hidden max-w-4xl mx-auto bg-white border border-slate-200 shadow-md p-6 sm:p-7 print:border-none print:shadow-none print:p-0 print:max-w-none text-slate-900 leading-normal">
-        {/* Subtle Watermark for Rejected / Superseded Historical Quotations */}
+        {/* Subtle Watermark for Draft / Rejected / Superseded Historical Quotations */}
+        {isDraftStatus && (
+          <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center overflow-hidden select-none">
+            <div className="text-amber-500/10 print:text-amber-600/15 font-black text-6xl sm:text-7xl md:text-8xl -rotate-45 tracking-widest uppercase border-4 border-dashed border-amber-500/15 print:border-amber-600/20 p-8 rounded-3xl text-center">
+              DRAFT
+              <div className="text-lg sm:text-xl mt-2 tracking-normal font-bold">
+                Preliminary Review Only
+              </div>
+            </div>
+          </div>
+        )}
         {isRejectedStatus && (
           <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center overflow-hidden select-none">
             <div className="text-rose-500/10 print:text-rose-600/15 font-black text-6xl sm:text-7xl md:text-8xl -rotate-45 tracking-widest uppercase border-4 border-dashed border-rose-500/15 print:border-rose-600/20 p-8 rounded-3xl text-center">
@@ -363,7 +373,7 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
         )}
 
         {/* Header Block (Authentic Logo, Company Hierarchy, Clean QUOTATION Badge, FY Number) */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between pb-1 print:pb-0.5 border-b-2 border-[#10243B] gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between pb-1.5 border-b-2 border-[#10243B] gap-2">
           <div className="flex items-start gap-2.5 max-w-[62%]">
             <div className="shrink-0 mt-0.5">
               <Image
@@ -371,23 +381,23 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
                 alt="Santhaya Associates Symbol"
                 width={480}
                 height={550}
-                className="w-11 sm:w-12 h-auto aspect-[480/550] object-contain print:w-10 shrink-0"
+                className="w-12 sm:w-13 h-auto aspect-[480/550] object-contain print:w-12 shrink-0"
                 priority
                 unoptimized
               />
             </div>
             <div className="space-y-0.5">
-              <h2 className="text-lg sm:text-[16pt] print:text-[15pt] font-extrabold text-[#10243B] leading-tight tracking-tight">
+              <h2 className="text-lg sm:text-[17pt] print:text-[16pt] font-extrabold text-[#10243B] leading-tight tracking-tight">
                 Santhaya Associates Pvt. Ltd.
               </h2>
-              <p className="text-[9pt] print:text-[8.5pt] text-slate-700 leading-snug">
+              <p className="text-[9.5pt] text-slate-700 leading-snug">
                 Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India
               </p>
-              <div className="text-[9pt] print:text-[8.5pt] text-slate-800 font-mono space-x-3 pt-0.5">
+              <div className="text-[9.5pt] text-slate-800 font-mono space-x-3 pt-0.5">
                 <span><strong className="font-sans">GSTIN:</strong> 10ABVCS4277J1ZU</span>
                 <span><strong className="font-sans">PAN:</strong> ABVCS4277J</span>
               </div>
-              <p className="text-[8.5pt] print:text-[8pt] text-slate-600 font-medium pt-0.5">
+              <p className="text-[9pt] text-slate-600 font-medium pt-0.5">
                 Govt. & Private Civil Infrastructure | Heavy Machinery Supply & Rentals | Turnkey EPC
               </p>
             </div>
@@ -396,7 +406,7 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
           <div className="sm:text-right shrink-0">
             <div className="flex items-center sm:justify-end gap-1.5 flex-wrap">
               <span
-                className={`inline-block text-[8.5pt] font-extrabold tracking-widest uppercase px-2.5 py-0.5 rounded shadow-sm ${
+                className={`inline-block text-[9pt] font-extrabold tracking-widest uppercase px-3 py-1 rounded shadow-sm ${
                   isRejectedStatus
                     ? 'bg-rose-600 text-white border border-rose-700'
                     : isSupersededVersion
@@ -411,10 +421,10 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
                   : 'QUOTATION'}
               </span>
             </div>
-            <h1 className="text-xl sm:text-[20pt] print:text-[18pt] font-black text-slate-900 mt-0.5 font-mono tracking-tight">
+            <h1 className="text-xl sm:text-[20pt] print:text-[19pt] font-black text-slate-900 mt-0.5 font-mono tracking-tight">
               {quote.quotation_number}
             </h1>
-            <div className="text-[8.5pt] print:text-[8pt] text-slate-700 mt-0.5 space-y-0.5">
+            <div className="text-[9.5pt] text-slate-700 mt-0.5 space-y-0.5">
               <p>
                 <span className="text-slate-500 font-medium">Date:</span>{' '}
                 <strong className="text-slate-900">{formatIndianDate(activeVersion.created_at)}</strong>
@@ -427,36 +437,28 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
                 <span className="text-slate-500 font-medium">Place of Supply:</span>{' '}
                 <strong className="text-slate-900">{placeOfSupplyFormatted}</strong>
               </p>
-              {isDraftStatus && (
-                <p>
-                  <span className="text-slate-500 font-medium">Status:</span>{' '}
-                  <span className="inline-block text-[8pt] font-semibold text-slate-700 bg-slate-100 border border-slate-300 px-1.5 py-0.5 rounded leading-none">
-                    Draft (Unissued)
-                  </span>
-                </p>
-              )}
             </div>
           </div>
         </div>
 
         {/* Customer & Project Information */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 py-1 print:py-0.5 border-b border-slate-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 py-1.5 border-b border-slate-200">
           <div>
-            <span className="text-[9pt] print:text-[8.5pt] uppercase font-bold text-[#10243B] tracking-wider block mb-0.5">
+            <span className="text-[9.5pt] uppercase font-bold text-[#10243B] tracking-wider block mb-0.5">
               QUOTATION FOR:
             </span>
-            <p className="text-[11pt] print:text-[10pt] font-bold text-slate-900 break-words leading-tight">{customer.company_name}</p>
+            <p className="text-[11.5pt] font-bold text-slate-900 break-words leading-tight">{customer.company_name}</p>
             {customer.primary_contact_person ? (
-              <p className="text-[9.5pt] print:text-[8.5pt] font-medium text-slate-800 mt-0.5">
+              <p className="text-[10pt] font-medium text-slate-800 mt-0.5">
                 <span className="text-slate-500 font-normal">Contact Person:</span> {customer.primary_contact_person}
               </p>
             ) : null}
             {customer.billing_address && (
-              <p className="text-[9pt] print:text-[8pt] text-slate-700 mt-0.5 whitespace-pre-line leading-tight break-words">
+              <p className="text-[9.5pt] text-slate-700 mt-0.5 whitespace-pre-line leading-tight break-words">
                 {customer.billing_address}
               </p>
             )}
-            <div className="text-[9pt] print:text-[8pt] text-slate-800 mt-0.5 space-y-0.5 font-mono">
+            <div className="text-[9.5pt] text-slate-800 mt-0.5 space-y-0.5 font-mono">
               {(customer.gstin || customer.pan) && (
                 <p>
                   {customer.gstin && <span><strong className="font-sans">GSTIN:</strong> {customer.gstin}</span>}
@@ -474,8 +476,8 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
             </div>
           </div>
 
-          <div className="space-y-0.5 bg-slate-50/70 p-2 print:p-1 rounded-lg border border-slate-200 text-[9pt] print:text-[8.5pt]">
-            <span className="text-[9pt] print:text-[8.5pt] uppercase font-bold text-[#10243B] tracking-wider block mb-0.5">
+          <div className="space-y-0.5 bg-slate-50/70 p-2.5 rounded-lg border border-slate-200 text-[9.5pt]">
+            <span className="text-[9.5pt] uppercase font-bold text-[#10243B] tracking-wider block mb-0.5">
               PROJECT DETAILS:
             </span>
             <p className="leading-tight">
@@ -504,42 +506,42 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
         </div>
 
         {/* Itemized Table (Crisp Borders, Visible Column Gridlines, Optimized Column Widths & Spacing) */}
-        <div className="my-2.5 print:my-1 border-2 border-slate-700 print:border-slate-800 rounded-lg overflow-hidden w-full">
+        <div className="my-2.5 border-2 border-slate-700 print:border-slate-800 rounded-lg overflow-hidden w-full">
           <table className="quotation-grid-table w-full text-left border-collapse table-fixed">
             <thead className="bg-[#10243B] text-white font-bold border-b-2 border-slate-900">
               <tr>
-                <th className="py-1.5 print:py-0.5 px-1 text-center w-[4%] border-r border-slate-500 text-[8.5pt] print:text-[8pt] uppercase tracking-wider">#</th>
-                <th className={`py-1.5 print:py-0.5 px-2 border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[27%]' : 'w-[37%]'} text-[8.5pt] print:text-[8pt] uppercase tracking-wider`}>
+                <th className="py-2 px-1 text-center w-[4%] border-r border-slate-500 text-[9pt] uppercase tracking-wider">#</th>
+                <th className={`py-2 px-2 border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[27%]' : 'w-[37%]'} text-[9pt] uppercase tracking-wider`}>
                   Item Description
                 </th>
-                <th className={`py-1.5 print:py-0.5 px-1 text-center border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[8%]' : 'w-[9%]'} text-[8.5pt] print:text-[8pt] uppercase tracking-wider`}>
+                <th className={`py-2 px-1 text-center border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[8%]' : 'w-[9%]'} text-[9pt] uppercase tracking-wider`}>
                   HSN/SAC
                 </th>
-                <th className={`py-1.5 print:py-0.5 px-1 text-right border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[5%]' : 'w-[6%]'} text-[8.5pt] print:text-[8pt] uppercase tracking-wider`}>
+                <th className={`py-2 px-1 text-right border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[5%]' : 'w-[6%]'} text-[9pt] uppercase tracking-wider`}>
                   Qty
                 </th>
-                <th className={`py-1.5 print:py-0.5 px-1 text-center border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[5%]' : 'w-[6%]'} text-[8.5pt] print:text-[8pt] uppercase tracking-wider`}>
+                <th className={`py-2 px-1 text-center border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[5%]' : 'w-[6%]'} text-[9pt] uppercase tracking-wider`}>
                   Unit
                 </th>
-                <th className={`py-1.5 print:py-0.5 px-1.5 text-right border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[11%]' : 'w-[18%]'} text-[8.5pt] print:text-[8pt] uppercase tracking-wider`}>
+                <th className={`py-2 px-1.5 text-right border-r border-slate-500 ${quote.is_gst_applicable ? 'w-[11%]' : 'w-[18%]'} text-[9pt] uppercase tracking-wider`}>
                   Rate (₹)
                 </th>
                 {quote.is_gst_applicable && (
-                  <th className="py-1.5 print:py-0.5 px-1.5 text-right border-r border-slate-500 w-[11%] text-[8.5pt] print:text-[8pt] uppercase tracking-wider">
+                  <th className="py-2 px-1.5 text-right border-r border-slate-500 w-[11%] text-[9pt] uppercase tracking-wider">
                     Taxable (₹)
                   </th>
                 )}
                 {quote.is_gst_applicable && (
                   <>
-                    <th className="py-1.5 print:py-0.5 px-1 text-center border-r border-slate-500 w-[5%] text-[8.5pt] print:text-[8pt] uppercase tracking-wider">
+                    <th className="py-2 px-1 text-center border-r border-slate-500 w-[5%] text-[9pt] uppercase tracking-wider">
                       GST %
                     </th>
-                    <th className="py-1.5 print:py-0.5 px-1.5 text-right border-r border-slate-500 w-[9%] text-[8.5pt] print:text-[8pt] uppercase tracking-wider">
+                    <th className="py-2 px-1.5 text-right border-r border-slate-500 w-[9%] text-[9pt] uppercase tracking-wider">
                       Tax (₹)
                     </th>
                   </>
                 )}
-                <th className={`py-1.5 print:py-0.5 px-1.5 text-right ${quote.is_gst_applicable ? 'w-[15%]' : 'w-[20%]'} text-[8.5pt] print:text-[8pt] uppercase tracking-wider`}>
+                <th className={`py-2 px-1.5 text-right ${quote.is_gst_applicable ? 'w-[15%]' : 'w-[20%]'} text-[9pt] uppercase tracking-wider`}>
                   Total (₹)
                 </th>
               </tr>
@@ -552,39 +554,39 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
 
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/60 print:hover:bg-white border-b border-slate-400 print:border-slate-500">
-                    <td className="py-1.5 print:py-0.5 px-1 text-center text-slate-500 border-r border-slate-400 print:border-slate-500 font-mono text-[8.5pt] print:text-[8pt] align-top">
+                    <td className="py-2 px-1 text-center text-slate-500 border-r border-slate-400 print:border-slate-500 font-mono text-[9pt] align-top">
                       {idx + 1}
                     </td>
-                    <td className="py-1.5 print:py-0.5 px-2 border-r border-slate-400 print:border-slate-500 align-top break-words">
-                      <p className="text-[9.5pt] print:text-[9pt] font-bold text-slate-900 leading-snug">{item.item_name}</p>
+                    <td className="py-2 px-2 border-r border-slate-400 print:border-slate-500 align-top break-words">
+                      <p className="text-[10pt] font-bold text-slate-900 leading-snug">{item.item_name}</p>
                       {item.description && (
-                        <p className="text-[8.5pt] print:text-[8pt] text-slate-600 mt-0.5 whitespace-pre-line leading-tight">
+                        <p className="text-[9pt] text-slate-600 mt-0.5 whitespace-pre-line leading-tight">
                           {item.description}
                         </p>
                       )}
                       {hasDiscount && (
-                        <p className="text-[8.5pt] print:text-[8pt] text-emerald-800 font-medium mt-0.5 leading-tight">
+                        <p className="text-[8.5pt] text-emerald-800 font-medium mt-0.5 leading-tight">
                           Gross: ₹{formatSmartRupee(grossAmount, false)} • Less Disc: -₹{formatSmartRupee(discountAmt, false)}
                         </p>
                       )}
                     </td>
-                    <td className="py-1.5 print:py-0.5 px-1 text-center text-slate-700 font-mono text-[8.5pt] print:text-[8pt] border-r border-slate-400 print:border-slate-500 align-top">
+                    <td className="py-2 px-1 text-center text-slate-700 font-mono text-[9pt] border-r border-slate-400 print:border-slate-500 align-top">
                       {item.hsn_sac_code || '—'}
                     </td>
-                    <td className="py-1.5 print:py-0.5 px-1 text-right font-mono font-semibold text-slate-900 border-r border-slate-400 print:border-slate-500 align-top text-[9pt] print:text-[8.5pt]">
+                    <td className="py-2 px-1 text-right font-mono font-semibold text-slate-900 border-r border-slate-400 print:border-slate-500 align-top text-[9.5pt]">
                       {formatQuantity(item.quantity)}
                     </td>
-                    <td className="py-1.5 print:py-0.5 px-1 text-center text-slate-700 uppercase text-[8.5pt] print:text-[8pt] border-r border-slate-400 print:border-slate-500 align-top">
+                    <td className="py-2 px-1 text-center text-slate-700 uppercase text-[9pt] border-r border-slate-400 print:border-slate-500 align-top">
                       {item.unit}
                     </td>
-                    <td className="py-1.5 print:py-0.5 px-1.5 text-right font-mono text-slate-900 border-r border-slate-400 print:border-slate-500 align-top whitespace-nowrap text-[9pt] print:text-[8.5pt]">
+                    <td className="py-2 px-1.5 text-right font-mono text-slate-900 border-r border-slate-400 print:border-slate-500 align-top whitespace-nowrap text-[9.5pt]">
                       {formatSmartRupee(item.unit_rate, false)}
                     </td>
                     {quote.is_gst_applicable && (
-                      <td className="py-1.5 print:py-0.5 px-1.5 text-right font-mono font-semibold text-slate-900 border-r border-slate-400 print:border-slate-500 align-top whitespace-nowrap text-[9pt] print:text-[8.5pt]">
+                      <td className="py-2 px-1.5 text-right font-mono font-semibold text-slate-900 border-r border-slate-400 print:border-slate-500 align-top whitespace-nowrap text-[9.5pt]">
                         <div>{formatSmartRupee(item.taxable_amount, false)}</div>
                         {hasDiscount && (
-                          <div className="text-[8pt] text-emerald-700 font-sans font-medium leading-none mt-0.5">
+                          <div className="text-[8.5pt] text-emerald-700 font-sans font-medium leading-none mt-0.5">
                             (-₹{formatSmartRupee(discountAmt, false)})
                           </div>
                         )}
@@ -592,19 +594,19 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
                     )}
                     {quote.is_gst_applicable && (
                       <>
-                        <td className="py-1.5 print:py-0.5 px-1 text-center font-mono text-slate-700 border-r border-slate-400 print:border-slate-500 align-top text-[8.5pt] print:text-[8pt]">
+                        <td className="py-2 px-1 text-center font-mono text-slate-700 border-r border-slate-400 print:border-slate-500 align-top text-[9pt]">
                           {item.gst_rate}%
                         </td>
-                        <td className="py-1.5 print:py-0.5 px-1.5 text-right font-mono border-r border-slate-400 print:border-slate-500 align-top whitespace-nowrap text-[9pt] print:text-[8.5pt]">
+                        <td className="py-2 px-1.5 text-right font-mono border-r border-slate-400 print:border-slate-500 align-top whitespace-nowrap text-[9.5pt]">
                           {isTaxDetermined ? (
                             <span className="text-slate-900">{formatSmartRupee(item.tax_amount, false)}</span>
                           ) : (
-                            <span className="text-amber-800 text-[8pt] italic font-sans font-medium">Pending</span>
+                            <span className="text-amber-800 text-[8.5pt] italic font-sans font-medium">Pending</span>
                           )}
                         </td>
                       </>
                     )}
-                    <td className="py-1.5 print:py-0.5 px-1.5 text-right font-black text-slate-950 font-mono align-top whitespace-nowrap text-[9.5pt] print:text-[9pt]">
+                    <td className="py-2 px-1.5 text-right font-black text-slate-950 font-mono align-top whitespace-nowrap text-[10pt]">
                       {isTaxDetermined || !quote.is_gst_applicable
                         ? formatSmartRupee(item.line_total, false)
                         : formatSmartRupee(item.taxable_amount, false)}
@@ -616,27 +618,27 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
           </table>
         </div>
 
-        {/* Financial Summary, Amount in Words & Commercial Notes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1.5 pb-1.5 print:pt-0.5 print:pb-0.5 border-b border-slate-200 print-avoid-break">
-          <div className="flex flex-col justify-between space-y-1.5 print:space-y-1">
-            <div className="bg-slate-50 p-2 print:p-1 rounded-lg border border-slate-200">
-              <span className="text-[8.5pt] print:text-[8pt] font-bold text-[#10243B] uppercase tracking-wider block">
+        {/* Financial Summary, Amount in Words & Bank Details */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 pb-2 border-b border-slate-200 print-avoid-break">
+          <div className="flex flex-col justify-between space-y-2">
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <span className="text-[9pt] font-bold text-[#10243B] uppercase tracking-wider block">
                 {isTaxDetermined || !quote.is_gst_applicable
                   ? 'AMOUNT IN WORDS (STATUTORY INR):'
                   : 'AMOUNT IN WORDS (SUBTOTAL BEFORE GST):'}
               </span>
-              <p className="text-[9.5pt] print:text-[9pt] font-semibold text-slate-900 mt-0.5 leading-snug">
+              <p className="text-[9.5pt] font-semibold text-slate-900 mt-1 leading-snug">
                 {isTaxDetermined || !quote.is_gst_applicable
                   ? convertNumberToIndianWords(activeVersion.grand_total_amount)
                   : `${convertNumberToIndianWords(activeVersion.taxable_amount)} (Exclusive of GST)`}
               </p>
             </div>
 
-            <div className="bg-slate-50 p-2 print:p-1 rounded-lg border border-slate-200">
-              <span className="text-[8.5pt] print:text-[8pt] font-bold text-[#10243B] uppercase tracking-wider block">
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <span className="text-[9pt] font-bold text-[#10243B] uppercase tracking-wider block">
                 BANK DETAILS
               </span>
-              <div className="text-[8.5pt] print:text-[8pt] text-slate-800 leading-tight space-y-0.5 mt-0.5">
+              <div className="text-[9pt] text-slate-800 leading-relaxed space-y-0.5 mt-1">
                 <p>
                   <strong className="font-semibold text-slate-700">Bank Name:</strong>{' '}
                   <span className="text-slate-900 font-medium">State Bank of India</span>
@@ -654,7 +656,7 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
           </div>
 
           {/* Financial Summary: STRICT TWO DECIMAL PLACES ENFORCEMENT */}
-          <div className="bg-slate-50/80 p-2 print:p-1 rounded-lg border border-slate-200 text-[9pt] print:text-[8.5pt] space-y-0.5 print:space-y-0">
+          <div className="bg-slate-50/80 p-2.5 rounded-lg border border-slate-200 text-[9.5pt] space-y-0.5">
             <div className="flex justify-between text-slate-700">
               <span>Gross Subtotal:</span>
               <span className="font-mono text-slate-900 font-medium">
@@ -707,7 +709,7 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
                 ) : (
                   <div className="flex justify-between items-center text-amber-800 py-0.5 font-medium">
                     <span>Applicable GST:</span>
-                    <span className="font-mono font-bold bg-amber-100 text-amber-900 text-[8pt] px-2 py-0.5 rounded border border-amber-300">
+                    <span className="font-mono font-bold bg-amber-100 text-amber-900 text-[8.5pt] px-2 py-0.5 rounded border border-amber-300">
                       Pending Determination
                     </span>
                   </div>
@@ -727,7 +729,7 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
             )}
 
             {isTaxDetermined && Number(activeVersion.round_off_amount) !== 0 && (
-              <div className="flex justify-between text-slate-600 text-[8.5pt] print:text-[8pt]">
+              <div className="flex justify-between text-slate-600 text-[9pt]">
                 <span>Round-off:</span>
                 <span className="font-mono">
                   {Number(activeVersion.round_off_amount) > 0 ? '+' : ''}
@@ -738,21 +740,21 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
 
             {/* Grand Total Box vs Subtotal Before GST Box */}
             {isTaxDetermined || !quote.is_gst_applicable ? (
-              <div className="flex justify-between items-center text-xs font-bold text-[#10243B] pt-1 mt-0.5 border-t-2 border-[#10243B] bg-white p-1.5 print:p-1 rounded-lg border border-slate-200 shadow-xs">
-                <span className="tracking-wide text-[9pt] print:text-[8.5pt]">GRAND TOTAL (INR):</span>
-                <span className="text-[16pt] print:text-[14pt] font-mono font-black text-[#10243B]">
+              <div className="flex justify-between items-center text-xs font-bold text-[#10243B] pt-1 mt-0.5 border-t-2 border-[#10243B] bg-white p-2 rounded-lg border border-slate-200 shadow-xs">
+                <span className="tracking-wide text-[9.5pt]">GRAND TOTAL (INR):</span>
+                <span className="text-[15pt] sm:text-[16pt] font-mono font-black text-[#10243B]">
                   {formatIndianRupee(activeVersion.grand_total_amount, 2)}
                 </span>
               </div>
             ) : (
-              <div className="space-y-0.5 pt-1 mt-0.5 border-t-2 border-amber-600 bg-white p-1.5 print:p-1 rounded-lg border border-amber-300">
+              <div className="space-y-0.5 pt-1 mt-0.5 border-t-2 border-amber-600 bg-white p-2 rounded-lg border border-amber-300">
                 <div className="flex justify-between items-center text-xs font-bold text-[#10243B]">
-                  <span className="tracking-wide text-amber-900 text-[8.5pt] print:text-[8pt]">SUBTOTAL BEFORE GST (INR):</span>
-                  <span className="text-[12.5pt] print:text-[11pt] font-mono font-black text-[#10243B]">
+                  <span className="tracking-wide text-amber-900 text-[9pt]">SUBTOTAL BEFORE GST (INR):</span>
+                  <span className="text-[13pt] font-mono font-black text-[#10243B]">
                     {formatIndianRupee(activeVersion.taxable_amount, 2)}
                   </span>
                 </div>
-                <p className="text-[7.5pt] text-amber-800 leading-tight">
+                <p className="text-[8pt] text-amber-800 leading-tight">
                   * Notice: Place of Supply is pending confirmation. Applicable statutory GST and final invoice payable amount are subject to determination upon delivery destination confirmation.
                 </p>
               </div>
@@ -760,13 +762,13 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
           </div>
         </div>
 
-        {/* Commercial Terms & Conditions (Clear Bold Headings, 2-Column Responsive Grid, Readable Text) */}
-        <div className="pt-1.5 pb-1.5 print:pt-0.5 print:pb-0.5 border-b border-slate-200">
-          <p className="font-bold text-[#10243B] uppercase tracking-wider text-[9pt] print:text-[8.5pt] mb-0.5 print:mb-0">
+        {/* Commercial Terms & Conditions (Clear Bold Headings, 2-Column Responsive Grid, Readable Text, Natural Page Breaks Between Clauses) */}
+        <div className="pt-2 pb-2 border-b border-slate-200">
+          <p className="font-bold text-[#10243B] uppercase tracking-wider text-[9.5pt] mb-1">
             TERMS & CONDITIONS
           </p>
-          <div className="bg-slate-50/80 p-2 print:p-1 rounded-lg border border-slate-200 text-[8.5pt] print:text-[8pt] text-slate-800 leading-tight">
-            <div className={`grid grid-cols-1 ${termsClauses.length > 4 ? 'sm:grid-cols-2 print:grid-cols-2' : ''} gap-x-4 gap-y-1 print:gap-y-0.5`}>
+          <div className="bg-slate-50/80 p-2.5 rounded-lg border border-slate-200 text-[9pt] text-slate-800 leading-relaxed">
+            <div className={`grid grid-cols-1 ${termsClauses.length > 4 ? 'sm:grid-cols-2 print:grid-cols-2' : ''} gap-x-4 gap-y-1.5`}>
               {termsClauses.map((clause: string, idx: number) => {
                 // Attempt to parse "1. HEADING: Details"
                 const headingMatch = clause.match(/^(\d+)\.\s*([^:]+):\s*(.*)$/);
@@ -803,10 +805,10 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
           </div>
         </div>
 
-        {/* Company Authorization Block (Genuine Round Stamp, Clean Geometry) */}
-        <div className="flex justify-end pt-1.5 print:pt-0.5 text-[9pt] print-avoid-break">
-          <div className="stamp-authorization-box w-full sm:w-80 md:w-80 print:w-80 border border-slate-300 rounded-lg p-2 print:p-1 bg-white text-right space-y-0.5 ml-auto">
-            <p className="font-bold text-slate-900 uppercase text-[8.5pt] print:text-[8pt] tracking-wide">
+        {/* Company Authorization Block (Genuine Round Stamp, Clean Geometry — Kept Strictly Together) */}
+        <div className="flex justify-end pt-2 text-[9pt] print-avoid-break">
+          <div className="stamp-authorization-box w-full sm:w-80 md:w-80 print:w-80 border border-slate-300 rounded-lg p-2.5 bg-white text-right space-y-1 ml-auto">
+            <p className="font-bold text-slate-900 uppercase text-[9pt] tracking-wide">
               For Santhaya Associates Pvt. Ltd.
             </p>
 
@@ -825,7 +827,7 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
               </div>
             </div>
 
-            <div className="border-t border-dashed border-slate-300 pt-0.5 flex justify-between text-[8.5pt] print:text-[8pt] text-slate-600">
+            <div className="border-t border-dashed border-slate-300 pt-1 flex justify-between text-[9pt] text-slate-700">
               <span>Date: {formatIndianDate(activeVersion.issued_at || activeVersion.created_at)}</span>
               <span className="font-semibold text-slate-800">
                 {isRejectedStatus
@@ -838,17 +840,19 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
           </div>
         </div>
 
-        {/* Verified Company Contact Details Footer (High-Contrast NAP, 9pt) */}
-        <div className="mt-2 print:mt-1 pt-1 border-t-2 border-slate-300 text-center text-[9pt] text-slate-800 print:text-[8pt] leading-snug print-avoid-break">
+        {/* Verified Company Contact Details Footer (High-Contrast NAP, 9pt, Clickable Web Link) */}
+        <div className="mt-3 pt-1.5 border-t-2 border-slate-300 text-center text-[9pt] text-slate-800 leading-snug print-avoid-break">
           <p className="font-semibold text-slate-900">
-            Santhaya Associates Pvt. Ltd. <span className="text-slate-400 mx-1">•</span> Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India
+            Santhaya Associates Pvt. Ltd. <span className="text-slate-400 mx-1.5">•</span> Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India
           </p>
-          <p className="text-slate-700 mt-0.5 font-medium text-[8.5pt] print:text-[7.5pt]">
+          <p className="text-slate-700 mt-1 font-medium text-[8.5pt]">
             <span><strong>Call:</strong> +91 9430986713</span>
             <span className="text-slate-400 mx-1.5">|</span>
             <span><strong>WhatsApp:</strong> +91 9608950748</span>
             <span className="text-slate-400 mx-1.5">|</span>
-            <span><strong>Email:</strong> santhayapvt.ltd@gmail.com</span>
+            <span><strong>Email:</strong> <a href="mailto:santhayapvt.ltd@gmail.com" className="text-slate-800 hover:underline">santhayapvt.ltd@gmail.com</a></span>
+            <span className="text-slate-400 mx-1.5">|</span>
+            <span><strong>Web:</strong> <a href="https://santhayaassociates.com" target="_blank" rel="noopener noreferrer" className="text-[#10243B] font-semibold underline underline-offset-1">https://santhayaassociates.com</a></span>
             <span className="text-slate-400 mx-1.5">|</span>
             <span className="font-mono"><strong>GSTIN:</strong> 10ABVCS4277J1ZU</span>
           </p>
