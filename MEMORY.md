@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-11-17 | Phase: Quotation PDF Readability & Smart Pagination Refinement | Implementation status: Complete Readability & Smart Pagination Refinement on fix/quotation-pdf-readability; Removed "Status: Draft (Unissued)" Text & Restored Subtle Diagonal DRAFT Watermark; Upgraded Print Typography to 9-10pt Body & 15-16pt Totals; Implemented Smart A4 Pagination with Grouped Closing Contractual Block to Prevent Orphan Stamp; Set 6-Clause Standard Preset as Default for New Quotations with Safe 10-Clause Recommendation for Multi-Page Tenders; Integrated Official Clickable Website Link (https://santhayaassociates.com) in High-Contrast 9pt Footer; 100% Zero-Regression Verification Across All Suites (TypeScript, ESLint, 29/29 Routes Built Cleanly, 26/26 Refinements, 24/24 Stamp, 47/47 Pagination & Stress, 70/70 Batch Suites, Visual Headless Chrome A4 Layout Confirmed 0 Clipping); Controlled Deployment Gate Active
+Updated: 2026-11-17 | Phase: Final Quotation PDF Pagination Refinement | Implementation status: Complete Final PDF Pagination Refinement on fix/quotation-pdf-readability; Preserved 9-10pt Readable Typography, Subtle DRAFT Watermark, Clean QUOTATION Heading, 32mm Round Stamp, and Website Link; Ungrouped Closing Contract Block to Allow Natural Page Breaks Between Complete Clauses While Keeping Signatory Block Intact; Removed Multi-Page Recommendation Banner; Preserved 6 Clauses as Default and 10 Clauses as Optional Preset Requiring Staff Confirmation; 100% Passing Automated Tests (TypeScript, ESLint, Next.js Build 29/29 Routes, 24/24 Stamp, 26/26 Refinements, 47/47 Stress & Pagination, 70/70 Batches 2-5, Chrome A4 Verifier 0 Clipping Across 2, 5, 7, 10, 20, 30 Items); Stopped for Deployment Approval Gate
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -1019,6 +1019,45 @@ Updated: 2026-11-17 | Phase: Quotation PDF Readability & Smart Pagination Refine
         * Generated visual screenshots: quotation-readability-visual.png and quotation-2-items-visual.png.
       - Strict Production Safety:
         * Stopped after development and testing. Zero commits pushed to master, zero production database changes. Awaiting explicit owner review and approval.
+
+  - 2026-11-17: Final Quotation PDF Pagination Refinement (fix/quotation-pdf-readability):
+      - Pagination Correction (Ungrouped Closing Contract Block):
+        * Removed the rigid `.closing-contract-block` wrapper around Terms & Conditions and Company Authorization Block in `src/app/staff/quotations/[id]/pdf/page.tsx`.
+        * Allows natural page breaks between complete contractual clauses, with each individual clause strictly enforcing `break-inside-avoid`.
+        * Preserves Company Authorization Block with the genuine 32mm round stamp (`public/santhaya-round-stamp.png`) and Authorized Signatory line intact with `print-avoid-break`.
+        * Eliminates awkward artificial whitespace at the bottom of Page 1 while avoiding nearly empty continuation pages without shrinking readable font sizes.
+        * Repeating table headers (`thead { display: table-header-group !important; }`) preserved on continuation pages.
+      - Terms Presets & Clean Form Policy:
+        * 6-clause standard preset preserved as default for new quotations in `QuotationForm.tsx`, `actions.ts`, and `default-terms.ts`.
+        * 10-clause comprehensive preset retained as an optional button requiring explicit staff confirmation.
+        * Removed automated multi-page recommendation banner from `QuotationForm.tsx` and `QuotationDetailView.tsx` per owner requirement (do not recommend ten clauses solely to fill available page space).
+      - Core Requirements Verified:
+        * Preserved 9-10pt readable typography, 11.5pt client name, and 15-16pt font-black Grand Total.
+        * Preserved subtle diagonal DRAFT watermark across unissued document background without orange banners or duplicated headings.
+        * Preserved clean QUOTATION document title badge and official quotation numbering.
+        * Preserved clickable website link (`https://santhayaassociates.com`) in 2-line high-contrast 9pt footer.
+        * Preserved genuine 32mm circular company round stamp.
+      - Complete Verification Results:
+        * TypeScript checks (`npm run typecheck`): 0 errors.
+        * ESLint checks (`npm run lint`): 0 warnings, 0 errors.
+        * Production build (`npm run build`): 29/29 routes compiled cleanly, shared First Load JS 87.3 kB.
+        * Round stamp test suite (`npm run test:stamp`): 24/24 passed.
+        * Refinement test suite (`npm run test:refinements`): 26/26 passed.
+        * Pagination & stress suite (`test-phase7-quotation-stress-and-pagination.mjs`): 47/47 passed.
+        * Regression batches 2-5 (`test:batch2-5`): 70/70 passed.
+        * Headless Chrome A4 PDF rendering (`scripts/test-pdf-a4-refinement.mjs`):
+          - 2 items -> 1 page (0 clipping)
+          - 5 items -> 2 pages (0 clipping)
+          - 7 items -> 2 pages (0 clipping)
+          - 10 items -> 2 pages (0 clipping)
+          - 20 items -> 3 pages (0 clipping)
+          - 30 items -> 4 pages (0 clipping)
+        * Generated visual screenshot artifacts: `quotation-readability-visual.png` and `quotation-2-items-visual.png`.
+      - Production Safety Invariants:
+        * Zero modifications to production Supabase database.
+        * Existing quotation records, stored terms, and quotation numbers untouched.
+        * Invoicing and GST calculations untouched.
+        * Stopped after testing and requesting explicit owner approval before production deployment.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.

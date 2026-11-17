@@ -623,29 +623,12 @@ export default function QuotationForm({
                 type="button"
                 onClick={() => setTermsConditions(getDefaultQuotationTerms(validityDays))}
                 className="text-[11px] px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium transition"
-                title="Apply comprehensive 10 commercial clauses (recommended for multi-page tenders)"
+                title="Apply comprehensive 10 commercial clauses"
               >
                 10-Clause Comprehensive
               </button>
             </div>
           </div>
-
-          {/* Smart Multi-Page Recommendation (Non-intrusive advisory for quotations spanning multiple pages) */}
-          {items.length > 7 && (
-            <div className="mb-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-center justify-between gap-2 shadow-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-blue-950">💡 Smart Recommendation:</span>
-                <span>This quotation has {items.length} items and will span multiple pages. The 10-clause comprehensive standard is recommended for extensive contracts.</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTermsConditions(getDefaultQuotationTerms(validityDays))}
-                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium text-[11px] shrink-0 transition"
-              >
-                Apply 10-Clause Terms
-              </button>
-            </div>
-          )}
           <textarea
             rows={4}
             placeholder="Statutory warranties, delivery schedule, escalation clauses..."

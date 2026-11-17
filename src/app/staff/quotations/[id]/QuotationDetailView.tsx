@@ -628,46 +628,26 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
           </div>
 
           {isDraftEditable && canEdit && (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[11px] text-slate-500 font-medium">Apply Preset:</span>
-                <button
-                  type="button"
-                  onClick={() => handleApplyTermsPreset('compact_6_clause')}
-                  disabled={isPending}
-                  className="text-[11px] px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-medium transition disabled:opacity-50"
-                  title="Apply approved 6-clause standard terms (default for standard quotations)"
-                >
-                  6-Clause Standard (Default)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleApplyTermsPreset('standard_10_clause')}
-                  disabled={isPending}
-                  className="text-[11px] px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium transition disabled:opacity-50"
-                  title="Apply 10 comprehensive commercial clauses"
-                >
-                  10-Clause Comprehensive
-                </button>
-              </div>
-
-              {/* Multi-Page Recommendation: Visible recommendation requiring staff action */}
-              {lineItems.length > 7 && (
-                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-center justify-between gap-2 shadow-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-blue-950">💡 Multi-Page Recommendation:</span>
-                    <span>For multi-page tenders ({lineItems.length} items), 10-clause comprehensive terms provide fuller contractual coverage.</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyTermsPreset('standard_10_clause')}
-                    disabled={isPending}
-                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium text-[11px] shrink-0 disabled:opacity-50 transition"
-                  >
-                    Apply 10-Clause Terms
-                  </button>
-                </div>
-              )}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] text-slate-500 font-medium">Apply Preset:</span>
+              <button
+                type="button"
+                onClick={() => handleApplyTermsPreset('compact_6_clause')}
+                disabled={isPending}
+                className="text-[11px] px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-medium transition disabled:opacity-50"
+                title="Apply approved 6-clause standard terms (default for standard quotations)"
+              >
+                6-Clause Standard (Default)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleApplyTermsPreset('standard_10_clause')}
+                disabled={isPending}
+                className="text-[11px] px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium transition disabled:opacity-50"
+                title="Apply 10 comprehensive commercial clauses"
+              >
+                10-Clause Comprehensive
+              </button>
             </div>
           )}
 

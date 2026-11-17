@@ -77,7 +77,6 @@ function generateReadableHtml(items, isDraft = false, quoteNumber = 'QT-2026-27-
       tfoot { display: table-footer-group !important; }
       tr { page-break-inside: avoid !important; break-inside: avoid !important; }
       .print-avoid-break { page-break-inside: avoid !important; break-inside: avoid !important; }
-      .closing-contract-block { page-break-inside: avoid !important; break-inside: avoid !important; }
       .stamp-authorization-box { width: 320px !important; margin-left: auto !important; }
     }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 9.5pt; color: #0f172a; margin: 0; padding: 0; }
@@ -188,34 +187,31 @@ function generateReadableHtml(items, isDraft = false, quoteNumber = 'QT-2026-27-
       </div>
     </div>
 
-    <!-- Closing Contractual Group (Terms & Conditions + Company Authorization Block — Avoids Orphan Stamp) -->
-    <div class="closing-contract-block print-avoid-break">
-      <!-- Terms and Conditions (6-Clause Default Standard) -->
-      <div style="padding: 6px 0; border-bottom: 1px solid #cbd5e1;">
-        <p style="font-weight: bold; color: #10243B; font-size: 9.5pt; margin: 0 0 3px; text-transform: uppercase;">TERMS & CONDITIONS</p>
-        <div style="background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 9pt; line-height: 1.35;">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;">
-            <div style="display: flex; gap: 4px;"><strong style="color: #10243B;">1. Validity & Pricing:</strong><span>Valid for 30 calendar days from date of issuance. Rates are based on statutory duties.</span></div>
-            <div style="display: flex; gap: 4px;"><strong style="color: #10243B;">2. Scope of Supply:</strong><span>Strictly limited to technical specifications and quantities enumerated in this proposal.</span></div>
-            <div style="display: flex; gap: 4px;"><strong style="color: #10243B;">3. Payment & Delivery:</strong><span>Commercial milestones follow agreed terms; timeline commences upon confirmed advance.</span></div>
-            <div style="display: flex; gap: 4px;"><strong style="color: #10243B;">4. Freight & Warranty:</strong><span>Transit freight and insurance apply per agreed terms; standard OEM warranty applies.</span></div>
-            <div style="display: flex; gap: 4px;"><strong style="color: #10243B;">5. Changes & Force Majeure:</strong><span>Modifications require written consent. Delays caused by force majeure are excused.</span></div>
-            <div style="display: flex; gap: 4px;"><strong style="color: #10243B;">6. Governing Law:</strong><span>Governed exclusively by Indian law; jurisdiction competent courts at Motihari, Bihar.</span></div>
-          </div>
+    <!-- Terms and Conditions (6-Clause Default Standard, allows clean page breaks between clauses) -->
+    <div style="padding: 6px 0; border-bottom: 1px solid #cbd5e1;">
+      <p style="font-weight: bold; color: #10243B; font-size: 9.5pt; margin: 0 0 3px; text-transform: uppercase;">TERMS & CONDITIONS</p>
+      <div style="background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 9pt; line-height: 1.35;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;">
+          <div style="display: flex; gap: 4px; page-break-inside: avoid; break-inside: avoid;"><strong style="color: #10243B;">1. Validity & Pricing:</strong><span>Valid for 30 calendar days from date of issuance. Rates are based on statutory duties.</span></div>
+          <div style="display: flex; gap: 4px; page-break-inside: avoid; break-inside: avoid;"><strong style="color: #10243B;">2. Scope of Supply:</strong><span>Strictly limited to technical specifications and quantities enumerated in this proposal.</span></div>
+          <div style="display: flex; gap: 4px; page-break-inside: avoid; break-inside: avoid;"><strong style="color: #10243B;">3. Payment & Delivery:</strong><span>Commercial milestones follow agreed terms; timeline commences upon confirmed advance.</span></div>
+          <div style="display: flex; gap: 4px; page-break-inside: avoid; break-inside: avoid;"><strong style="color: #10243B;">4. Freight & Warranty:</strong><span>Transit freight and insurance apply per agreed terms; standard OEM warranty applies.</span></div>
+          <div style="display: flex; gap: 4px; page-break-inside: avoid; break-inside: avoid;"><strong style="color: #10243B;">5. Changes & Force Majeure:</strong><span>Modifications require written consent. Delays caused by force majeure are excused.</span></div>
+          <div style="display: flex; gap: 4px; page-break-inside: avoid; break-inside: avoid;"><strong style="color: #10243B;">6. Governing Law:</strong><span>Governed exclusively by Indian law; jurisdiction competent courts at Motihari, Bihar.</span></div>
         </div>
       </div>
+    </div>
 
-      <!-- Company Authorization Box (32mm authentic round stamp preserved) -->
-      <div class="print-avoid-break" style="display: flex; justify-content: flex-end; padding-top: 6px;">
-        <div class="stamp-authorization-box" style="width: 320px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; text-align: right; background: white;">
-          <p style="font-size: 9pt; font-weight: bold; color: #0f172a; text-transform: uppercase; margin: 0;">For Santhaya Associates Pvt. Ltd.</p>
-          <div class="stamp-align-container" style="min-height: 32mm; display: flex; align-items: center; justify-content: flex-end; padding: 2px 0;">
-            <img src="data:image/png;base64,${stampBase64}" style="width: 32mm; height: 32mm; max-width: 120px; max-height: 120px; object-fit: contain;" />
-          </div>
-          <div style="border-top: 1px dashed #cbd5e1; padding-top: 3px; display: flex; justify-content: space-between; font-size: 9pt; color: #334155;">
-            <span>Date: 17 Nov 2026</span>
-            <span style="font-weight: 600; color: #1e293b;">Authorized Signatory</span>
-          </div>
+    <!-- Company Authorization Box (32mm authentic round stamp preserved, kept strictly together) -->
+    <div class="print-avoid-break" style="display: flex; justify-content: flex-end; padding-top: 6px;">
+      <div class="stamp-authorization-box" style="width: 320px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; text-align: right; background: white;">
+        <p style="font-size: 9pt; font-weight: bold; color: #0f172a; text-transform: uppercase; margin: 0;">For Santhaya Associates Pvt. Ltd.</p>
+        <div class="stamp-align-container" style="min-height: 32mm; display: flex; align-items: center; justify-content: flex-end; padding: 2px 0;">
+          <img src="data:image/png;base64,${stampBase64}" style="width: 32mm; height: 32mm; max-width: 120px; max-height: 120px; object-fit: contain;" />
+        </div>
+        <div style="border-top: 1px dashed #cbd5e1; padding-top: 3px; display: flex; justify-content: space-between; font-size: 9pt; color: #334155;">
+          <span>Date: 17 Nov 2026</span>
+          <span style="font-weight: 600; color: #1e293b;">Authorized Signatory</span>
         </div>
       </div>
     </div>

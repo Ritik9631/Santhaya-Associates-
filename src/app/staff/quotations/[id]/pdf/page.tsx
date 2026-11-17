@@ -223,10 +223,6 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
-          .closing-contract-block {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
           .quotation-grid-table,
           .quotation-grid-table th,
           .quotation-grid-table td {
@@ -766,83 +762,80 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
           </div>
         </div>
 
-        {/* Closing Contractual Group (Terms & Conditions + Company Authorization Block — avoids orphan stamp on page 2) */}
-        <div className="closing-contract-block print-avoid-break">
-          {/* Commercial Terms & Conditions (Clear Bold Headings, 2-Column Responsive Grid, Readable Text) */}
-          <div className="pt-2 pb-2 border-b border-slate-200">
-            <p className="font-bold text-[#10243B] uppercase tracking-wider text-[9.5pt] mb-1">
-              TERMS & CONDITIONS
-            </p>
-            <div className="bg-slate-50/80 p-2.5 rounded-lg border border-slate-200 text-[9pt] text-slate-800 leading-relaxed">
-              <div className={`grid grid-cols-1 ${termsClauses.length > 4 ? 'sm:grid-cols-2 print:grid-cols-2' : ''} gap-x-4 gap-y-1.5`}>
-                {termsClauses.map((clause: string, idx: number) => {
-                  // Attempt to parse "1. HEADING: Details"
-                  const headingMatch = clause.match(/^(\d+)\.\s*([^:]+):\s*(.*)$/);
-                  if (headingMatch) {
-                    return (
-                      <div key={idx} className="flex items-start gap-1.5 break-inside-avoid">
-                        <span className="font-bold text-[#10243B] shrink-0 w-5 text-right select-none">{headingMatch[1]}.</span>
-                        <p className="flex-1 text-slate-800">
-                          <strong className="font-bold text-slate-900">{headingMatch[2]}: </strong>
-                          <span className="text-slate-700">{headingMatch[3]}</span>
-                        </p>
-                      </div>
-                    );
-                  }
-
-                  // Fallback if no colon in clause
-                  const simpleMatch = clause.match(/^(\d+)\.\s*(.*)$/);
-                  if (simpleMatch) {
-                    return (
-                      <div key={idx} className="flex items-start gap-1.5 break-inside-avoid">
-                        <span className="font-bold text-[#10243B] shrink-0 w-5 text-right select-none">{simpleMatch[1]}.</span>
-                        <p className="flex-1 text-slate-700">{simpleMatch[2]}</p>
-                      </div>
-                    );
-                  }
-
+        {/* Commercial Terms & Conditions (Clear Bold Headings, 2-Column Responsive Grid, Readable Text, Natural Page Breaks Between Clauses) */}
+        <div className="pt-2 pb-2 border-b border-slate-200">
+          <p className="font-bold text-[#10243B] uppercase tracking-wider text-[9.5pt] mb-1">
+            TERMS & CONDITIONS
+          </p>
+          <div className="bg-slate-50/80 p-2.5 rounded-lg border border-slate-200 text-[9pt] text-slate-800 leading-relaxed">
+            <div className={`grid grid-cols-1 ${termsClauses.length > 4 ? 'sm:grid-cols-2 print:grid-cols-2' : ''} gap-x-4 gap-y-1.5`}>
+              {termsClauses.map((clause: string, idx: number) => {
+                // Attempt to parse "1. HEADING: Details"
+                const headingMatch = clause.match(/^(\d+)\.\s*([^:]+):\s*(.*)$/);
+                if (headingMatch) {
                   return (
-                    <p key={idx} className="pl-4 break-inside-avoid text-slate-700">
-                      {clause}
-                    </p>
+                    <div key={idx} className="flex items-start gap-1.5 break-inside-avoid">
+                      <span className="font-bold text-[#10243B] shrink-0 w-5 text-right select-none">{headingMatch[1]}.</span>
+                      <p className="flex-1 text-slate-800">
+                        <strong className="font-bold text-slate-900">{headingMatch[2]}: </strong>
+                        <span className="text-slate-700">{headingMatch[3]}</span>
+                      </p>
+                    </div>
                   );
-                })}
-              </div>
+                }
+
+                // Fallback if no colon in clause
+                const simpleMatch = clause.match(/^(\d+)\.\s*(.*)$/);
+                if (simpleMatch) {
+                  return (
+                    <div key={idx} className="flex items-start gap-1.5 break-inside-avoid">
+                      <span className="font-bold text-[#10243B] shrink-0 w-5 text-right select-none">{simpleMatch[1]}.</span>
+                      <p className="flex-1 text-slate-700">{simpleMatch[2]}</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <p key={idx} className="pl-4 break-inside-avoid text-slate-700">
+                    {clause}
+                  </p>
+                );
+              })}
             </div>
           </div>
+        </div>
 
-          {/* Company Authorization Block (Genuine Round Stamp, Clean Geometry) */}
-          <div className="flex justify-end pt-2 text-[9pt] print-avoid-break">
-            <div className="stamp-authorization-box w-full sm:w-80 md:w-80 print:w-80 border border-slate-300 rounded-lg p-2.5 bg-white text-right space-y-1 ml-auto">
-              <p className="font-bold text-slate-900 uppercase text-[9pt] tracking-wide">
-                For Santhaya Associates Pvt. Ltd.
-              </p>
+        {/* Company Authorization Block (Genuine Round Stamp, Clean Geometry — Kept Strictly Together) */}
+        <div className="flex justify-end pt-2 text-[9pt] print-avoid-break">
+          <div className="stamp-authorization-box w-full sm:w-80 md:w-80 print:w-80 border border-slate-300 rounded-lg p-2.5 bg-white text-right space-y-1 ml-auto">
+            <p className="font-bold text-slate-900 uppercase text-[9pt] tracking-wide">
+              For Santhaya Associates Pvt. Ltd.
+            </p>
 
-              {/* Official Circular Stamp: Approved company stamp displayed above signatory line */}
-              <div className="stamp-align-container py-0.5 flex items-center justify-end w-full min-h-[32mm]">
-                <div className="stamp-image-wrapper relative flex items-center justify-end ml-auto">
-                  <Image
-                    src="/santhaya-round-stamp.png"
-                    alt="Santhaya Associates Official Company Stamp"
-                    width={1254}
-                    height={1254}
-                    className="w-[32mm] h-[32mm] max-w-[120px] max-h-[120px] object-contain select-none pointer-events-none ml-auto"
-                    priority
-                    unoptimized
-                  />
-                </div>
+            {/* Official Circular Stamp: Approved company stamp displayed above signatory line */}
+            <div className="stamp-align-container py-0.5 flex items-center justify-end w-full min-h-[32mm]">
+              <div className="stamp-image-wrapper relative flex items-center justify-end ml-auto">
+                <Image
+                  src="/santhaya-round-stamp.png"
+                  alt="Santhaya Associates Official Company Stamp"
+                  width={1254}
+                  height={1254}
+                  className="w-[32mm] h-[32mm] max-w-[120px] max-h-[120px] object-contain select-none pointer-events-none ml-auto"
+                  priority
+                  unoptimized
+                />
               </div>
+            </div>
 
-              <div className="border-t border-dashed border-slate-300 pt-1 flex justify-between text-[9pt] text-slate-700">
-                <span>Date: {formatIndianDate(activeVersion.issued_at || activeVersion.created_at)}</span>
-                <span className="font-semibold text-slate-800">
-                  {isRejectedStatus
-                    ? 'Authorized Signatory (Archival Copy)'
-                    : isSupersededVersion
-                    ? 'Authorized Signatory (Superseded)'
-                    : 'Authorized Signatory'}
-                </span>
-              </div>
+            <div className="border-t border-dashed border-slate-300 pt-1 flex justify-between text-[9pt] text-slate-700">
+              <span>Date: {formatIndianDate(activeVersion.issued_at || activeVersion.created_at)}</span>
+              <span className="font-semibold text-slate-800">
+                {isRejectedStatus
+                  ? 'Authorized Signatory (Archival Copy)'
+                  : isSupersededVersion
+                  ? 'Authorized Signatory (Superseded)'
+                  : 'Authorized Signatory'}
+              </span>
             </div>
           </div>
         </div>
