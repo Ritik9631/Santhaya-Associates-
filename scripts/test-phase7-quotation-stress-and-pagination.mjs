@@ -160,15 +160,15 @@ test('PDF Test 1 & 2: Short quotations (1-2 items) fit comfortably inside single
 
 test('PDF Test 3: Five items (standard quote) columns fit inside 100% printable width without clipping', () => {
   const pdfContent = fs.readFileSync(path.join(rootDir, 'src/app/staff/quotations/[id]/pdf/page.tsx'), 'utf8');
-  // Column percentages for GST (sums to 100%, with 17% for Total to prevent clipping):
-  // 4% + 27% + 8% + 5% + 5% + 10% + 10% + 5% + 9% + 17% = 100%
+  // Column percentages for GST (sums to 100%, with 15% for Total and 11% for Rate & Taxable):
+  // 4% + 27% + 8% + 5% + 5% + 11% + 11% + 5% + 9% + 15% = 100%
   assert(pdfContent.includes("w-[4%]"), 'Col 1: 4%');
   assert(pdfContent.includes("w-[27%]"), 'Col 2: 27%');
   assert(pdfContent.includes("w-[8%]"), 'Col 3: 8%');
   assert(pdfContent.includes("w-[5%]"), 'Col 4, 5, 8: 5%');
-  assert(pdfContent.includes("w-[10%]"), 'Col 6, 7: 10%');
+  assert(pdfContent.includes("w-[11%]"), 'Col 6, 7: 11%');
   assert(pdfContent.includes("w-[9%]"), 'Col 9: 9%');
-  assert(pdfContent.includes("w-[17%]"), 'Col 10: 17%');
+  assert(pdfContent.includes("w-[15%]"), 'Col 10: 15%');
 });
 
 test('PDF Test 4 & 5: Long & multi-page quotes (20-50 items) repeat thead and avoid split rows', () => {
@@ -205,10 +205,10 @@ test('PDF Test 9: Large monetary values (multi-Crores) format with whitespace-no
 
 test('PDF Test 10: GST vs Non-GST table layouts both sum to 100% of usable A4 width', () => {
   const pdfContent = fs.readFileSync(path.join(rootDir, 'src/app/staff/quotations/[id]/pdf/page.tsx'), 'utf8');
-  // Non-GST column widths: 4% + 37% + 11% + 8% + 8% + 15% + 17% = 100%
+  // Non-GST column widths: 4% + 37% + 9% + 6% + 6% + 18% + 20% = 100%
   assert(pdfContent.includes("w-[37%]"), 'Non-GST description expands to 37%');
-  assert(pdfContent.includes("w-[15%]"), 'Non-GST rate expands to 15%');
-  assert(pdfContent.includes("w-[17%]"), 'Non-GST total expands to 17%');
+  assert(pdfContent.includes("w-[18%]"), 'Non-GST rate expands to 18%');
+  assert(pdfContent.includes("w-[20%]"), 'Non-GST total expands to 20%');
 });
 
 console.log('----------------------------------------------------------------------');

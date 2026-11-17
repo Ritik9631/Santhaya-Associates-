@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-11-03 | Phase: Staff Login & Quotation Performance Optimization | Implementation status: Complete Request-Scoped Session Memoization (React.cache), Concurrent Rate-Limiting & Query Parallelism (Promise.all in loginAction, NewQuotationPage, createQuotationAction, NewInvoicePage), Network-Only PWA Verification, 100% Zero-Regression Verification Across All Suites (TypeScript, ESLint, PWA 31/31, Responsive 48/48, Regressions 70/70, 27/27 Routes Built Cleanly); Phase 7 Cutover on Hold
+Updated: 2026-11-17 | Phase: Quotation PDF Layout Refinement & Desktop Development Setup | Implementation status: Complete Local Desktop Setup on fix/quotation-pdf-layout-refinement; Removed Excessive Draft Banner, Watermark, & R2 from PDF; Preserved Clean "QUOTATION" Title & Discreet Draft Indicator; Reallocated Table Columns (11% Rate, 11% Taxable, 15% Total); Optimized A4 Print Rhythm to Fit 7-Item Quotation on Single Page with 32mm Stamp Intact; Verified QT-2026-27-002 Immutability and Next Sequence QT-2026-27-008; 100% Zero-Regression Verification Across All Suites (TypeScript, ESLint, 29/29 Routes Built Cleanly, 26/26 Refinements, 24/24 Stamp, 47/47 Pagination & Stress, 70/70 Batch Suites, Visual Chrome A4 Layout Confirmed); Controlled Deployment Gate Active
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -937,6 +937,49 @@ Updated: 2026-11-03 | Phase: Staff Login & Quotation Performance Optimization | 
         * Regression batteries: test:super-admin, test:refinements (26/26), test:stamp (24/24), test:batch2 through test:batch5 (70/70) all passing.
         * Production build (next build): 27/27 routes compiled cleanly, shared First Load JS 87.3 kB.
         * Temporary measurement scripts safely cleaned up; legacy out/ folder, source code, and database records preserved intact.
+
+  - 2026-11-17: Quotation PDF Refinement, A4 Single-Page Fit & Desktop Development Setup (Phases 1 through 6):
+      - Phase 1 — Local Desktop Setup & Environment Isolation:
+        * Verified clean repository cloned on Windows environment (Node v22.12.0, npm 10.9.0).
+        * Fetched origin/master baseline (commit d57366a) and created dedicated feature branch fix/quotation-pdf-layout-refinement.
+        * Configured .env.local strictly targeting development Supabase project ref bkqneudnnhvvwmtggorz with EMAIL_PROVIDER=mock. Verified .env.local is git-ignored (.gitignore:27).
+        * Zero production credentials copied, zero database migrations executed automatically.
+      - Phase 2 — Draft Label Cleanup on Quotation PDF (src/app/staff/quotations/[id]/pdf/page.tsx):
+        * Removed the large top orange alert banner ("DRAFT QUOTATION Preliminary estimate for review only...").
+        * Removed the large diagonal draft watermark ("DRAFT Preliminary Review Only").
+        * Restored the clean, high-contrast document title badge "QUOTATION" (bg-[#10243B] text-[#F4B323]).
+        * Removed the internal revision code (-R2) from the customer-facing PDF header, preserving the clean quotation reference QT-2026-27-002.
+        * Added a single discreet, truthful status indicator for unissued drafts: <span className="inline-block text-[8pt] font-semibold text-slate-700 bg-slate-100 border border-slate-300 px-1.5 py-0.5 rounded leading-none">Draft (Unissued)</span> placed cleanly under Place of Supply.
+        * Preserved clear archival status labeling, watermarks, and banners for rejected and superseded historical copies.
+        * Maintained internal ERP revision history and quotation status untouched.
+      - Phase 3 — A4 Page Layout Optimization:
+        * Addressed the root cause of the 7-item quotation spilling onto Page 2 (which previously left only the stamp and footer orphaned on page 2).
+        * Reduced vertical whitespace in print styles (print:py-0.5, print:pt-0.5, print:pb-0.5, my-2.5 print:my-1).
+        * Kept 32mm circular company round stamp intact in bottom-right Authorized Signatory block with min-h-[32mm] container.
+        * Verified through headless Chrome Print to PDF with A4 paper settings: 7-item quotation fits completely on exactly 1 A4 page with zero text shrinkage, zero overlap, and ~140px vertical safety margin.
+        * Verified short quotes (1-2 items: 1 page; 5 items: 1 page) and long quotes (10+ items: balanced multi-page breaks with repeated thead).
+      - Phase 4 — Table Column Widths & Metric Reallocation:
+        * Reduced Total (₹) column width from 17% to 15% to eliminate surplus whitespace.
+        * Reallocated available width to Rate (₹) from 10% to 11% and Taxable (₹) from 10% to 11%.
+        * Non-GST table widths updated to 4% (#), 37% (Description), 9% (HSN), 6% (Qty), 6% (Unit), 18% (Rate), 20% (Total).
+        * Total table width sums to exactly 100%. Tested with numbers up to ₹1,25,00,000 (1.25 Cr) and fractional paise with zero overflow, clipping, or overlap.
+      - Phase 5 — Quotation Numbering Verification & Audit:
+        * Verified that reopening and editing QT-2026-27-002 preserves the original quotation number untouched (reopen_rejected_quotation RPC sets is_locked = true on prior version and creates QT-2026-27-002-R2 snapshot, leaving quotation_number unmodified).
+        * Read-only audit of public.quotation_fy_sequences for FY 2026-27 confirmed last_seq = 7.
+        * Confirmed next available new quotation number is QT-2026-27-008 via public.generate_quotation_number() and generateServerQuotationNumber fallback.
+        * Zero mutations performed against production database, zero test quotations created.
+      - Phase 6 — Full Automated Regression Testing & Visual Artifacts:
+        * TypeScript checks (tsc --noEmit): 0 errors.
+        * ESLint validation (next lint): 0 warnings, 0 errors.
+        * Production build (next build): 29/29 routes compiled cleanly, shared First Load JS 87.3 kB.
+        * PDF refinement suite (test:refinements): 26/26 passed.
+        * Round stamp suite (test:stamp): 24/24 passed across all 4 sections.
+        * Pagination & stress suite (test-phase7-quotation-stress-and-pagination.mjs): 47/47 passed.
+        * Comprehensive regression batches (test:batch2 through test:batch5): 70/70 passed.
+        * Automated Headless Chrome A4 layout script (scripts/test-pdf-a4-refinement.mjs): confirmed 0 clipping and verified page counts.
+        * Generated visual before/after comparison artifacts saved to artifact directory: quotation-7-items-before-layout.png and quotation-7-items-visual.png.
+      - Strict Production Safety:
+        * Stopped after local development and testing. No push to master, no database migrations executed, no Hostinger deployment triggered. Awaiting explicit user approval.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
