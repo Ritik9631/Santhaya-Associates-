@@ -31,9 +31,13 @@ interface PageProps {
   params: {
     id: string;
   };
+  searchParams?: {
+    v?: string;
+    version?: string;
+  };
 }
 
-export default async function QuotationPdfPage({ params }: PageProps) {
+export default async function QuotationPdfPage({ params, searchParams }: PageProps) {
   try {
     await requireStaffSession();
   } catch {
@@ -89,11 +93,23 @@ export default async function QuotationPdfPage({ params }: PageProps) {
 
   const rawQuote: any = quote;
 
-  // Active version snapshot
+  // Active version snapshot (supports viewing historical revisions via ?v=N or ?version=N)
+  const requestedVersion = searchParams?.version
+    ? Number(searchParams.version)
+    : searchParams?.v
+    ? Number(searchParams.v)
+    : null;
+
   const activeVersion =
+    (requestedVersion
+      ? rawQuote.quotation_versions?.find(
+          (v: any) => v.version_number === requestedVersion
+        )
+      : null) ||
     rawQuote.quotation_versions?.find(
       (v: any) => v.version_number === quote.current_version_number
-    ) || rawQuote.quotation_versions?.[0];
+    ) ||
+    rawQuote.quotation_versions?.[0];
 
   if (!activeVersion) {
     notFound();
@@ -141,12 +157,10 @@ export default async function QuotationPdfPage({ params }: PageProps) {
     '100% advance against Proforma Invoice prior to dispatch'
   );
 
-  // Authorization status for corporate seal application:
-  // Stamp is only rendered on finalized/authorized quotations ('issued', 'accepted', 'converted_to_invoice' or having active issued_at)
-  // Draft quotations ('draft') remain strictly unstamped per statutory corporate governance rules.
-  const isAuthorized =
-    ['issued', 'accepted', 'converted_to_invoice'].includes(quote.status) ||
-    Boolean(activeVersion.issued_at);
+  // Document status & revision state for compliance badges and archival notices
+  const isSupersededVersion = activeVersion.version_number < quote.current_version_number;
+  const isDraftStatus = quote.status === 'draft';
+  const isRejectedStatus = quote.status === 'rejected';
 
   return (
     <div className="min-h-screen bg-slate-100 py-6 px-4 print:bg-white print:py-0 print:px-0 text-slate-900 font-sans">
@@ -296,7 +310,81 @@ export default async function QuotationPdfPage({ params }: PageProps) {
       )}
 
       {/* Official Quotation Document Container (A4 Printable) */}
-      <div className="print-container max-w-4xl mx-auto bg-white border border-slate-200 shadow-md p-6 sm:p-7 print:border-none print:shadow-none print:p-0 print:max-w-none text-slate-900 leading-normal">
+      <div className="print-container relative overflow-hidden max-w-4xl mx-auto bg-white border border-slate-200 shadow-md p-6 sm:p-7 print:border-none print:shadow-none print:p-0 print:max-w-none text-slate-900 leading-normal">
+        {/* Subtle Watermark for Draft / Rejected / Superseded Quotations */}
+        {isDraftStatus && (
+          <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center overflow-hidden select-none">
+            <div className="text-amber-500/10 print:text-amber-600/15 font-black text-6xl sm:text-7xl md:text-8xl -rotate-45 tracking-widest uppercase border-4 border-dashed border-amber-500/15 print:border-amber-600/20 p-8 rounded-3xl text-center">
+              DRAFT
+              <div className="text-lg sm:text-xl mt-2 tracking-normal font-bold">
+                Preliminary Review Only
+              </div>
+            </div>
+          </div>
+        )}
+        {isRejectedStatus && (
+          <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center overflow-hidden select-none">
+            <div className="text-rose-500/10 print:text-rose-600/15 font-black text-6xl sm:text-7xl md:text-8xl -rotate-45 tracking-widest uppercase border-4 border-dashed border-rose-500/15 print:border-rose-600/20 p-8 rounded-3xl text-center">
+              REJECTED
+              <div className="text-lg sm:text-xl mt-2 tracking-normal font-bold">
+                Archival Record • Void
+              </div>
+            </div>
+          </div>
+        )}
+        {isSupersededVersion && (
+          <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center overflow-hidden select-none">
+            <div className="text-slate-500/10 print:text-slate-600/15 font-black text-5xl sm:text-6xl md:text-7xl -rotate-45 tracking-widest uppercase border-4 border-dashed border-slate-500/15 print:border-slate-600/20 p-8 rounded-3xl text-center">
+              SUPERSEDED
+              <div className="text-lg sm:text-xl mt-2 tracking-normal font-bold">
+                Historical Revision ({activeVersion.version_code || `R${activeVersion.version_number - 1}`})
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Document Status Notice (Visible in Print & Screen to prevent confusion with formally issued quotations) */}
+        {isDraftStatus && (
+          <div className="mb-2 p-2 bg-amber-50 border-2 border-amber-500 rounded-lg text-amber-950 text-xs font-semibold flex items-center justify-between print:border-amber-600">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold uppercase tracking-wider bg-amber-500 text-slate-950 px-2 py-0.5 rounded text-[9pt] shrink-0">
+                DRAFT QUOTATION
+              </span>
+              <span className="text-[8.5pt] leading-tight">
+                Preliminary estimate for review only. Not a binding or formally issued commercial quotation.
+              </span>
+            </div>
+            <span className="font-mono text-[8pt] text-amber-800 shrink-0 font-bold ml-2">STATUS: DRAFT</span>
+          </div>
+        )}
+
+        {isRejectedStatus && (
+          <div className="mb-2 p-2 bg-rose-50 border-2 border-rose-500 rounded-lg text-rose-950 text-xs font-semibold flex items-center justify-between print:border-rose-600">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold uppercase tracking-wider bg-rose-600 text-white px-2 py-0.5 rounded text-[9pt] shrink-0">
+                REJECTED QUOTATION
+              </span>
+              <span className="text-[8.5pt] leading-tight">
+                Archival record: This quotation was rejected and is not valid for commercial execution.
+              </span>
+            </div>
+            <span className="font-mono text-[8pt] text-rose-800 shrink-0 font-bold ml-2">STATUS: REJECTED (VOID)</span>
+          </div>
+        )}
+
+        {isSupersededVersion && (
+          <div className="mb-2 p-2 bg-slate-100 border-2 border-slate-400 rounded-lg text-slate-800 text-xs font-semibold flex items-center justify-between print:border-slate-500">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold uppercase tracking-wider bg-slate-600 text-white px-2 py-0.5 rounded text-[9pt] shrink-0">
+                SUPERSEDED REVISION ({activeVersion.version_code || `R${activeVersion.version_number - 1}`})
+              </span>
+              <span className="text-[8.5pt] leading-tight">
+                Archival record: This revision has been superseded by a newer revision.
+              </span>
+            </div>
+            <span className="font-mono text-[8pt] text-slate-600 shrink-0 font-bold ml-2">HISTORICAL SNAPSHOT</span>
+          </div>
+        )}
         {/* Header Block (Authentic Logo, Company Hierarchy, QUOTATION Badge, FY Number) */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between pb-1.5 print:pb-1 border-b-2 border-[#10243B] gap-2.5">
           <div className="flex items-start gap-3 max-w-[62%]">
@@ -329,9 +417,32 @@ export default async function QuotationPdfPage({ params }: PageProps) {
           </div>
 
           <div className="sm:text-right shrink-0">
-            <span className="inline-block bg-[#10243B] text-[#F4B323] text-[8.5pt] font-extrabold tracking-widest uppercase px-2.5 py-0.5 rounded shadow-sm">
-              QUOTATION
-            </span>
+            <div className="flex items-center sm:justify-end gap-1.5 flex-wrap">
+              <span
+                className={`inline-block text-[8.5pt] font-extrabold tracking-widest uppercase px-2.5 py-0.5 rounded shadow-sm ${
+                  isDraftStatus
+                    ? 'bg-amber-500 text-slate-950 border border-amber-600'
+                    : isRejectedStatus
+                    ? 'bg-rose-600 text-white border border-rose-700'
+                    : isSupersededVersion
+                    ? 'bg-slate-700 text-slate-100 border border-slate-800'
+                    : 'bg-[#10243B] text-[#F4B323]'
+                }`}
+              >
+                {isDraftStatus
+                  ? 'DRAFT QUOTATION'
+                  : isRejectedStatus
+                  ? 'REJECTED QUOTATION'
+                  : isSupersededVersion
+                  ? 'SUPERSEDED QUOTATION'
+                  : 'QUOTATION'}
+              </span>
+              {activeVersion.version_code && (
+                <span className="inline-block bg-slate-100 text-slate-800 border border-slate-300 text-[8pt] font-bold font-mono px-2 py-0.5 rounded">
+                  {activeVersion.version_code}
+                </span>
+              )}
+            </div>
             <h1 className="text-xl sm:text-[22pt] font-black text-slate-900 mt-0.5 font-mono tracking-tight">
               {quote.quotation_number}
             </h1>
@@ -740,7 +851,15 @@ export default async function QuotationPdfPage({ params }: PageProps) {
 
             <div className="border-t border-dashed border-slate-300 pt-0.5 flex justify-between text-[8.5pt] text-slate-600">
               <span>Date: {formatIndianDate(activeVersion.issued_at || activeVersion.created_at)}</span>
-              <span className="font-semibold text-slate-800">Authorized Signatory</span>
+              <span className="font-semibold text-slate-800">
+                {isDraftStatus
+                  ? 'Authorized Signatory (Draft Review)'
+                  : isRejectedStatus
+                  ? 'Authorized Signatory (Archival Copy)'
+                  : isSupersededVersion
+                  ? 'Authorized Signatory (Superseded)'
+                  : 'Authorized Signatory'}
+              </span>
             </div>
           </div>
         </div>

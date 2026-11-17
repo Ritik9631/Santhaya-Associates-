@@ -331,7 +331,7 @@ export default function QuotationDetailView({ quotation, userRole }: QuotationDe
           )}
 
           <Link
-            href={`/staff/quotations/${quotation.id}/pdf`}
+            href={`/staff/quotations/${quotation.id}/pdf${activeVersionNumber !== quotation.current_version_number ? `?v=${activeVersionNumber}` : ''}`}
             target="_blank"
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition"
           >
