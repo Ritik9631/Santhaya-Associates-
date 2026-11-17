@@ -14,6 +14,7 @@ import {
   convertNumberToIndianWords,
   formatIndianRupee,
   formatSmartRupee,
+  formatWholeRupee,
 } from '@/lib/utils/currency';
 import { formatIndianDate } from '@/lib/utils/date';
 import { getDefaultQuotationTerms, getSimplifiedQuotationTerms } from '@/lib/billing/default-terms';
@@ -143,6 +144,15 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
   const isTaxDetermined = taxDetermination !== 'undetermined';
   const placeOfSupplyFormatted = formatPlaceOfSupply(quote.place_of_supply_state_code);
 
+  // Display-only check: flag whether any line-item tax amount has fractional paise
+  // so whole-rupee TAX column rounding is transparently noted against exact GST summary totals
+  const hasFractionalLineTax =
+    quote.is_gst_applicable &&
+    isTaxDetermined &&
+    lineItems.some(
+      (item: any) => Math.round(Math.abs(Number(item.tax_amount || 0)) * 100) % 100 !== 0
+    );
+
   const defaultTerms = getSimplifiedQuotationTerms(activeVersion.validity_days || 30);
   const rawTermsText = activeVersion.terms_conditions || defaultTerms;
   const termsClauses = rawTermsText
@@ -199,6 +209,27 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
             margin: 0 !important;
             border: none !important;
             box-shadow: none !important;
+            overflow: visible !important;
+            background: transparent !important;
+          }
+          .pdf-watermark-layer {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            pointer-events: none !important;
+            z-index: 0 !important;
+            overflow: visible !important;
+          }
+          .pdf-content-layer {
+            position: relative !important;
+            z-index: 10 !important;
           }
           table {
             width: 100% !important;
@@ -311,37 +342,38 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
 
       {/* Official Quotation Document Container (A4 Printable) */}
       <div className="print-container relative overflow-hidden max-w-4xl mx-auto bg-white border border-slate-200 shadow-md p-6 sm:p-7 print:border-none print:shadow-none print:p-0 print:max-w-none text-slate-900 leading-normal">
-        {/* Subtle Watermark for Draft / Rejected / Superseded Historical Quotations */}
-        {isDraftStatus && (
-          <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center overflow-hidden select-none">
-            <div className="text-amber-500/10 print:text-amber-600/15 font-black text-6xl sm:text-7xl md:text-8xl -rotate-45 tracking-widest uppercase border-4 border-dashed border-amber-500/15 print:border-amber-600/20 p-8 rounded-3xl text-center">
-              DRAFT
-              <div className="text-lg sm:text-xl mt-2 tracking-normal font-bold">
-                Preliminary Review Only
-              </div>
-            </div>
-          </div>
-        )}
-        {isRejectedStatus && (
-          <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center overflow-hidden select-none">
-            <div className="text-rose-500/10 print:text-rose-600/15 font-black text-6xl sm:text-7xl md:text-8xl -rotate-45 tracking-widest uppercase border-4 border-dashed border-rose-500/15 print:border-rose-600/20 p-8 rounded-3xl text-center">
+        {/* Subtle Mutually Exclusive Watermark Layer (Fixed in Print -> Repeats Centered on Every Page Behind Content) */}
+        {isRejectedStatus ? (
+          <div className="pdf-watermark-layer absolute inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden select-none">
+            <div className="text-rose-500/10 print:text-rose-600/15 font-black text-[5rem] sm:text-[6rem] md:text-[7.25rem] print:text-[86pt] print:leading-none -rotate-45 tracking-widest uppercase border-4 border-dashed border-rose-500/15 print:border-rose-600/20 px-10 py-8 print:px-12 print:py-9 rounded-3xl text-center">
               REJECTED
-              <div className="text-lg sm:text-xl mt-2 tracking-normal font-bold">
+              <div className="text-xl sm:text-2xl print:text-[18pt] mt-2.5 tracking-normal font-bold">
                 Archival Record • Void
               </div>
             </div>
           </div>
-        )}
-        {isSupersededVersion && (
-          <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center overflow-hidden select-none">
-            <div className="text-slate-500/10 print:text-slate-600/15 font-black text-5xl sm:text-6xl md:text-7xl -rotate-45 tracking-widest uppercase border-4 border-dashed border-slate-500/15 print:border-slate-600/20 p-8 rounded-3xl text-center">
+        ) : isSupersededVersion ? (
+          <div className="pdf-watermark-layer absolute inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden select-none">
+            <div className="text-slate-500/10 print:text-slate-600/15 font-black text-[4.25rem] sm:text-[5.25rem] md:text-[6.25rem] print:text-[76pt] print:leading-none -rotate-45 tracking-widest uppercase border-4 border-dashed border-slate-500/15 print:border-slate-600/20 px-10 py-8 print:px-12 print:py-9 rounded-3xl text-center">
               SUPERSEDED
-              <div className="text-lg sm:text-xl mt-2 tracking-normal font-bold">
+              <div className="text-xl sm:text-2xl print:text-[18pt] mt-2.5 tracking-normal font-bold">
                 Historical Revision ({activeVersion.version_code || `R${activeVersion.version_number - 1}`})
               </div>
             </div>
           </div>
-        )}
+        ) : isDraftStatus ? (
+          <div className="pdf-watermark-layer absolute inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden select-none">
+            <div className="text-amber-500/10 print:text-amber-600/15 font-black text-[5.25rem] sm:text-[6.25rem] md:text-[7.75rem] print:text-[96pt] print:leading-none -rotate-45 tracking-widest uppercase border-4 border-dashed border-amber-500/15 print:border-amber-600/20 px-12 py-10 print:px-14 print:py-10 rounded-3xl text-center">
+              DRAFT
+              <div className="text-xl sm:text-2xl print:text-[19pt] mt-2.5 tracking-normal font-bold">
+                Preliminary Review Only
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Foreground Content Layer (Strictly Above Watermark Layer) */}
+        <div className="pdf-content-layer relative z-10">
 
         {/* Archival Status Notice for Rejected and Superseded Historical Records */}
         {isRejectedStatus && (
@@ -579,11 +611,11 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
                     <td className="py-2 px-1 text-center text-slate-700 uppercase text-[9pt] border-r border-slate-400 print:border-slate-500 align-top">
                       {item.unit}
                     </td>
-                    <td className="py-2 px-1.5 text-right font-mono text-slate-900 border-r border-slate-400 print:border-slate-500 align-top whitespace-nowrap text-[9.5pt]">
+                    <td className="py-2 px-1 text-right font-mono tracking-tight text-slate-900 border-r border-slate-400 print:border-slate-500 align-top whitespace-nowrap text-[9pt]">
                       {formatSmartRupee(item.unit_rate, false)}
                     </td>
                     {quote.is_gst_applicable && (
-                      <td className="py-2 px-1.5 text-right font-mono font-semibold text-slate-900 border-r border-slate-400 print:border-slate-500 align-top whitespace-nowrap text-[9.5pt]">
+                      <td className="py-2 px-1 text-right font-mono tracking-tight font-semibold text-slate-900 border-r border-slate-400 print:border-slate-500 align-top whitespace-nowrap text-[9pt]">
                         <div>{formatSmartRupee(item.taxable_amount, false)}</div>
                         {hasDiscount && (
                           <div className="text-[8.5pt] text-emerald-700 font-sans font-medium leading-none mt-0.5">
@@ -599,7 +631,7 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
                         </td>
                         <td className="py-2 px-1.5 text-right font-mono border-r border-slate-400 print:border-slate-500 align-top whitespace-nowrap text-[9.5pt]">
                           {isTaxDetermined ? (
-                            <span className="text-slate-900">{formatSmartRupee(item.tax_amount, false)}</span>
+                            <span className="text-slate-900">{formatWholeRupee(item.tax_amount, false)}</span>
                           ) : (
                             <span className="text-amber-800 text-[8.5pt] italic font-sans font-medium">Pending</span>
                           )}
@@ -616,12 +648,17 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
               })}
             </tbody>
           </table>
+          {hasFractionalLineTax && (
+            <p className="mt-1 text-[8pt] text-slate-600 italic leading-snug">
+              * Line-item TAX (₹) values are rounded to the nearest whole rupee for display clarity; statutory GST summary totals below reflect exact unrounded calculations.
+            </p>
+          )}
         </div>
 
         {/* Financial Summary, Amount in Words & Bank Details */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 pb-2 border-b border-slate-200 print-avoid-break">
           <div className="flex flex-col justify-between space-y-2">
-            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            <div className="bg-slate-50/80 p-2.5 rounded-lg border border-slate-200">
               <span className="text-[9pt] font-bold text-[#10243B] uppercase tracking-wider block">
                 {isTaxDetermined || !quote.is_gst_applicable
                   ? 'AMOUNT IN WORDS (STATUTORY INR):'
@@ -634,7 +671,7 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
               </p>
             </div>
 
-            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            <div className="bg-slate-50/80 p-2.5 rounded-lg border border-slate-200">
               <span className="text-[9pt] font-bold text-[#10243B] uppercase tracking-wider block">
                 BANK DETAILS
               </span>
@@ -807,7 +844,7 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
 
         {/* Company Authorization Block (Genuine Round Stamp, Clean Geometry — Kept Strictly Together) */}
         <div className="flex justify-end pt-2 text-[9pt] print-avoid-break">
-          <div className="stamp-authorization-box w-full sm:w-80 md:w-80 print:w-80 border border-slate-300 rounded-lg p-2.5 bg-white text-right space-y-1 ml-auto">
+          <div className="stamp-authorization-box w-full sm:w-80 md:w-80 print:w-80 border border-slate-300 rounded-lg p-2.5 bg-white/95 text-right space-y-1 ml-auto">
             <p className="font-bold text-slate-900 uppercase text-[9pt] tracking-wide">
               For Santhaya Associates Pvt. Ltd.
             </p>
@@ -840,22 +877,21 @@ export default async function QuotationPdfPage({ params, searchParams }: PagePro
           </div>
         </div>
 
-        {/* Verified Company Contact Details Footer (High-Contrast NAP, 9pt, Clickable Web Link) */}
+        {/* Verified Company Contact Details Footer (High-Contrast NAP, 9pt, Clickable Web Link — No Duplicate GSTIN) */}
         <div className="mt-3 pt-1.5 border-t-2 border-slate-300 text-center text-[9pt] text-slate-800 leading-snug print-avoid-break">
           <p className="font-semibold text-slate-900">
             Santhaya Associates Pvt. Ltd. <span className="text-slate-400 mx-1.5">•</span> Gopalpur, Motihari, Purbi Champaran, Bihar – 845401, India
           </p>
-          <p className="text-slate-700 mt-1 font-medium text-[8.5pt]">
-            <span><strong>Call:</strong> +91 9430986713</span>
+          <p className="text-slate-700 mt-1 font-medium text-[9pt]">
+            <span className="whitespace-nowrap"><strong>Call:</strong> +91 9430986713</span>
             <span className="text-slate-400 mx-1.5">|</span>
-            <span><strong>WhatsApp:</strong> +91 9608950748</span>
+            <span className="whitespace-nowrap"><strong>WhatsApp:</strong> +91 9608950748</span>
             <span className="text-slate-400 mx-1.5">|</span>
-            <span><strong>Email:</strong> <a href="mailto:santhayapvt.ltd@gmail.com" className="text-slate-800 hover:underline">santhayapvt.ltd@gmail.com</a></span>
+            <span className="whitespace-nowrap"><strong>Email:</strong> <a href="mailto:santhayapvt.ltd@gmail.com" className="text-slate-800 hover:underline">santhayapvt.ltd@gmail.com</a></span>
             <span className="text-slate-400 mx-1.5">|</span>
-            <span><strong>Web:</strong> <a href="https://santhayaassociates.com" target="_blank" rel="noopener noreferrer" className="text-[#10243B] font-semibold underline underline-offset-1">https://santhayaassociates.com</a></span>
-            <span className="text-slate-400 mx-1.5">|</span>
-            <span className="font-mono"><strong>GSTIN:</strong> 10ABVCS4277J1ZU</span>
+            <span className="whitespace-nowrap"><strong>Web:</strong> <a href="https://santhayaassociates.com" target="_blank" rel="noopener noreferrer" className="text-[#10243B] font-semibold underline underline-offset-1">https://santhayaassociates.com</a></span>
           </p>
+        </div>
         </div>
       </div>
     </div>

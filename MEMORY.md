@@ -1,5 +1,5 @@
 # MEMORY.md — Project continuity log
-Updated: 2026-11-17 | Phase: Production Release of Quotation PDF Readability & Pagination Refinement | Implementation status: Successfully Deployed Production Release Commit 16f16c9 to origin/master; Merged Approved Candidate 7c5c769 from fix/quotation-pdf-readability; Hostinger Pipeline Triggered & Verified Live; Public Homepage, Services, Request Quotation, and Staff Login All 200 OK; Quotation PDF Route Verified 307 Protected; Zero Database Mutations; Existing Production Records Untouched; Owner User-Acceptance Verification Ready
+Updated: 2026-11-18 | Phase: Final Quotation PDF & ERP Refinements (fix/quotation-final-pdf-polish) | Implementation status: Completed Final Quotation PDF & ERP Polish on Isolated Branch fix/quotation-final-pdf-polish from Baseline fb86216; Whole-Rupee Line-Item TAX Display (formatWholeRupee, Half-Up) With Exact Statutory GST Preserved & Unambiguous Rounding Footnote; Enlarged ~33% Repeating DRAFT Watermark (Fixed Per Printed Page Behind Content, Mutually Exclusive Archival Guards); Removed Duplicate GSTIN From Footer While Preserving Header GSTIN/PAN & Verified Clickable PDF Website Hyperlink Annotation; Added Validated Print-Layout Estimator & Non-Intrusive Multi-Page 10-Clause Terms Recommendation With Explicit Staff Confirmation; Audited FY Quotation Numbering & Deletion Non-Reuse Integrity; 100% Automated & Visual Chrome A4 PDF Verification Passed (TypeScript, ESLint 0 Warnings, Next.js Build 29/29 Routes, 13/13 Final Polish, 24/24 Stamp, 26/26 Refinements, 47/47 Pagination/Stress, 70/70 Batches 2-5, 6/6 Chrome A4 PDF Exports Visually Inspected); Stopped Pending Separate Production Deployment Approval
 
 ## Confirmed decisions
 - Project: Santhaya Associates corporate website plus staff-only quotation and GST billing system.
@@ -1084,6 +1084,42 @@ Updated: 2026-11-17 | Phase: Production Release of Quotation PDF Readability & P
         * Zero test quotations created in production.
         * Existing production quotation records (including QT-2026-27-008) and historical revisions preserved.
         * Handed over to project owner for manual inspection via the live Staff ERP.
+
+  - 2026-11-18: Final Quotation PDF & ERP Refinements (Branch: fix/quotation-final-pdf-polish, Baseline: fb86216):
+      - Phase 1 — Safe Development:
+        * Fetched origin/master (fb86216) and created isolated feature branch fix/quotation-final-pdf-polish.
+        * Zero database credentials configured or queried; static fixtures and mock PDF datasets used for all verification.
+      - Phase 2 — TAX Column Whole-Rupee Display (`src/lib/utils/currency.ts`, `src/app/staff/quotations/[id]/pdf/page.tsx`):
+        * Added display-only `formatWholeRupee()` using standard half-up rounding to the nearest whole rupee (`37,906.74 -> 37,907`, `40,728.78 -> 40,729`, `10,988.10 -> 10,988`).
+        * Applied ONLY to individual line-item values in the TAX (₹) column; TOTAL (₹) column retains `formatSmartRupee`, and statutory GST summary (CGST, SGST, IGST, Total Tax, Grand Total) retains exact 2-decimal precision (`formatIndianRupee`).
+        * Added unambiguous 1-line footnote beneath the table whenever any line item has fractional paise tax so rounding presentation is transparent without fabricating balancing adjustments.
+        * Refined RATE/TAXABLE horizontal padding and tracking (`px-1 tracking-tight text-[9pt]`) so multi-crore figures with paise (e.g. `1,75,00,901.50`) render with zero clipping.
+      - Phase 3 — Enlarged Repeating DRAFT Watermark (`src/app/staff/quotations/[id]/pdf/page.tsx`):
+        * Enlarged DRAFT watermark by ~33% (`print:text-[96pt]`) while preserving subtle amber color/opacity, dashed border, and `-rotate-45` orientation.
+        * Moved watermark to `.pdf-watermark-layer` (`position: fixed !important; z-index: 0 !important;` in `@media print`) behind foreground `.pdf-content-layer` (`z-index: 10 !important;`) so it repeats centered on EVERY printed A4 page (verified visually on 1-, 2-, 3-, and 4-page Chrome PDF exports).
+        * Made Draft / Rejected / Superseded watermarks strictly mutually exclusive to prevent overlapping watermarks.
+      - Phases 4 & 5 — Footer Cleanup & Clickable PDF Website Hyperlink (`src/app/staff/quotations/[id]/pdf/page.tsx`):
+        * Removed duplicate GSTIN from the document footer while preserving GSTIN and PAN in the company header.
+        * Preserved clean 2-line 9pt footer with verified company NAP, Call, WhatsApp, Email, and real `<a href="https://santhayaassociates.com">` hyperlink (`whitespace-nowrap`).
+        * Verified exported Chrome PDF binaries contain `/Subtype /Link` and `/URI (https://santhayaassociates.com)`.
+      - Phase 6 — Smart Two-Page Terms Recommendation (`src/lib/quotation/layout-estimator.ts`, `QuotationForm.tsx`, `QuotationDetailView.tsx`):
+        * Built validated print-layout estimator `estimateQuotationPageLayout()` calibrated against Chrome A4 rendering (predicts single vs multi-page from content geometry, not a fixed item-count threshold).
+        * Added `classifyQuotationTerms()` to distinguish 6-clause default, 10-clause comprehensive, custom, and empty terms.
+        * Preserved 6-Clause Standard as default for new quotations and 10-Clause Comprehensive as optional preset.
+        * Displayed non-intrusive Staff ERP recommendation for predicted multi-page drafts with explicit inline confirmation dialog (`Confirm & Apply` / `Cancel`) and `Keep Current Terms` option; warns before overwriting customized terms; never shown in exported PDF; never modifies issued or historical revisions.
+      - Phase 7 — Quotation Numbering Audit:
+        * Audited `20261102120000_financial_year_quotation_numbering.sql`, `src/lib/quotation/numbering.ts`, and `src/lib/quotation/actions.ts`.
+        * Confirmed `quotation_fy_sequences.last_seq` is atomic, row-locked, and strictly monotonic (never decremented); fallback scans both `quotations` (including soft-deleted rows) and `audit_logs` (`quotation_deleted`, `quotation_draft_discarded`) so deleted/cancelled numbers are permanently consumed. Zero duplicate-number bugs detected.
+      - Phase 9 — Automated & Visual Testing Results (100% Passing):
+        * TypeScript (`tsc --noEmit`): 0 errors.
+        * ESLint (`next lint`): 0 warnings, 0 errors.
+        * Next.js Production Build (`next build`): 29/29 routes compiled cleanly (First Load JS 87.3 kB).
+        * Final Polish Suite (`scripts/test-quotation-final-polish.mjs`): 13/13 passed.
+        * Chrome A4 PDF Verifier (`scripts/test-pdf-a4-refinement.mjs`): 6/6 scenarios passed (2, 5, 7, 10, 20, 30 items — 0 clipping, verified PDF hyperlink URI, verified whole-rupee TAX, visually inspected 1-, 2-, 3-, and 4-page exported PDFs).
+        * Existing Regression Suites: `test:stamp` (24/24), `test:refinements` (26/26), Phase 7 stress/pagination (47/47), Batches 2–5 (70/70).
+        * Database-dependent integration suites (`test:connection`, `test:phase3*`, `test:phase4*`, `test:db-health`) intentionally skipped per owner directive (no local DB credentials / zero production DB access).
+      - Production Safety Gate:
+        * Stopped after local verification and commit on `fix/quotation-final-pdf-polish`. Not merged to `master`, not pushed to `origin/master`, not deployed to Hostinger. Awaiting explicit owner approval.
 
 ## Agent update discipline
 Record actual code changes and tests promptly. Never change 'not started' to 'completed' until verified. Mark reversed decisions superseded with date; do not erase history.
